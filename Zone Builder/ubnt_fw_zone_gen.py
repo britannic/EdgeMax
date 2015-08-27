@@ -499,7 +499,7 @@ if __name__ == '__main__':
     commands.append("save")
     commands.append("end")
 
-    if user_opts.update_config_boot and yesno(
+    if (user_opts.update_config_boot of user_opts.default_log) and yesno(
             'y', 'OK to update your configuration?'):  # Open a pipe to bash and iterate commands
         vyatta_shell = sp.Popen(
             'bash',
