@@ -206,10 +206,11 @@ rules                                                       = (
     (('int', 'gst', 'dmz', 'local'), 'ext', ('description "Block MDNS & SSDP access to Internet"', 'action drop', 'protocol udp', 'destination port mdns'), [4, 6], 1500),
     # RULES 3000-3100 **************************************************************
     # Drop brute force SSH from Internet
-    ('ext', ('gst', 'int', 'local',), ('description "Drop brute force SSH from Internet"', 'action drop', 'protocol tcp', 'destination port ssh', 'recent count 3', 'recent time 30'), [4, 6], 3000),
+    ('ext', ('gst', 'int', 'local'), ('description "Drop brute force SSH from Internet"', 'action drop', 'protocol tcp', 'destination port ssh', 'recent count 3', 'recent time 30'), [4], 3000),
     # Allow SSH
-    (('dmz', 'gst', 'int', 'local'), ('dmz', 'gst', 'int', 'local'), ('description "Allow SSH"', 'action accept', 'protocol tcp', 'destination port ssh'), [4, 6], 3100),
-    ('ext', 'local', ('description "Allow SSH"', 'action accept', 'protocol tcp', 'destination port ssh'), [4, 6], 3100),
+    (('dmz', 'gst', 'int', 'local'), ('dmz', 'gst', 'int', 'local'), ('description "Allow SSH"', 'action accept', 'protocol tcp', 'destination port ssh'), [4], 3100),
+    ('ext', 'local', ('description "Allow SSH"', 'action accept', 'protocol tcp', 'destination port ssh'), [4], 3100),
+    ('ext', 'dmz', ('description "Allow SSH"', 'action accept', 'protocol tcp', 'destination port 3062'), [4], 3100),
     # RULES 5000-5600 **************************************************************
     # Allow vpn traffic ext/int to local, dmz
     (('ext', 'int'), ('local', 'dmz'), ('description "Allow vpn traffic"', 'action accept', 'protocol udp', 'destination group port-group vpn'), [4], 5000),
@@ -408,7 +409,6 @@ def build_rule(source_zones, dest_zones, params, ipversions = [4, 6], rulenum=No
 if __name__ == '__main__':
     get_args()
 
-    commands.append("begin")
     commands.append("delete firewall group")
     commands.append("delete firewall name")
     commands.append("delete firewall ipv6-name")
@@ -495,12 +495,14 @@ if __name__ == '__main__':
                     "set zone-policy zone %s from %s firewall %sname %s%s-%s" %
                     (zone, srczone, prefix, prefix, srczone, zone))
 
-    commands.append("commit")
-    commands.append("save")
-    commands.append("end")
-
-    if (user_opts.update_config_boot of user_opts.default_log) and yesno(
+    if user_opts.update_config_boot and yesno(
             'y', 'OK to update your configuration?'):  # Open a pipe to bash and iterate commands
+
+        commands[:0]=["begin"]
+        commands.append("commit")
+        commands.append("save")
+        commands.append("end")
+
         vyatta_shell = sp.Popen(
             'bash',
             shell=True,
