@@ -74,7 +74,7 @@ install_adblock_support ()
 
 	if [[ ! -d "${SCRIPTS}" ]]
 	then
-		try install -d -o root -g root -m 0755 "${SCRIPTS}/" || ERROR=1
+		install -d -o root -g root -m 0755 "${SCRIPTS}/" || ERROR=1
 	fi
 
 	echo "Installing ${ADBLOCK} to ${SCRIPTS}/"
