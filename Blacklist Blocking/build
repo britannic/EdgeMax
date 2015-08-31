@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+export COPY_EXTENDED_ATTRIBUTES_DISABLE=true
+export COPYFILE_DISABLE=true
+
+if [ -e "${0##*/}" ]; then
+	BASEDIR=`pwd`
+	rm erSetup.tgz
+	cd payload
+	tar zcf ../payload.tgz --exclude='._*' --exclude='.svn' --exclude='.DS_Store' --exclude='*.bak' --exclude='*~' ./*
+	cd ..
+
+	if [ -e "payload.tgz" ]; then
+		cat decompress payload.tgz > ersetup
+	else
+		echo "payload.tgz does not exist"
+		exit 1
+	fi
+
+	chmod 755 ersetup
+	echo "ersetup created"
+	cd ..
+	tar -zcf erSetup.tgz --exclude='._*' --exclude='.svn' --exclude='.DS_Store' --exclude='*.bak' --exclude='*~' erSetup/*
+	mv erSetup.tgz ${BASEDIR}/
+	cd ${BASEDIR}
+	[ ${1} ] && /usr/bin/scp ${BASEDIR}/ersetup ${1}@scratch:/tmp/ersetup
+else
+	echo "$(basename $0) must be run in the directory where it is located."
+fi
+exit 0

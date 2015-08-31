@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+# Install dnsmasq adserver and blacklist blocking onto an EdgeMax router
+# Use at your own risk
+# @britannic 08.31.2015
+
+VERSION="v1.0"
+
+# Uncomment for debugging or syntax checking
+# set -x
+# Syntax check - uncomment for non execution dry run:
+# set -n
+
+# Make sure script runs as root
+if [[ ${EUID} != 0 ]]
+then
+	echo "This script must be run as root, use: [sudo $(pwd)/ersetup]"
+	exit 1
+fi
+
+# Set up the Vyatta environment
+source /opt/vyatta/etc/functions/script-template
+OPRUN=/opt/vyatta/bin/vyatta-op-cmd-wrapper
+CFGRUN=/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper
+API=/bin/cli-shell-api
+shopt -s expand_aliases
+
+alias begin='${CFGRUN} begin'
+alias commit='${CFGRUN} commit'
+alias copy='${CFGRUN} copy'
+alias delete='${CFGRUN} delete'
+alias discard='${CFGRUN} discard'
+alias end='${CFGRUN} end'
+alias save='${CFGRUN} save'
+alias set='${CFGRUN} set'
+alias version='${OPRUN} show version'
+
+SHOWVER=$(version | sed 's/$/;/g')
+BUILD=$(echo ${SHOWVER} | awk 'BEGIN {RS=";"} /Build ID:/ {print $3}')
+VER=$(echo ${SHOWVER} | awk 'BEGIN {RS=";"} /Version:/ {print $2}')
+ME="${0##*/} ${VERSION}: "
+ERROR=0
+
+
+# Check version and set up environment
+is_version ()
+{
+	# v1.2.0: build 4574253
+	# v1.4.1: build 4648309
+	# v1.5.0: build 4677648
+	# v1.6.0: build 4716006
+	# v1.7.0: build 4783374
+
+	if [[ ${BUILD} > 4716006 ]]   # Script is only support on OS v1.6.0 & above
+	then
+		return 0
+	else
+		return 1
+	fi
+}
+
+
+# Make sure we clean up session on deliberate and accidental exits
+atexit ()
+{
+	end
+}
+
+# Install adblock and bogon support
+install_adblock_support ()
+{
+	SCRIPTS="/config/scripts"
+	ADBLOCK="update-blacklists-dnsmasq.pl"
+	ERROR=0
+
+	if [[ ! -d "${SCRIPTS}" ]]
+	then
+		try install -d -o root -g root -m 0755 "${SCRIPTS}/" || ERROR=1
+	fi
+
+	echo "Installing ${ADBLOCK} to ${SCRIPTS}/"
+	install -o root -g root -m 0755 "${ADBLOCK}" "${SCRIPTS}/${ADBLOCK}" || ERROR=1
+
+	echo "Opening EdgeMax configuration session..."
+	begin || ERROR=1
+
+	echo "Creating task scheduler entry for ${ADBLOCK}..."
+	set system task-scheduler task update_blacklists executable path ${SCRIPTS}/${ADBLOCK} || ERROR=1
+	set system task-scheduler task update_blacklists interval 1d || ERROR=1
+
+	echo "Committing configuration..."
+	commit || ERROR=1
+
+	echo "Saving configuration..."
+	save || ERROR=1
+
+	echo "Ending configuration session..."
+	end || ERROR=1
+
+	return ${ERROR}
+}
+
+# This is where we run the script using the above functions
+trap atexit exit ${?}
+
+if is_version
+	then
+		echo "${ME}Installing Ad Server and Blacklist blocking dnsmasq support..."
+		install_adblock_support || echo "${ME} Blacklist installation failed!"
+	else
+		echo "${ME}Edgemax ${VER} is not supported, upgrade!"
+	fi
