@@ -5,7 +5,7 @@ git@empirecreekcircle.com
 NOTE: THIS IS NOT OFFICIAL UBIQUITI SOFTWARE AND THEREFORE NOT SUPPORTED OR ENDORSED BY Ubiquiti Networks®
 
 ## Overview
-ubnt_fw_zone_gen.py is based on the work of @mrjester (http://community.ubnt.com/t5/user/viewprofilepage/user-id/131140) aka @UBNT-Bane﻿ (http://community.ubnt.com/t5/user/viewprofilepage/user-id/259529). It provides a quick and easy way to generate groups and rulesets for Zone Policy based firewalls used on Vyos (formerly Vyatta) and EdgeOS based routers.
+ubnt_fw_zone_gen.py is based on @jfunk's (https://community.ubnt.com/t5/user/viewprofilepage/user-id/152190) excellent vyatta_firewall_builder.py and the work of @mrjester (http://community.ubnt.com/t5/user/viewprofilepage/user-id/131140) aka @UBNT-Bane﻿ (http://community.ubnt.com/t5/user/viewprofilepage/user-id/259529). It provides a quick and easy way to generate groups and rulesets for Zone Policy based firewalls used on Vyos (formerly Vyatta) and EdgeOS based routers.
 
 ## Licenses
 * GNU General Public License, version 3
