@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
-# This script will write a combined, unique sorted list of adserver and
-# blacklisted fqdns to a file in dnsmasq format
+# This script writes a unique sorted list of adserver and blacklisted fqdns to
+# a file in dnsmasq format
 #
 use warnings;
 use strict;
@@ -9,7 +9,7 @@ use integer;
 my $ad_list_url
                    = "http://pgl.yoyo.org/adservers/serverlist.php?hostformat=dnsmasq&showintro=0&mimetype=plaintext";
 my $blacklist_url  = "http://winhelp2002.mvps.org/hosts.txt";
-my $dnsmasq        = "/etc/init.d/dnsmasq";
+# my $dnsmasq        = "/etc/init.d/dnsmasq";
 
 # The IP address below should point to the IP of your router/pixelserver or to 0.0.0.0
 # 0.0.0.0 is easy and doesn't require much from the router
