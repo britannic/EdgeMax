@@ -4,7 +4,7 @@
 #
 # -*- coding: utf-8 -*-
 
-version = '1.5'
+version                                                     = '1.5'
 
 import argparse
 import itertools
@@ -87,7 +87,7 @@ fw_groups                                                   = {
     },
     'ipv4_group': {
         'ipv4Bogons': {
-            'description': 'ipv4 BOGON Addresses',
+            'description': 'IPv4 BOGON Addresses',
             'addresses': (
                         '10.0.0.0/8',
                         '100.64.0.0/10',
@@ -106,7 +106,7 @@ fw_groups                                                   = {
     },
     'ipv6_group': {
         'ipv6Bogons': {
-            'description': 'ipv6 BOGON Addresses',
+            'description': 'IPv6 BOGON Addresses',
             'addresses': (
                         '::/127',
                         '::ffff:0:0/96',
@@ -151,12 +151,12 @@ fw_groups                                                   = {
 
 # Build list of all zone names, which can be used in rules
 #
-all_zones = zones.keys()
+all_zones                                                   = zones.keys()
 all_zones.append('local')
 
 # Build list of all groups, which can be used in rules
 #
-all_groups = fw_groups.keys()
+all_groups                                                  = fw_groups.keys()
 
 # List of rules to create. Each rule is a list of arguments passed to the
 # build_rule function. Each rule has the following elements:
@@ -175,17 +175,17 @@ all_groups = fw_groups.keys()
 rules                                                       = (
     # RULE 1 ***********************************************************************
     # Allow connections
-    (('ext', 'dmz', 'gst'), ('dmz', 'gst', 'int', 'local'), ('description "Allow established connections"', 'action accept', 'state established enable', 'state related enable'), [4, 6], 1),
-    (('dmz', 'gst'), 'ext', ('description "Allow all connections"', 'action accept', 'state new enable', 'state established enable', 'state related enable'), [4, 6], 1),
-    ('local', all_zones, ('description "Allow all connections"', 'action accept', 'state new enable', 'state established enable', 'state related enable'), [4, 6], 1),
-    ('int', all_zones, ('description "Allow all connections"', 'action accept', 'state new enable', 'state established enable', 'state related enable'), [4, 6], 1),
+    (('ext', 'dmz', 'gst'), ('dmz', 'gst', 'int', 'local'), ('description "Allow established connections"', 'action accept', 'state established enable', 'state related enable'), [4, 6]),
+    (('dmz', 'gst'), 'ext', ('description "Allow all connections"', 'action accept', 'state new enable', 'state established enable', 'state related enable'), [4, 6]),
+    ('local', all_zones, ('description "Allow all connections"', 'action accept', 'state new enable', 'state established enable', 'state related enable'), [4, 6]),
+    ('int', all_zones, ('description "Allow all connections"', 'action accept', 'state new enable', 'state established enable', 'state related enable'), [4, 6]),
     # RULE 2 ***********************************************************************
     # Drop invalid packets
-     (all_zones, all_zones, ('description "Drop invalid packets"', 'action drop', 'state invalid enable'), [4, 6], 2),
+     (all_zones, all_zones, ('description "Drop invalid packets"', 'action drop', 'state invalid enable'), [4, 6]),
     # RULE 3 ***********************************************************************
     # Drop invalid WAN source IPs
-    ('ext', ('dmz', 'gst', 'int', 'local'), ('description "Drop IPv4 bogons"', 'action drop', 'source group network-group ipv4Bogons'), [4], 3),
-    ('ext', ('dmz', 'gst', 'int', 'local'), ('description "Drop IPv6 bogons"', 'action drop', 'source group ipv6-network-group ipv6Bogons'), [6], 3),
+    ('ext', ('dmz', 'gst', 'int', 'local'), ('description "Drop IPv4 bogons"', 'action drop', 'source group network-group ipv4Bogons'), [4]),
+    ('ext', ('dmz', 'gst', 'int', 'local'), ('description "Drop IPv6 bogons"', 'action drop', 'source group ipv6-network-group ipv6Bogons'), [6]),
     # RULE 400 *********************************************************************
     # Allow media address group access from gst
     ('gst', ('int', 'local'), ('description "Allow media address group access from guest vlan"', 'action accept', 'destination group address-group media'), [4], 400),
@@ -193,11 +193,11 @@ rules                                                       = (
     # RULE 500 *********************************************************************
     # Allow ICMP/IPV6-ICMP
     ('ext', 'local', ('description "Block ICMP ping from the Internet"', 'action drop', 'icmp type-name ping', 'protocol icmp'), [4], 500),
-    ('ext', 'local', ('description "Block IPV6-ICMP ping from the Internet"', 'action drop', 'icmpv6 type ping', 'protocol ipv6-icmp'), [6], 500),
+    ('ext', 'local', ('description "Block IPv6-ICMP ping from the Internet"', 'action drop', 'icmpv6 type ping', 'protocol ipv6-icmp'), [6], 500),
     ('ext', 'local', ('description "Allow ICMP"', 'action accept', 'limit burst 1', 'limit rate 50/minute', 'protocol icmp'), [4], 510),
-    ('ext', 'local', ('description "Allow IPV6-ICMP"', 'action accept', 'limit burst 1', 'limit rate 50/minute', 'protocol ipv6-icmp'), [6], 510),
+    ('ext', 'local', ('description "Allow IPv6-ICMP"', 'action accept', 'limit burst 5', 'limit rate 30/minute', 'protocol ipv6-icmp'), [6], 510),
     (('dmz', 'gst', 'int', 'local'), ('dmz', 'ext', 'gst', 'int', 'local'), ('description "Allow ICMP"', 'action accept', 'protocol icmp'), [4], 510),
-    (('dmz', 'gst', 'int', 'local'), ('dmz', 'ext', 'gst', 'int', 'local'), ('description "Allow IPV6-ICMP"', 'action accept', 'protocol ipv6-icmp'), [6], 510),
+    (('dmz', 'gst', 'int', 'local'), ('dmz', 'ext', 'gst', 'int', 'local'), ('description "Allow IPv6-ICMP"', 'action accept', 'protocol ipv6-icmp'), [6], 510),
     # RULE 1000 ********************************************************************
     # Permit access to local DNS
     (('dmz', 'gst'), 'local', ('description "Permit access to local DNS"', 'action accept', 'protocol tcp_udp', 'destination port domain'), [4, 6], 1000),
@@ -222,7 +222,7 @@ rules                                                       = (
     # RULE 7000 ********************************************************************
     # Allow DHCP/DHCPV6 responses from ISP
     ('ext', 'local', ('description "Allow DHCP responses from ISP"', 'action accept', 'protocol udp', 'source port bootps', 'destination port bootpc'), [4], 7000),
-    ('ext', 'local', ('description "Allow DHCPV6 responses from ISP"', 'action accept', 'protocol udp', 'source port dhcpv6-server', 'destination port dhcpv6-client'), [6], 7000),
+    ('ext', 'local', ('description "Allow DHCPV6 responses from ISP"', 'action accept', 'protocol udp', 'source address fe80::/64', 'source port dhcpv6-server', 'destination port dhcpv6-client'), [6], 7000),
     # Allow DHCP/DHCPV6 responses from DMZ and gst to local
     (('dmz', 'gst'), 'local', ('description "Allow DHCP responses from DMZ to Local"', 'action accept', 'protocol udp', 'source port bootpc', 'destination port bootps'), [4], 7000),
     (('dmz', 'gst'), 'local', ('description "Allow DHCPV6 responses from DMZ to Local"', 'action accept', 'protocol udp', 'source port dhcpv6-client', 'destination port dhcpv6-server'), [6], 7000),
@@ -239,8 +239,8 @@ rules                                                       = (
 class switch(object):
 
     def __init__(self, value):
-        self.value = value
-        self.fall = False
+        self.value                                          = value
+        self.fall                                           = False
 
     def __iter__(self):
         #Return the match method once, then stop
@@ -252,19 +252,19 @@ class switch(object):
         if self.fall or not args:
             return True
         elif self.value in args:  # changed for v1.5, see below
-            self.fall = True
+            self.fall                                       = True
             return True
         else:
             return False
 
 # Counters to determine rule numbers for rules without explicit rule numbers
 #
-ruleset_counters = {}
+ruleset_counters                                            = {}
 
 global commands
-commands         = []
+commands                                                    = []
 
-vyatta_cmd       = "/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper"
+vyatta_cmd                                                  = "/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper"
 
 
 # vyatta_cmd                                                = "echo" # Debug
@@ -275,14 +275,14 @@ def get_args():
     # Defaulted to log all non-matching dropped packets
     #
     # global default_log
-    # default_log                                                 = user_opts.default_log
+    # default_log                                           = user_opts.default_log
 
     # Set this to False unless you want to generate and write to your config.boot file
     #
-    # update_config_boot                                          = user_opts.update_config_boot
+    # update_config_boot                                    = user_opts.update_config_boot
 
-    parser = argparse.ArgumentParser(
-        description=
+    parser                                                  = argparse.ArgumentParser(
+        description                                         =
         'Build a zone-based IPv4/IPv6 firewall configuration for Vyatta.',
         epilog=
         'If [-l/-log] isn\'t set, enable-default-log will be disabled for all rulesets. If [-U/-Update] isn\'t set, %(prog)s prints to STDOUT.')
@@ -290,7 +290,7 @@ def get_args():
     parser.add_argument(
         '-U',
         '-Update',
-        action="store_true",
+        action                                              = "store_true",
         default=False,
         dest='update_config_boot',
         help=
@@ -299,7 +299,7 @@ def get_args():
     parser.add_argument(
         '-l',
         '-log',
-        action="store_true",
+        action                                              = "store_true",
         default=False,
         dest='default_log',
         help=
@@ -308,33 +308,33 @@ def get_args():
     parser.add_argument(
         '-v',
         '-version',
-        action='version',
+        action                                              = 'version',
         help='Show %(prog)s version and exit.',
-        version='%(prog)s {}'.format(version))
+        version                                             = '%(prog)s {}'.format(version))
 
     global user_opts
 
-    user_opts = parser.parse_args()
+    user_opts                                               = parser.parse_args()
 
 
 def yesno(*args):
 
     if len(args) > 1:
-        default  = args[0].strip().lower()
-        question = args[1].strip()
+        default                                             = args[0].strip().lower()
+        question                                            = args[1].strip()
     elif len(args) == 1:
-        default  = args[0].strip().lower()
-        question = 'Answer y or n:'
+        default                                             = args[0].strip().lower()
+        question                                            = 'Answer y or n:'
     else:
-        default  = None
-        question = 'Answer y or n:'
+        default                                             = None
+        question                                            = 'Answer y or n:'
 
     if default == None:
-        prompt   = " [y/n] "
+        prompt                                              = " [y/n] "
     elif default == "y":
-        prompt   = " [Y/n] "
+        prompt                                              = " [Y/n] "
     elif default == "n":
-        prompt   = " [y/N] "
+        prompt                                              = " [y/N] "
     else:
         raise ValueError(
             "{} invalid default parameter: \'{}\' - only [y, n] permitted".format(
@@ -342,7 +342,7 @@ def yesno(*args):
 
     while 1:
         sys.stdout.write(question + prompt)
-        choice   = (raw_input().lower().strip() or '')
+        choice                                              = (raw_input().lower().strip() or '')
         if default is not None and choice == '':
             if default == 'y':
                 return True
@@ -370,10 +370,10 @@ def build_rule(source_zones, dest_zones, params, ipversions = [4, 6], rulenum=No
     '''
     # If zones are passed as simple strings, convert to tuples
     if isinstance(source_zones, str):
-        source_zones = (source_zones,)
+        source_zones                                        = (source_zones,)
 
     if isinstance(dest_zones, str):
-        dest_zones = (dest_zones,)
+        dest_zones                                          = (dest_zones,)
 
     if isinstance(params, str):
         raise TypeError("params must be a list or tuple")
@@ -382,24 +382,24 @@ def build_rule(source_zones, dest_zones, params, ipversions = [4, 6], rulenum=No
     for source, dest in itertools.product(source_zones, dest_zones):
         if source == dest:
             continue
-        ruleset = '%s-%s' % (source, dest)
+        ruleset                                             = '%s-%s' % (source, dest)
 
         # Check/update counter for ruleset if rulenum is omitted
         if rulenum:
-            ruleid = rulenum
+            ruleid                                          = rulenum
         else:
             if not ruleset in ruleset_counters:
-                ruleset_counters[ruleset] = 0
+                ruleset_counters[ruleset]                   = 0
             ruleset_counters[ruleset] += 1
-            ruleid = ruleset_counters[ruleset]
+            ruleid                                          = ruleset_counters[ruleset]
         for ipversion in ipversions:
             if ipversion == 4:
-                name_param = 'name'
-                set_name = ruleset
+                name_param                                  = 'name'
+                set_name                                    = ruleset
             else:
-                name_param = 'ipv6-name'
-                set_name = 'ipv6-' + ruleset
-            base_cmd = "set firewall %s %s rule %s" % (name_param, set_name,
+                name_param                                  = 'ipv6-name'
+                set_name                                    = 'ipv6-' + ruleset
+            base_cmd                                        = "set firewall %s %s rule %s" % (name_param, set_name,
                                                        ruleid)
             commands.append(base_cmd)
             for param in params:
@@ -417,27 +417,27 @@ if __name__ == '__main__':
     for a in all_groups:
         for case in switch(a):
             if case('port_group'):
-                dkey = 'ports'
-                gtype = 'port-group'
-                gtarget = 'port'
+                dkey                                        = 'ports'
+                gtype                                       = 'port-group'
+                gtarget                                     = 'port'
                 break
 
             if case('address_group'):
-                dkey = 'addresses'
-                gtype = 'address-group'
-                gtarget = 'address'
+                dkey                                        = 'addresses'
+                gtype                                       = 'address-group'
+                gtarget                                     = 'address'
                 break
 
             if case('ipv4_group'):
-                dkey = 'addresses'
-                gtype = 'network-group'
-                gtarget = 'network'
+                dkey                                        = 'addresses'
+                gtype                                       = 'network-group'
+                gtarget                                     = 'network'
                 break
 
             if case('ipv6_group'):
-                dkey = 'addresses'
-                gtype = 'ipv6-network-group'
-                gtarget = 'ipv6-network'
+                dkey                                        = 'addresses'
+                gtype                                       = 'ipv6-network-group'
+                gtarget                                     = 'ipv6-network'
                 break
 
         for b in fw_groups[a].keys():
@@ -449,7 +449,7 @@ if __name__ == '__main__':
                     "set firewall group %s %s %s %s" % (gtype, b, gtarget, c))
 
     # Build a ruleset for every direction (eg: 'int-ext', 'ext-dmz', 'ext-local', etc.)
-    rulesets = list(itertools.permutations(all_zones, 2))
+    rulesets                                                = list(itertools.permutations(all_zones, 2))
 
     # Create rulesets for all directions
     for src, dest in rulesets:
@@ -498,31 +498,31 @@ if __name__ == '__main__':
     if user_opts.update_config_boot and yesno(
             'y', 'OK to update your configuration?'):  # Open a pipe to bash and iterate commands
 
-        commands[:0]=["begin"]
+        commands[:0]                                        = ["begin"]
         commands.append("commit")
         commands.append("save")
         commands.append("end")
 
-        vyatta_shell = sp.Popen(
+        vyatta_shell                                        = sp.Popen(
             'bash',
             shell=True,
-            stdin=sp.PIPE,
+            stdin                                           = sp.PIPE,
             stdout=sp.PIPE,
-            stderr=sp.PIPE)
+            stderr                                          = sp.PIPE)
         for cmd in commands:  # print to stdout
             print cmd
             vyatta_shell.stdin.write('{} {};\n'.format(vyatta_cmd, cmd))
 
-        out, err = vyatta_shell.communicate()
+        out, err                                            = vyatta_shell.communicate()
 
-        cfg_error = False
+        cfg_error                                           = False
         if out:
             if re.search(r'^Error:.?', out):
-                cfg_error = True
+                cfg_error                                   = True
             print "configure message:"
             print out
         if err:
-            cfg_error = True
+            cfg_error                                       = True
             print "Error reported by configure:"
             print err
         if (vyatta_shell.returncode == 0) and not cfg_error:
