@@ -54,7 +54,6 @@ sub update_blacklist {
     my $addr = qr|^address=/\b([-a-z0-9_\.]+)\b/127\.0\.0\.1|;
     my $zero = qr|^0\.0\.0\.0\s\b([-a-z0-9_\.]*\b).*|;
     my $lhst = qr|^127\.0\.0\.1\s\s\b([-a-z0-9_\.]*)\b[\s]{0,1}|;
-    my $exclusions;
 
     foreach (@exclusions) {
         $_ = ".*" . $_ . ".*";
