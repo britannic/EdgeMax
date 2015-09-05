@@ -91,7 +91,7 @@ sub get_blacklist {
 }
 
 # debug - uncomment print and comment write_list && ...
-print get_blacklist;
+# print get_blacklist;
 
-# write_list( $blacklist_file, get_blacklist() )
-#     && system("$dnsmasq force-reload");
+write_list( $blacklist_file, get_blacklist() )
+    && system("$dnsmasq force-reload");
