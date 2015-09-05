@@ -1,11 +1,39 @@
 #!/usr/bin/env perl
-# This script writes a unique sorted list of adserver and blacklisted fqdns to
+#
+# **** License ****
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# A copy of the GNU General Public License is available as
+# `/usr/share/common-licenses/GPL' in the Debian GNU/Linux distribution
+# or on the World Wide Web at `http://www.gnu.org/copyleft/gpl.html'.
+# You can also obtain it by writing to the Free Software Foundation,
+# Free Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+# MA 02110-1301, USA.
+#
+# Author: Neil Beadle
+# Date: September 2015
+# Description: Script for writing a unique sorted list of adserver and blacklisted fqdns to
 # a file in dnsmasq format
 #
+# **** End License ****
 
 use integer;
 use strict;
 use warnings;
+use feature qw(say);
+use lib '/opt/vyatta/share/perl5/';
+
+use Vyatta::Config;
+use Vyatta::ConfigMgmt;
+
+my $config = new Vyatta::Config;
 
 my @blacklist_urls = (
      qw|"http://winhelp2002.mvps.org/hosts.txt"
@@ -27,6 +55,24 @@ my @exclusions
     = (
     qw/appleglobal.112.2o7.net cdn.visiblemeasures.com hb.disney.go.com googleadservices.com hulu.com localhost static.chartbeat.com survey.112.2o7.net/
     );
+
+sub get_exclusions{
+
+    $config->setLevel('service dns forwarding blacklist');
+    @exclusions = $config->returnValues('exclude');
+
+    # Make sure localhost is in the whitelist of exclusions
+    push @exclusions, qw/localhost/;
+
+#     say "@exclusions";
+}
+
+sub get_blklist_uris {
+
+    $config->setLevel('service dns forwarding blacklist');
+    @exclusions = $config->returnValues('sources');
+
+}
 
 sub gnash {
     my $line = shift;
@@ -55,10 +101,13 @@ sub update_blacklist {
     my $zero = qr|^0\.0\.0\.0\s\b([-a-z0-9_\.]*\b).*|;
     my $lhst = qr|^127\.0\.0\.1\s\s\b([-a-z0-9_\.]*)\b[\s]{0,1}|;
 
-    foreach (@exclusions) {
-        $_ = ".*" . $_ . ".*";
-    }
+#     foreach (@exclusions) {
+#         $_ = ".*" . $_ . ".*";
+#     }
     my $exclude = join( "|", @exclusions );
+    $exclude = qr/$exclude/;
+#     say $exclude;
+#     return;
 
     # Get blacklist and convert the hosts file into a dnsmasq.conf format
     # file. Be paranoid and replace every IP address with $black_hole_ip.
@@ -91,7 +140,11 @@ sub get_blacklist {
 }
 
 # debug - uncomment print and comment write_list && ...
-# print get_blacklist;
+print get_blacklist;
 
-write_list( $blacklist_file, get_blacklist() )
-    && system("$dnsmasq force-reload");
+# write_list( $blacklist_file, get_blacklist() )
+#     && system("$dnsmasq force-reload");
+
+# get_exclusions;
+
+# get_blacklist;
