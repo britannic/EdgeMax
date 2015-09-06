@@ -1,1 +1,4 @@
+tag:
+priority: 919
+type: txt
 help: Blacklist source and regex pairs

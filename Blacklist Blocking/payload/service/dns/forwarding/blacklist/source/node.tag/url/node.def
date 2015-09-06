@@ -1,5 +1,4 @@
 tag:
 type: txt
 help: Add blacklist source url here e.g. http://someonewhocares.org/hosts/zero/
-comp_help: Make sure the matching regex search correctly returns the FQDN or
-           domain name.
+comp_help: Make sure the matching regex search correctly returns the FQDN or domain name.
