@@ -1,9 +1,0 @@
-tag:
-priority: 918
-type: txt
-
-help: A blacklist source URL and regex pair is required for dns blacklisting
-
-comp_help: Make sure the source URL provides a text output and the regex returns
-           only the domain or fully qualified domanin name.
-
