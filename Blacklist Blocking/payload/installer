@@ -70,6 +70,7 @@ install_adblock_support ()
 {
 	SCRIPTS="/config/scripts"
 	ADBLOCK="update-blacklists-dnsmasq.pl"
+	CFGDIR="/opt/vyatta/share/vyatta-cfg/templates"
 	ERROR=0
 
 	if [[ ! -d "${SCRIPTS}" ]]
@@ -80,10 +81,34 @@ install_adblock_support ()
 	echo "Installing ${ADBLOCK} to ${SCRIPTS}/"
 	install -o root -g root -m 0755 "${ADBLOCK}" "${SCRIPTS}/${ADBLOCK}" || ERROR=1
 
+	echo "Installing blacklist configuration templates for ${ADBLOCK}..."
+	cp -rf service/ "${CFGDIR}/"
+
 	echo "Opening EdgeMax configuration session..."
 	begin || ERROR=1
 
-	echo "Creating task scheduler entry for ${ADBLOCK}..."
+	echo "Creating starter blacklists and task scheduler entry for ${ADBLOCK}..."
+	set service dns forwarding blacklist exclude msdn.com || ERROR=1
+	set service dns forwarding blacklist exclude appleglobal.112.2o7.net || ERROR=1
+	set service dns forwarding blacklist exclude cdn.visiblemeasures.com || ERROR=1
+	set service dns forwarding blacklist exclude hb.disney.go.com || ERROR=1
+	set service dns forwarding blacklist exclude googleadservices.com || ERROR=1
+	set service dns forwarding blacklist exclude hulu.com || ERROR=1
+	set service dns forwarding blacklist exclude static.chartbeat.com || ERROR=1
+	set service dns forwarding blacklist exclude survey.112.2o7.net || ERROR=1
+	set service dns forwarding blacklist set blackhole 0.0.0.0 || ERROR=1
+	set service dns forwarding blacklist source someonewhocares.org description 'Zero based host and domain list' || ERROR=1
+	set service dns forwarding blacklist source someonewhocares.org regex '^0.0.0.0\s([-a-z0-9_.]+).*' || ERROR=1
+	set service dns forwarding blacklist source someonewhocares.org url 'http://someonewhocares.org/hosts/zero/' || ERROR=1
+	set service dns forwarding blacklist source winhelp2002.mvps.org description 'Zero based host and domain list' || ERROR=1
+	set service dns forwarding blacklist source winhelp2002.mvps.org regex '^0.0.0.0\s([-a-z0-9_.]+).*' || ERROR=1
+	set service dns forwarding blacklist source winhelp2002.mvps.org url 'http://winhelp2002.mvps.org/hosts.txt' || ERROR=1
+	set service dns forwarding blacklist source www.malwaredomainlist.com description '127.0.0.1 based host and domain list' || ERROR=1
+	set service dns forwarding blacklist source www.malwaredomainlist.com regex '^127\.0\.0\.1\s\s\b([-a-z0-9_\.]*)\b[\s]{0,1}' || ERROR=1
+	set service dns forwarding blacklist source www.malwaredomainlist.com url 'http://www.malwaredomainlist.com/hostslist/hosts.txt' || ERROR=1
+	set service dns forwarding blacklist source yoyo.org description 'DNSmasq formatted, but with 127.0.0.1 black hole IP' || ERROR=1
+	set service dns forwarding blacklist source yoyo.org regex '^address=/\b([-a-z0-9_\.]+)\b/127\.0\.0\.1' || ERROR=1
+	set service dns forwarding blacklist source yoyo.org url 'http://pgl.yoyo.org/adservers/serverlist.php?hostformat=dnsmasq&showintro=0&mimetype=plaintext' || ERROR=1
 	set system task-scheduler task update_blacklists executable path ${SCRIPTS}/${ADBLOCK} || ERROR=1
 	set system task-scheduler task update_blacklists interval 1d || ERROR=1
 
@@ -106,7 +131,6 @@ if is_version
 	then
 		echo "${ME}Installing Ad Server and Blacklist blocking dnsmasq support..."
 		install_adblock_support || echo "${ME} Blacklist installation failed!"
-		"${SCRIPTS}/${ADBLOCK}"		
 	else
 		echo "${ME}Edgemax ${VER} is not supported, upgrade!"
 	fi

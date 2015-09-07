@@ -4,5 +4,10 @@ Blacklist Blocking/payload/hosts.txt
 Blacklist Blocking/payload/nytprof.out
 
 Blacklist Blocking/payload/update-blacklists-dnsmasq.ptkdb
+<<<<<<< HEAD
+
+*.tgz
+=======
+>>>>>>> master
 
 *.tgz
