@@ -117,7 +117,7 @@ install_adblock_support ()
 	set service dns forwarding blacklist exclude hulu.com || ERROR=1
 	set service dns forwarding blacklist exclude static.chartbeat.com || ERROR=1
 	set service dns forwarding blacklist exclude survey.112.2o7.net || ERROR=1
-	set service dns forwarding blacklist set blackhole 0.0.0.0 || ERROR=1
+	set service dns forwarding blacklist blackhole 0.0.0.0 || ERROR=1
 	set service dns forwarding blacklist source someonewhocares.org description 'Zero based host and domain list' || ERROR=1
 	set service dns forwarding blacklist source someonewhocares.org regex '^0.0.0.0\s([-a-z0-9_.]+).*' || ERROR=1
 	set service dns forwarding blacklist source someonewhocares.org url 'http://someonewhocares.org/hosts/zero/' || ERROR=1

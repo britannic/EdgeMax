@@ -1,8 +1,33 @@
 #!/bin/bash
-#echo ""
-#echo "Self Extracting Installer"
-#echo ""
-CDIR=$(pwd)
+echo
+echo "Self Extracting Installer"
+echo
+
+install_menu () {
+	local IFS=' '
+	local PS3="Enter option number and hit return => "
+	local OPTIONS="INSTALL REMOVE QUIT"
+
+	echo "Would you like to install or remove ADBLOCK (if previously installed)?"
+
+	while true; do
+		select CHOICE in ${OPTIONS}; do
+			case ${REPLY} in
+				1)		./installer
+						return 0
+						;;
+				2)		./remove_adblock
+						return 0
+						;;
+				3|*)	return 0
+				;;
+			esac
+		done
+	done
+}
+
+CDIR="$(pwd)"
+
 # Make sure script runs as root
 if [[ ${EUID} -ne 0 ]]; then
 	echo "This script must be run as root, use: sudo ${CDIR}/ersetup" #1>&2
@@ -13,14 +38,14 @@ export TMPDIR=`mktemp -d /tmp/selfextract.XXXXXX`
 
 ARCHIVE=`awk '/^__ARCHIVE_BELOW__/ {print NR + 1; exit 0; }' $0`
 
-tail -n+${ARCHIVE} $0 | tar xz -C ${TMPDIR}
+tail -n+${ARCHIVE} $0 | tar xz -C "${TMPDIR}"
 
-cd ${TMPDIR}
+cd "${TMPDIR}"
 
-./installer ${CDIR}
+install_menu
 
-cd ${CDIR}
-rm -rf ${TMPDIR}
+cd "${CDIR}"
+rm -rf "${TMPDIR}"
 
 exit 0
 

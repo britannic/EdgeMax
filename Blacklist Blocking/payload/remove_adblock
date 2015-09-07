@@ -73,19 +73,19 @@ delete_adblock_support ()
 	SCRIPTS="/config/scripts"
 	ADBLOCK="update-blacklists-dnsmasq.pl"
 	CFGDIR="/opt/vyatta/share/vyatta-cfg/templates/service/dns/forwarding/blacklist/"
+	NODEDEF="node.def"
 	ERROR=0
 
 	echo "Removing ${ADBLOCK} from ${SCRIPTS}/"
 	rm -f "${SCRIPTS}/${ADBLOCK}" || ERROR=1
 
-	echo "Removing blacklist configuration templates for ${ADBLOCK}..."
-	rm -rf "${CFGDIR}/"
+	echo "help: Add and delete blacklist blackhole IP, exclusions and URL sources" > "${CFGDIR}/${NODEDEF}"
 
 	echo "Opening EdgeMax configuration session..."
 	begin || ERROR=1
 
 	echo "Removing ADBLOCK blacklist and task scheduler entry for ${ADBLOCK}..."
-	delete service dns forwarding blacklist exclude msdn.com || ERROR=1
+	delete service dns forwarding blacklist || ERROR=1
 	delete system task-scheduler task update_blacklists  || ERROR=1
 
 	echo "Committing configuration..."
@@ -97,6 +97,9 @@ delete_adblock_support ()
 	echo "Ending configuration session..."
 	end || ERROR=1
 
+	echo "Removing blacklist configuration templates for ${ADBLOCK}..."
+
+	rm -rf "${CFGDIR}/"
 	return ${ERROR}
 }
 
@@ -105,5 +108,12 @@ trap atexit exit ${?}
 
 if /opt/vyatta/bin/yesno -y 'Do you want to completely remove ADBLOCK? '
 then
-	delete_adblock_support
+	if delete_adblock_support
+	then
+		echo 'ADBLOCK has been completely removed.'
+		exit 0
+	else
+		echo 'There were problems removing ADBLOCK'
+		exit 1
+	fi
 fi
