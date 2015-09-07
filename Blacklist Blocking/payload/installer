@@ -20,7 +20,7 @@
 # Date: September 2015
 #
 # **** End License ****
-# Install dnsmasq adserver and blacklist blocking onto an EdgeMax router
+# Install dnsmasq ADBLOCK and blacklist blocking onto an EdgeMax router
 # Use at your own risk
 #
 
@@ -71,7 +71,7 @@ is_version ()
 	# v1.6.0: build 4716006
 	# v1.7.0: build 4783374
 
-	if [[ ${BUILD} > 4716006 ]]   # Script is only support on OS v1.6.0 & above
+	if [[ ${BUILD} > 4716006 ]]   # Script is only supported on OS v1.6.0 & above
 	then
 		return 0
 	else
@@ -150,8 +150,8 @@ trap atexit exit ${?}
 
 if is_version
 	then
-		echo "${ME}Installing Ad Server and Blacklist blocking dnsmasq support..."
+		echo "${ME}Installing ADBLOCK and Blacklist blocking dnsmasq support..."
 		install_adblock_support || echo "${ME} Blacklist installation failed!"
 	else
 		echo "${ME}Edgemax ${VER} is not supported, upgrade!"
-	fi
+fi
