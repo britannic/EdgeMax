@@ -11,7 +11,7 @@
 # General Public License for more details.
 #
 # A copy of the GNU General Public License is available as
-# `/usr/share/common-licenses/GPL' in the Debian GNU/Linux distribution
+# '/usr/share/common-licenses/GPL' in the Debian GNU/Linux distribution
 # or on the World Wide Web at `http://www.gnu.org/copyleft/gpl.html'.
 # You can also obtain it by writing to the Free Software Foundation,
 # Free Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
