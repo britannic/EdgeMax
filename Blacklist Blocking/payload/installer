@@ -106,6 +106,7 @@ if is_version
 	then
 		echo "${ME}Installing Ad Server and Blacklist blocking dnsmasq support..."
 		install_adblock_support || echo "${ME} Blacklist installation failed!"
+		"${SCRIPTS}/${ADBLOCK}"		
 	else
 		echo "${ME}Edgemax ${VER} is not supported, upgrade!"
 	fi
