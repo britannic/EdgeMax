@@ -36,37 +36,37 @@ use Vyatta::Config;
 use Vyatta::ConfigMgmt;
 use XorpConfigParser;
 
-my $config                                 = new Vyatta::Config;
+my $config = new Vyatta::Config;
 
-my @exclusions                             = ();
-my @blacklist_urls                         = ();
-my @blacklist_rgxs                         = ();
+my @exclusions     = ();
+my @blacklist_urls = ();
+my @blacklist_rgxs = ();
 
-my $dnsmasq                                = "/etc/init.d/dnsmasq";
+my $dnsmasq = "/etc/init.d/dnsmasq";
 
 # The IP address below should point to the IP of your router/pixelserver or to 0.0.0.0
 # 0.0.0.0 is easy and doesn't require much from the router
-my $black_hole_ip                          = "0.0.0.0";
-my $blacklist_file                         = "/etc/dnsmasq.d/dnsmasq.blacklist.conf";
+my $black_hole_ip  = "0.0.0.0";
+my $blacklist_file = "/etc/dnsmasq.d/dnsmasq.blacklist.conf";
 my @blacklist;
 
 sub gnash {
-    my $line                               = shift;
+    my $line = shift;
 
     if ( defined($line) ) {
-        push @blacklist,  sprintf( "address=/%s/%s\n", $line, $black_hole_ip );
+        push @blacklist, sprintf( "address=/%s/%s\n", $line, $black_hole_ip );
     }
 }
 
 sub uniq {
-    my %hash                               = map { $_ => 1 } @_;
+    my %hash = map { $_ => 1 } @_;
     return keys %hash;
 }
 
 sub write_list {
     my $fh;
-    my $file                               = shift;
-    my @list                               = @_;
+    my $file = shift;
+    my @list = @_;
     open( $fh, '>', $file ) || die "Could not open file: '$file' $!";
     print $fh (@list);
     close($fh);
@@ -77,28 +77,33 @@ sub get_blklist_cfg {
     # Make sure localhost is in the whitelist of exclusions
     push @exclusions, qw/localhost/;
 
-    my $xcp                                = new XorpConfigParser();
+    my $xcp = new XorpConfigParser();
     $xcp->parse('/config/config.boot');
 
     my $hashBlacklist
-                                           = $xcp->get_node( [ 'service', 'dns', 'forwarding', 'blacklist' ] );
+        = $xcp->get_node( [ 'service', 'dns', 'forwarding', 'blacklist' ] );
 
     if ( defined($hashBlacklist) ) {
-        my $hashBlacklistChildren          = $hashBlacklist->{'children'};
-        my @excludes                       = $xcp->copy_multis( $hashBlacklistChildren, 'exclude' );
-        my @sources                        = $xcp->copy_multis( $hashBlacklistChildren, 'source' );
+        my $hashBlacklistChildren = $hashBlacklist->{'children'};
+        my @excludes = $xcp->copy_multis( $hashBlacklistChildren, 'exclude' );
+        my @sources = $xcp->copy_multis( $hashBlacklistChildren, 'source' );
+
+        for ( $hashBlacklist->{'name'} ) {
+            $_ =~ /^blackhole\s(.*)$/
+                and $black_hole_ip = $_ // $black_hole_ip;
+        }
 
         foreach my $multiBlacklistExclude (@excludes) {
             push( @exclusions, $multiBlacklistExclude->{'name'} );
         }
 
         foreach my $multiBlacklistSource (@sources) {
-            my $hashSource                 = $xcp->get_node(
+            my $hashSource = $xcp->get_node(
                 [   'service', 'dns', 'forwarding', 'blacklist',
                     "source $multiBlacklistSource->{'name'}"
                 ]
             );
-            my $hashSourceChildren         = $hashSource->{'children'};
+            my $hashSourceChildren = $hashSource->{'children'};
 
             foreach my $node (@$hashSourceChildren) {
                 for ( $node->{'name'} ) {
@@ -110,32 +115,59 @@ sub get_blklist_cfg {
             }
         }
     }
+    else {
+        @blacklist_urls
+            = (
+                qw|"http://winhelp2002.mvps.org/hosts.txt"
+                   "http://someonewhocares.org/hosts/zero/"
+                   "http://pgl.yoyo.org/adservers/serverlist.php?hostformat=dnsmasq&showintro=0&mimetype=plaintext"
+                   "http://www.malwaredomainlist.com/hostslist/hosts.txt"|
+            );
+        @blacklist_rgxs
+            = (
+                   '^0.0.0.0\s([-a-z0-9_.]+).*',
+                   '^127\.0\.0\.1\s\s\b([-a-z0-9_\.]*)\b[\s]{0,1}',
+                   '^address=/\b([-a-z0-9_\.]+)\b/127\.0\.0\.1'
+            );
+        @exclusions
+            = (
+                qw|localhost msdn.com
+                   appleglobal.112.2o7.net
+                   cdn.visiblemeasures.com
+                   hb.disney.go.com
+                   googleadservices.com
+                   hulu.com
+                   static.chartbeat.com
+                   survey.112.2o7.net|
+            );
+    }
 }
 
 sub update_blacklist {
     get_blklist_cfg;
-    my $exclude                            = join( "|", @exclusions );
-    $exclude                               = qr/$exclude/;
-    my $regex                              = join( "|", @blacklist_rgxs);
-    $regex                                 = qr/$regex/;
+    my $exclude = join( "|", @exclusions );
+    my $regex   = join( "|", @blacklist_rgxs );
+
+    $exclude = qr/$exclude/;
+    $regex   = qr/$regex/;
 
     # Get blacklist and convert the hosts file into a dnsmasq.conf format
     # file. Be paranoid and replace every IP address with $black_hole_ip.
     # We only want the actual blacklist, so we can prepend our own hosts.
     # $black_hole_ip="0.0.0.0" saves router CPU cycles and is more efficient
     foreach my $url (@blacklist_urls) {
-        my @content                        = qx(curl -s $url) or next;
+        my @content = qx(curl -s $url) or next;
         chomp @content;
 
         for my $line (@content) {
-            $line                          = lc $line;
+            $line = lc $line;
             $line =~ s/\s+$//;
 
             for ($line) {
                 length($_) < 1   and last;
                 !defined         and last;
                 $_ =~ /$exclude/ and last;
-                $_ =~ /$regex/   and gnash($1), last;
+                $_ =~ /$regex/ and gnash($1), last;
             }
         }
     }
