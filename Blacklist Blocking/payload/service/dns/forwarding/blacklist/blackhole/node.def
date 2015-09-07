@@ -3,3 +3,9 @@ help: Black hole IP for dropping blacklisted hosts
 
 val_help: ipv4net; IP address
 val_help: ipv6net; IPv6 address
+
+default: 0.0.0.0
+
+create: sudo /config/scripts/update-blacklists-dnsmasq.pl
+delete: sudo /config/scripts/update-blacklists-dnsmasq.pl
+update: sudo /config/scripts/update-blacklists-dnsmasq.pl

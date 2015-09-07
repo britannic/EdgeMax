@@ -48,40 +48,6 @@ my $black_hole_ip  = "0.0.0.0";
 my $blacklist_file = "/etc/dnsmasq.d/dnsmasq.blacklist.conf";
 my @blacklist;
 
-sub gnash {
-    my $line = shift;
-
-    if ( defined($line) ) {
-        push @blacklist, sprintf( "address=/%s/%s\n", $line, $black_hole_ip );
-    }
-}
-
-sub get_exclusions{
-
-    $config->setLevel('service dns forwarding blacklist');
-    @exclusions = $config->returnValues('exclude');
-
-    # Make sure localhost is in the whitelist of exclusions
-    push @exclusions, qw/localhost/;
-
-#     say "@exclusions";
-}
-
-sub get_blklist_uris {
-
-    $config->setLevel('service dns forwarding blacklist');
-    @exclusions = $config->returnValues('sources');
-
-}
-
-sub gnash {
-    my $line = shift;
-
-    if ( defined($line) ) {
-        push @blacklist, sprintf( "address=/%s/%s\n", $line, $black_hole_ip );
-    }
-}
-
 sub uniq {
     my %hash = map { $_ => 1 } @_;
     return keys %hash;
@@ -95,14 +61,6 @@ sub write_list {
     print $fh (@list);
     close($fh);
 }
-
-sub update_blacklist {
-    my $addr = qr|^address=/\b([-a-z0-9_\.]+)\b/127\.0\.0\.1|;
-    my $zero = qr|^0\.0\.0\.0\s\b([-a-z0-9_\.]*\b).*|;
-    my $lhst = qr|^127\.0\.0\.1\s\s\b([-a-z0-9_\.]*)\b[\s]{0,1}|;
-
-    my $exclude = join( "|", @exclusions );
-    $exclude = qr/$exclude/;
 
 sub get_blklist_cfg {
 
@@ -148,30 +106,35 @@ sub get_blklist_cfg {
         }
     }
     else {
-        @blacklist_urls
-            = (
-                qw|"http://winhelp2002.mvps.org/hosts.txt"
-                   "http://someonewhocares.org/hosts/zero/"
-                   "http://pgl.yoyo.org/adservers/serverlist.php?hostformat=dnsmasq&showintro=0&mimetype=plaintext"
-                   "http://www.malwaredomainlist.com/hostslist/hosts.txt"|
-            );
-        @blacklist_rgxs
-            = (
-                   '^0.0.0.0\s([-a-z0-9_.]+).*',
-                   '^127\.0\.0\.1\s\s\b([-a-z0-9_\.]*)\b[\s]{0,1}',
-                   '^address=/\b([-a-z0-9_\.]+)\b/127\.0\.0\.1'
-            );
-        @exclusions
-            = (
-                qw|localhost msdn.com
-                   appleglobal.112.2o7.net
-                   cdn.visiblemeasures.com
-                   hb.disney.go.com
-                   googleadservices.com
-                   hulu.com
-                   static.chartbeat.com
-                   survey.112.2o7.net|
-            );
+        @blacklist_urls = (
+            qw|"http://winhelp2002.mvps.org/hosts.txt"
+                "http://someonewhocares.org/hosts/zero/"
+                "http://pgl.yoyo.org/adservers/serverlist.php?hostformat=dnsmasq&showintro=0&mimetype=plaintext"
+                "http://www.malwaredomainlist.com/hostslist/hosts.txt"|
+        );
+        @blacklist_rgxs = (
+            '^0.0.0.0\s([-a-z0-9_.]+).*',
+            '^127\.0\.0\.1\s\s\b([-a-z0-9_\.]*)\b[\s]{0,1}',
+            '^address=/\b([-a-z0-9_\.]+)\b/127\.0\.0\.1'
+        );
+        @exclusions = (
+            qw|localhost msdn.com
+                appleglobal.112.2o7.net
+                cdn.visiblemeasures.com
+                hb.disney.go.com
+                googleadservices.com
+                hulu.com
+                static.chartbeat.com
+                survey.112.2o7.net|
+        );
+    }
+}
+
+sub gnash {
+    my $line = shift;
+
+    if ( defined($line) ) {
+        push @blacklist, sprintf( "address=/%s/%s\n", $line, $black_hole_ip );
     }
 }
 
@@ -199,7 +162,7 @@ sub update_blacklist {
                 length($_) < 1   and last;
                 !defined         and last;
                 $_ =~ /$exclude/ and last;
-                $_ =~ /$regex/ and gnash($1), last;
+                $_ =~ /$regex/   and gnash($1), last;
             }
         }
     }
@@ -215,5 +178,5 @@ sub get_blacklist {
 # print get_blacklist;
 
 write_list( $blacklist_file, get_blacklist() )
-     && system("$dnsmasq force-reload");
+    && system("$dnsmasq force-reload");
 
