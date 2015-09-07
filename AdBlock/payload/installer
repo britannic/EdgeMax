@@ -149,9 +149,15 @@ install_adblock_support ()
 trap atexit exit ${?}
 
 if is_version
+then
+	echo "${ME}Installing ADBLOCK and Blacklist blocking dnsmasq support..."
+	if install_adblock_support
 	then
-		echo "${ME}Installing ADBLOCK and Blacklist blocking dnsmasq support..."
-		install_adblock_support || echo "${ME} Blacklist installation failed!"
+		echo "Running update-blacklists-dnsmasq.pl for the first time, this will take a few minutes..."
+		/config/scripts/update-blacklists-dnsmasq.pl
 	else
-		echo "${ME}Edgemax ${VER} is not supported, upgrade!"
+		echo "${ME} Blacklist installation failed!"
+	fi
+else
+	echo "${ME}Edgemax ${VER} is not supported, upgrade!"
 fi
