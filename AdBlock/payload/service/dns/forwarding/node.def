@@ -9,7 +9,6 @@ end:expression: "if [ -f \"/tmp/dnsmasq.$PPID\" ]; then \
             echo 'ADBLOCK: Updating /etc/dnsmasq.d/dnsmasq.blacklist.conf'; \
             sudo /config/scripts/update-blacklists-dnsmasq.pl --in-cli; \
             sudo rm /tmp/update-blacklists-dnsmasq.$PPID; \
-            touch /tmp/dnsmasq.$PPID; \
         fi; \
         sudo /opt/vyatta/sbin/vyatta-dns-forwarding.pl --update-dnsforwarding; \
     fi;"
