@@ -23,70 +23,74 @@
 # a file in dnsmasq format
 #
 # **** End License ****
+my $version                        = 2.0;
 
 use integer;
 use strict;
 use warnings;
-
-use feature qw(say);
 use lib '/opt/vyatta/share/perl5/';
-
-use Data::Dumper qw(Dumper);
 use Getopt::Long;
 use Vyatta::Config;
 use Vyatta::ConfigMgmt;
 use XorpConfigParser;
 
-my @blacklist      = ();
-my @exclusions     = ();
-my @blacklist_urls = ();
-my @blacklist_rgxs = ();
+my @blacklist                      = ();
+my @exclusions                     = ();
+my @blacklist_urls                 = ();
+my @blacklist_rgxs                 = ();
 
-my $dnsmasq = "/etc/init.d/dnsmasq";
+my $dnsmasq                        = "/etc/init.d/dnsmasq";
 
 # The IP address below should point to the IP of your router/pixelserver or to 0.0.0.0
 # 0.0.0.0 is easy and doesn't require much from the router
-my $black_hole_ip  = "0.0.0.0";
-my $blacklist_file = "/etc/dnsmasq.d/dnsmasq.blacklist.conf";
+my $black_hole_ip                  = "0.0.0.0";
+my $blacklist_file                 = "/etc/dnsmasq.d/dnsmasq.blacklist.conf";
 my $cfg_file;
-my $config = new Vyatta::Config;
-my $mode   = &cmd_line;
+my $mode                           = &cmd_line;
 
 sub cmd_line {
     my $std_alone;
     my $in_cli;
     my $cmd_line;
+    my $print_ver;
 
     GetOptions(
-        "cfg-file=s" => \$cfg_file,
-        "in-cli!"    => \$in_cli,
-        "std-alone!" => \$std_alone
+        "cfg-file=s"               => \$cfg_file,
+        "in-cli!"                  => \$in_cli,
+        "std-alone!"               => \$std_alone,
+        "version!"                 => \$print_ver
     );
 
     if ( defined($std_alone) ) {
-        $cmd_line = "std-alone";
+        $cmd_line                  = "std-alone";
     }
     elsif ( defined($in_cli) ) {
-        $cmd_line = "in-cli";
+        $cmd_line                  = "in-cli";
     }
     elsif ( defined($cfg_file) ) {
-        $cmd_line = "cfg-file";
+        $cmd_line                  = "cfg-file";
     }
     else {
-        $cmd_line = "ex-cli";
+        $cmd_line                  = "ex-cli";
+    }
+
+    if ( defined($print_ver) ) {
+        printf( "%s version: %.2f\n", $0, $version );
+        exit 0;
     }
     return $cmd_line;
+
 }
 
 sub uniq {
-    my %hash = map { $_ => 1 } @_;
+    my %hash                       = map { $_ => 1 } @_;
     return keys %hash;
 }
 
 sub write_list {
     my $fh;
-    my $file = shift;
-    my @list = @_;
+    my $file                       = shift;
+    my @list                       = @_;
     open( $fh, '>', $file ) or die "Could not open file: '$file' $!";
     print $fh (@list);
     close($fh);
@@ -95,7 +99,7 @@ sub write_list {
 sub cfg_none {
 
     # Source urls for blacklisted adservers and malware servers
-    @blacklist_urls = (
+    @blacklist_urls                = (
         qw|
             "http://winhelp2002.mvps.org/hosts.txt"
             "http://someonewhocares.org/hosts/zero/"
@@ -104,14 +108,14 @@ sub cfg_none {
     );
 
     # regexs strings that will only the return the FQDN or hostname
-    @blacklist_rgxs = (
+    @blacklist_rgxs                = (
         '^0\.0\.0\.0\s([-a-z0-9_.]+).*',
         '^127\.0\.0\.1\s\s\b([-a-z0-9_\.]*)\b[\s]{0,1}',
         '^address=/\b([-a-z0-9_\.]+)\b/127\.0\.0\.1'
     );
 
     # Exclude good hosts
-    @exclusions = (
+    @exclusions                    = (
         qw|
             localhost msdn.com
             appleglobal.112.2o7.net
@@ -129,27 +133,28 @@ sub cfg_none {
 }
 
 sub isblacklist {
+    my $config                     = new Vyatta::Config;
     my $blklst_exists;
-    my $bool = 0;
+    my $bool                       = 0;
     $config->setLevel("service dns forwarding");
     if ( $mode eq "in-cli" ) {
-        $blklst_exists = $config->exists("blacklist");
+        $blklst_exists             = $config->exists("blacklist");
     }
     else {
-        $blklst_exists = $config->existsOrig("blacklist");
+        $blklst_exists             = $config->existsOrig("blacklist");
     }
     if ( defined($blklst_exists) ) {
-        $bool = 1;
+        $bool                      = 1;
     }
     else {
-        $bool = 0;
+        $bool                      = 0;
     }
     return $bool;
 }
 
 sub gnash {
-    my $list = shift;
-    my $line = shift;
+    my $list                       = shift;
+    my $line                       = shift;
     if ( defined($line) ) {
         for ($list) {
             /blacklisted|include/ and do push( @blacklist,
@@ -164,19 +169,20 @@ sub gnash {
 
 sub cfg_active {
     my ( @sources, $source, @includes, $include, @excludes, $exclude );
+    my $config                     = new Vyatta::Config;
 
     if (isblacklist) {
         if ( $mode eq "in-cli" ) {
             $config->setLevel('service dns forwarding blacklist');
-            @includes = $config->returnEffectiveValues('include');
-            @excludes = $config->returnEffectiveValues('exclude');
-            @sources  = $config->listEffectiveNodes('source');
+            @includes              = $config->returnValues('include');
+            @excludes              = $config->returnValues('exclude');
+            @sources               = $config->listNodes('source');
         }
         else {
             $config->setLevel('service dns forwarding blacklist');
-            @includes = $config->returnOrigValues('include');
-            @excludes = $config->returnOrigValues('exclude');
-            @sources  = $config->listOrigNodes('source');
+            @includes              = $config->returnOrigValues('include');
+            @excludes              = $config->returnOrigValues('exclude');
+            @sources               = $config->listOrigNodes('source');
         }
 
         foreach $include (@includes) {
@@ -192,9 +198,9 @@ sub cfg_active {
                 "service dns forwarding blacklist source $source");
             if ( $mode eq "in-cli" ) {
                 gnash( 'blacklist_urls',
-                    $config->returnEffectiveValue('url') );
+                    $config->returnValue('url') );
                 gnash( 'blacklist_rgxs',
-                    $config->returnEffectiveValue('regex') );
+                    $config->returnValue('regex') );
             }
             else {
                 gnash( 'blacklist_urls', $config->returnOrigValue('url') );
@@ -209,19 +215,19 @@ sub cfg_active {
 }
 
 sub cfg_file {
-    my $rgx_url = qr/^url\s+(.*)$/;
-    my $rgx_re  = qr/^regex\s["{0,1}](.*)["{0,1}].*$/;
-    my $xcp     = new XorpConfigParser();
+    my $rgx_url                    = qr/^url\s+(.*)$/;
+    my $rgx_re                     = qr/^regex\s["{0,1}](.*)["{0,1}].*$/;
+    my $xcp                        = new XorpConfigParser();
     $xcp->parse($cfg_file);
 
     my $hashBlacklist
-        = $xcp->get_node( [ 'service', 'dns', 'forwarding', 'blacklist' ] );
+                                   = $xcp->get_node( [ 'service', 'dns', 'forwarding', 'blacklist' ] );
 
     if ( defined($hashBlacklist) ) {
-        my $hashBlacklistChildren = $hashBlacklist->{'children'};
-        my @excludes = $xcp->copy_multis( $hashBlacklistChildren, 'exclude' );
-        my @includes = $xcp->copy_multis( $hashBlacklistChildren, 'include' );
-        my @sources  = $xcp->copy_multis( $hashBlacklistChildren, 'source' );
+        my $hashBlacklistChildren  = $hashBlacklist->{'children'};
+        my @excludes               = $xcp->copy_multis( $hashBlacklistChildren, 'exclude' );
+        my @includes               = $xcp->copy_multis( $hashBlacklistChildren, 'include' );
+        my @sources                = $xcp->copy_multis( $hashBlacklistChildren, 'source' );
 
         for ( $hashBlacklist->{'name'} ) {
             /^blackhole\s(.*)$/
@@ -237,7 +243,7 @@ sub cfg_file {
         }
 
         foreach my $multiBlacklistSource (@sources) {
-            my $hashSource = $xcp->get_node(
+            my $hashSource         = $xcp->get_node(
                 [   'service', 'dns', 'forwarding', 'blacklist',
                     "source $multiBlacklistSource->{'name'}"
                 ]
@@ -276,16 +282,11 @@ sub get_blklist_cfg {
 sub update_blacklist {
     get_blklist_cfg;
 
-    my $exclude = join( "|", uniq(@exclusions) );
-    my $regex   = join( "|", uniq(@blacklist_rgxs) );
+    my $exclude                    = join( "|", uniq(@exclusions) );
+    my $regex                      = join( "|", uniq(@blacklist_rgxs) );
 
-    $exclude = qr/$exclude/;
-    $regex   = qr/$regex/;
-
-    #     for my $i ( @blacklist, @blacklist_urls, $exclude, $regex ) {
-    #         say "Outputs: $i";
-    #     }
-    #     exit;
+    $exclude                       = qr/$exclude/;
+    $regex                         = qr/$regex/;
 
     # Get blacklist and convert the hosts file into a dnsmasq.conf format
     # file. Be paranoid and replace every IP address with $black_hole_ip.
@@ -294,11 +295,11 @@ sub update_blacklist {
     if ( !@blacklist_urls == 0 ) {
         foreach my $url (@blacklist_urls) {
             if ( $url =~ m|^http://| ) {
-                my @content = qx(curl -s $url);
+                my @content        = qx(curl -s $url);
                 chomp @content;
 
                 for my $line (@content) {
-                    $line = lc $line;
+                    $line          = lc $line;
                     $line =~ s/\s+$//;
 
                     for ($line) {

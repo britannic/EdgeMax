@@ -1,6 +1,6 @@
 multi:
 type: txt
-help: hostnames and FQDNs to exclude from DNS forwarding blacklist
+help: hostnames and FQDNs to include in the DNS forwarding blacklist
 
 syntax:expression: pattern $VAR(@) "^[[:alnum:]][-.[:alnum:]]*[[:alnum:]]$"
                    ; "invalid host name $VAR(@)"
@@ -8,3 +8,5 @@ syntax:expression: pattern $VAR(@) "^[[:alnum:]][-.[:alnum:]]*[[:alnum:]]$"
 create:expression: "touch /tmp/update-blacklists-dnsmasq.$PPID"
 delete:expression: "touch /tmp/update-blacklists-dnsmasq.$PPID"
 update:expression: "touch /tmp/update-blacklists-dnsmasq.$PPID"
+
+

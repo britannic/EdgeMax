@@ -72,7 +72,8 @@ delete_adblock_support ()
 {
 	SCRIPTS="/config/scripts"
 	ADBLOCK="update-blacklists-dnsmasq.pl"
-	CFGDIR="/opt/vyatta/share/vyatta-cfg/templates/service/dns/forwarding/blacklist/"
+	CFGDIR="/opt/vyatta/share/vyatta-cfg/templates/service/dns/forwarding"
+	BLKLIST="blacklist"
 	NODEDEF="node.def"
 	ERROR=0
 
@@ -98,15 +99,15 @@ delete_adblock_support ()
 	end || ERROR=1
 
 	echo "Removing blacklist configuration templates for ${ADBLOCK}..."
-
-	rm -rf "${CFGDIR}/"
+	install -o root -g root -m 0644 ${NODEDEF} "${CFGDIR}/"
+	rm -rf "${CFGDIR}/${BLKLIST}/"
 	return ${ERROR}
 }
 
 # This is where we run the script using the above functions
 trap atexit exit ${?}
 
-if /opt/vyatta/bin/yesno -y 'Do you want to completely remove ADBLOCK? '
+if /opt/vyatta/bin/yesno -n 'Do you want to completely remove ADBLOCK? [y/N]: '
 then
 	if delete_adblock_support
 	then

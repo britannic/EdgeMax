@@ -1,4 +1,8 @@
 tag:
-priority: 919
 type: txt
 help: Blacklist source and regex pairs
+
+commit:expression: $VAR(./url) != ""; "At least one source url must be configured."
+create:expression: "touch /tmp/update-blacklists-dnsmasq.$PPID"
+delete:expression: "touch /tmp/update-blacklists-dnsmasq.$PPID"
+update:expression: "touch /tmp/update-blacklists-dnsmasq.$PPID"

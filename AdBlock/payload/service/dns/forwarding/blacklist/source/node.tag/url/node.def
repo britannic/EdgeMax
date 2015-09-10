@@ -1,6 +1,7 @@
 type: txt
-help: Add blacklist source url here e.g.
-                http://someonewhocares.org/hosts/zero/
-comp_help: Make sure the matching regex search only returns the FQDN or hostname.
+help: Add blacklist source url that provides a list of hostnames and or FQDNs
 
-commit:expression: $VAR(../regex) != ""; "A source regex search string must be set" 
+val_help: http; Example: http://someonewhocares.org/hosts/zero/
+comp_help: Make sure the matching regex search only returns the Fully Qualified Domain Name or hostname.
+
+commit:expression: $VAR(../regex) != ""; "A source regex search string must be set"

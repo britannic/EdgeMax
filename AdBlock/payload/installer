@@ -134,8 +134,6 @@ install_adblock_support ()
 	set system task-scheduler task update_blacklists executable path /config/scripts/update-blacklists-dnsmasq.pl || ERROR=1
 	set system task-scheduler task update_blacklists interval 1d || ERROR=1
 
-	rm /tmp/update-blacklists-dnsmasq.*
-
 	echo "Committing configuration..."
 	commit || ERROR=1
 
