@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# vyatta_firewall_builder.py - Build a zone-based IPv4/IPv6 firewall for Vyatta
+# edgeos_firewall_builder.py - Build a zone-based IPv4/IPv6 firewall for edgeos
 #
 # -*- coding: utf-8 -*-
 
@@ -11,6 +11,7 @@ import itertools
 import re
 import subprocess as sp
 import sys
+from subprocess import call
 
 # Define zones and which interfaces reside in each. The 'int' and
 # 'ext' zones are required
@@ -264,10 +265,10 @@ ruleset_counters                                            = {}
 global commands
 commands                                                    = []
 
-vyatta_cmd                                                  = "/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper"
+edgeos_cmd                                                  = "/opt/edgeos/sbin/edgeos-cfg-cmd-wrapper"
+edgeos_api                                                  = "/bin/cli-shell-api"
 
-
-# vyatta_cmd                                                = "echo" # Debug
+# edgeos_cmd                                                = "echo" # Debug
 
 
 def get_args():
@@ -283,7 +284,7 @@ def get_args():
 
     parser                                                  = argparse.ArgumentParser(
         description                                         =
-        'Build a zone-based IPv4/IPv6 firewall configuration for Vyatta.',
+        'Build a zone-based IPv4/IPv6 firewall configuration for edgeos.',
         epilog=
         'If [-l/-log] isn\'t set, enable-default-log will be disabled for all rulesets. If [-U/-Update] isn\'t set, %(prog)s prints to STDOUT.')
 
@@ -319,26 +320,35 @@ def get_args():
 
 def yesno(*args):
 
-    if len(args) > 1:
-        default                                             = args[0].strip().lower()
-        question                                            = args[1].strip()
-    elif len(args) == 1:
-        default                                             = args[0].strip().lower()
-        question                                            = 'Answer y or n:'
-    else:
-        default                                             = None
-        question                                            = 'Answer y or n:'
+    for case in switch(len(args)):
+        if case > 1:
+            default                                             = args[0].strip().lower()
+            question                                            = args[1].strip()
+            break
 
-    if default == None:
-        prompt                                              = " [y/n] "
-    elif default == "y":
-        prompt                                              = " [Y/n] "
-    elif default == "n":
-        prompt                                              = " [y/N] "
-    else:
-        raise ValueError(
-            "{} invalid default parameter: \'{}\' - only [y, n] permitted".format(
-                __name__, default))
+        if case == 1:
+            default                                             = args[0].strip().lower()
+            question                                            = 'Answer y or n:'
+            break
+
+        if case < 1:
+            default                                             = None
+            question                                            = 'Answer y or n:'
+
+    for case in switch(default):
+        if case (None):
+            prompt                                              = " [y/n] "
+            break
+        if case ("y"):
+            prompt                                              = " [Y/n] "
+            break
+        if case ("n"):
+            prompt                                              = " [y/N] "
+            break
+        else:
+            raise ValueError(
+                "{} invalid default parameter: \'{}\' - only [y, n] permitted".format(
+                    __name__, default))
 
     while 1:
         sys.stdout.write(question + prompt)
@@ -405,8 +415,37 @@ def build_rule(source_zones, dest_zones, params, ipversions = [4, 6], rulenum=No
             for param in params:
                 commands.append(base_cmd + " " + param)
 
+def edgeos_cfg()
+    edgeos_shell                                        = sp.Popen(
+        'bash',
+        shell=True,
+        stdin                                           = sp.PIPE,
+        stdout=sp.PIPE,
+        stderr                                          = sp.PIPE)
+    for cmd in commands:  # print to stdout
+        print cmd
+        edgeos_shell.stdin.write('{} {};\n'.format(edgeos_cmd, cmd))
+
+    out, err                                            = edgeos_shell.communicate()
+
+    cfg_error                                           = False
+    if out:
+        if re.search(r'^Error:.?', out):
+            cfg_error                                   = True
+        print "configure message:"
+        print out
+    if err:
+        cfg_error                                       = True
+        print "Error reported by configure:"
+        print err
+
+def get_active_cfg():
+    zoneruleset                                             = "zone-policy baserules"
+    if not sp.call("%s inSession" % edgeos_api, shell=True) == 0:
+        exit()
 
 if __name__ == '__main__':
+    get_active_cfg()
     get_args()
 
     commands.append("delete firewall group")
@@ -479,7 +518,6 @@ if __name__ == '__main__':
             for interface in zones[zone]['interfaces']:
                 commands.append(
                     "set zone-policy zone %s interface %s" % (zone, interface))
-#       elif zone == 'local':
         else:
             # Configure local zone
             commands.append(
@@ -503,7 +541,7 @@ if __name__ == '__main__':
         commands.append("save")
         commands.append("end")
 
-        vyatta_shell                                        = sp.Popen(
+        edgeos_shell                                        = sp.Popen(
             'bash',
             shell=True,
             stdin                                           = sp.PIPE,
@@ -511,9 +549,9 @@ if __name__ == '__main__':
             stderr                                          = sp.PIPE)
         for cmd in commands:  # print to stdout
             print cmd
-            vyatta_shell.stdin.write('{} {};\n'.format(vyatta_cmd, cmd))
+            edgeos_shell.stdin.write('{} {};\n'.format(edgeos_cmd, cmd))
 
-        out, err                                            = vyatta_shell.communicate()
+        out, err                                            = edgeos_shell.communicate()
 
         cfg_error                                           = False
         if out:
@@ -525,7 +563,7 @@ if __name__ == '__main__':
             cfg_error                                       = True
             print "Error reported by configure:"
             print err
-        if (vyatta_shell.returncode == 0) and not cfg_error:
+        if (edgeos_shell.returncode == 0) and not cfg_error:
             print "Zone firewall configuration was successful."
         else:
             print "Zone firewall configuration was NOT successful!"
