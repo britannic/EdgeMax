@@ -74,7 +74,7 @@ sub cmd_line {
     }
     elsif ( defined($cfg_file) ) {
         $cmdmode = "cfg-file";
-        if (! -f $cfg_file ) {
+        if ( !-f $cfg_file ) {
             print("$cfg_file doesn't exist!\n");
             exit 0;
         }
@@ -304,11 +304,16 @@ sub update_blacklist {
     if ( !@blacklist_urls == 0 ) {
         foreach my $url (@blacklist_urls) {
             if ( $url =~ m|^http://| ) {
-                my @content = qx(curl -s $url);
-                chomp @content;
+                my @content = grep {!/^\s+$/} map { chomp; my $val = $_;
+                    (my $key = lc $val) =~ s/^\s+|\s$//g;
+                    $key => $val}
+                    qx(curl -s $url);
+#                 chomp @content;
+
                 for my $line (@content) {
-                    $line = lc $line;
-                    $line =~ s/^\s+|\s$//g;
+
+                    #                     $line = lc $line;
+                    #                     $line =~ s/^\s+|\s$//g;
                     print $entry, $i if $cmdmode ne "ex-cli";
                     for ($line) {
                         length($_) < 1 and last;
@@ -321,7 +326,9 @@ sub update_blacklist {
                 }
             }
         }
-    }
+
+}
+
 }
 
 # main()
