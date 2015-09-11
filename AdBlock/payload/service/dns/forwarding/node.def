@@ -5,10 +5,10 @@ end:expression: "if [ -f \"/tmp/dnsmasq.$PPID\" ]; then \
     sudo /opt/vyatta/sbin/vyatta-dns-forwarding.pl --stop-dnsforwarding; \
     rm /tmp/dnsmasq.$PPID; \
     else \
-        if [ -f \"/tmp/update-blacklists-dnsmasq.$PPID\" ]; then \
+        if [ -f \"/tmp/update-blacklists.$PPID\" ]; then \
             echo 'ADBLOCK: Updating /etc/dnsmasq.d/dnsmasq.blacklist.conf'; \
             sudo /config/scripts/update-blacklists-dnsmasq.pl --in-cli; \
-            sudo rm /tmp/update-blacklists-dnsmasq.$PPID; \
+            sudo rm /tmp/update-blacklists.$PPID; \
         fi; \
         sudo /opt/vyatta/sbin/vyatta-dns-forwarding.pl --update-dnsforwarding; \
     fi;"

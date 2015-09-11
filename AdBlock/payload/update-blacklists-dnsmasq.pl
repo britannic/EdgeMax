@@ -23,7 +23,7 @@
 # a file in dnsmasq format
 #
 # **** End License ****
-my $version = 2.0;
+my $version = 2.1;
 
 use integer;
 use strict;
@@ -46,13 +46,14 @@ my $dnsmasq = "/etc/init.d/dnsmasq";
 my $black_hole_ip  = "0.0.0.0";
 my $blacklist_file = "/etc/dnsmasq.d/dnsmasq.blacklist.conf";
 my $cfg_file;
-my $cmdmode = &cmd_line;
-my $i       = 0;
+my $cmdmode;
+my $i = 0;
+my $list;
+my $line;
 
 sub cmd_line {
     my $std_alone;
     my $in_cli;
-    my $cmd_line;
     my $print_ver;
 
     GetOptions(
@@ -60,38 +61,44 @@ sub cmd_line {
         "in-cli!"    => \$in_cli,
         "std-alone!" => \$std_alone,
         "version!"   => \$print_ver
-    );
+        )
+        or print(
+        "Valid options: --in-cli | --std-alone | --version | --cfg_file <filename>\n"
+        ) and exit 0;
 
     if ( defined($std_alone) ) {
-        $cmd_line = "std-alone";
+        $cmdmode = "std-alone";
     }
     elsif ( defined($in_cli) ) {
-        $cmd_line = "in-cli";
+        $cmdmode = "in-cli";
     }
     elsif ( defined($cfg_file) ) {
-        $cmd_line = "cfg-file";
+        $cmdmode = "cfg-file";
+        if (! -f $cfg_file ) {
+            print("$cfg_file doesn't exist!\n");
+            exit 0;
+        }
     }
     else {
-        $cmd_line = "ex-cli";
+        $cmdmode = "ex-cli";
     }
 
     if ( defined($print_ver) ) {
         printf( "%s version: %.2f\n", $0, $version );
         exit 0;
     }
-    return $cmd_line;
+    return $cmdmode;
 
 }
 
 sub uniq {
     my %hash = map { $_ => 1 } @_;
-    return keys %hash;
+    return ( sort keys(%hash) );
 }
 
 sub write_list {
     my $fh;
-    my $file = shift;
-    my @list = @_;
+    my ( $file, @list ) = @_;
     open( $fh, '>', $file ) or die "Could not open file: '$file' $!";
     print $fh (@list);
     close($fh);
@@ -154,8 +161,7 @@ sub isblacklist {
 }
 
 sub sendit {
-    my $list = shift;
-    my $line = shift;
+    my ( $list, $line ) = @_;
     if ( defined($line) ) {
         for ($list) {
             /blacklisted|include/ and do push( @blacklist,
@@ -302,9 +308,8 @@ sub update_blacklist {
                 chomp @content;
                 for my $line (@content) {
                     $line = lc $line;
-                    $line =~ s/\s+$//;
-                    print $entry . $i
-                        if $cmdmode ne "ex-cli";
+                    $line =~ s/^\s+|\s$//g;
+                    print $entry, $i if $cmdmode ne "ex-cli";
                     for ($line) {
                         length($_) < 1 and last;
                         !defined       and last;
@@ -319,20 +324,15 @@ sub update_blacklist {
     }
 }
 
-sub get_blacklist {
-
-    update_blacklist;
-    return sort( uniq(@blacklist) );
-}
-
 # main()
-# debug - uncomment print and comment write_list && ...
-# print get_blacklist;
 
-write_list( $blacklist_file, get_blacklist() );
+cmd_line;
+update_blacklist;
+my @dnsmasq_hosts = uniq(@blacklist);
+write_list( $blacklist_file, @dnsmasq_hosts );
 
 printf( "Entries processed %d - unique records: %d \n",
-    $i, scalar( uniq(@blacklist) ) )
+    $i, scalar(@dnsmasq_hosts) )
     if $cmdmode ne "ex-cli";
 
 system("$dnsmasq force-reload") if $cmdmode ne "in-cli";

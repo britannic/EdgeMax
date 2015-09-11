@@ -6,6 +6,6 @@ val_help: ipv6net; IPv6 address
 
 default: 0.0.0.0
 
-create:expression: "touch /tmp/update-blacklists-dnsmasq.$PPID"
-delete:expression: "touch /tmp/update-blacklists-dnsmasq.$PPID"
-update:expression: "touch /tmp/update-blacklists-dnsmasq.$PPID"
+create:expression: "touch /tmp/update-blacklists.$PPID"
+delete:expression: "touch /tmp/update-blacklists.$PPID"
+update:expression: "touch /tmp/update-blacklists.$PPID"

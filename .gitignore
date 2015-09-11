@@ -11,3 +11,11 @@ Blacklist Blocking/payload/update-blacklists-dnsmasq.ptkdb
 >>>>>>> master
 
 *.tgz
+
+*.bbprojectsettings
+
+*.bbprojectdata
+
+*.txt
+
+*.worksheet
