@@ -23,7 +23,7 @@
 # a file in dnsmasq format
 #
 # **** End License ****
-my $version = 2.12;
+my $version = 2.5;
 
 use diagnostics;
 use integer;
@@ -34,6 +34,11 @@ use Getopt::Long;
 use Vyatta::Config;
 use Vyatta::ConfigMgmt;
 use XorpConfigParser;
+
+use constant blacklist => 'blacklist';
+use constant url       => 'url';
+use constant regex     => 'regex';
+use constant exclude   => 'exclude';
 
 my @blacklist      = ();
 my $ref_blst       = \@blacklist;
@@ -59,6 +64,7 @@ my $list;
 my $line;
 
 my @debug;
+
 sub cmd_line {
     my $cmdmode = \$ref_mode;
     my $in_cli;
@@ -98,6 +104,20 @@ sub cmd_line {
     }
 }
 
+sub sendit {
+    my ( $listref, $lineref ) = @_;
+    my ( $list, $line ) = ( $$listref, $$lineref );
+    if ( defined($line) ) {
+        for ($list) {
+            /blacklist/ and push( @$ref_blst, "address=/$line/$$ref_bhip\n" ),
+                last;
+            /url/     and push( @$ref_urls, $line ), last;
+            /regex/   and push( @$ref_rgxs, $line ), last;
+            /exclude/ and push( @$ref_excs, $line ), last;
+        }
+    }
+}
+
 sub uniq {
     my $ref = shift;
     my %hash = map { $_ => 1 } @$ref;
@@ -133,7 +153,8 @@ sub cfg_none {
     # Exclude our own good hosts
     @exclusions = (
         qw|
-            localhost msdn.com
+            localhost
+            msdn.com
             appleglobal.112.2o7.net
             cdn.visiblemeasures.com
             hb.disney.go.com
@@ -144,7 +165,8 @@ sub cfg_none {
     );
 
     # Include our own bad hosts
-    push( @$ref_blst, sprintf("address=/beap.gemini.yahoo.com/0.0.0.0\n") );
+    my $badhost = "address=/beap.gemini.yahoo.com/0.0.0.0\n";
+    sendit( \blacklist, \$badhost );
     return 1;
 }
 
@@ -189,24 +211,23 @@ sub cfg_active {
         }
 
         foreach $include (@includes) {
-            push( @$ref_blst,
-                sprintf( "address=/%s/%s\n", $include, $$ref_bhip ) );
+            sendit( \blacklist, \$include );
         }
 
         foreach $exclude (@excludes) {
-            push( @$ref_excs, $exclude );
+            sendit( \exclude, \$exclude );
         }
 
         foreach $source (@sources) {
             $config->setLevel(
                 "service dns forwarding blacklist source $source");
             if ( $ref_mode eq "in-cli" ) {
-                push( @$ref_urls, $config->returnValue('url') );
-                push( @$ref_rgxs, $config->returnValue('regex') );
+                sendit( \url,   \$config->returnValue('url') );
+                sendit( \regex, \$config->returnValue('regex') );
             }
             else {
-                push( @$ref_urls, $config->returnOrigValue('url') );
-                push( @$ref_rgxs, $config->returnOrigValue('regex') );
+                sendit( \url,   \$config->returnOrigValue('url') );
+                sendit( \regex, \$config->returnOrigValue('regex') );
             }
         }
     }
@@ -239,13 +260,11 @@ sub cfg_file {
         }
 
         foreach my $multiBlacklistExclude (@excludes) {
-            push( @$ref_excs, $multiBlacklistExclude->{'name'} );
+            sendit( \exclude, \$multiBlacklistExclude->{'name'} );
         }
 
         foreach my $multiBlacklistInclude (@includes) {
-            push( @$ref_blst,
-                "address=/%s/%s\n", $multiBlacklistInclude->{'name'},
-                $$ref_bhip );
+            sendit( \blacklist, \$multiBlacklistInclude->{'name'} );
         }
 
         foreach my $multiBlacklistSource (@sources) {
@@ -260,9 +279,9 @@ sub cfg_file {
             foreach my $node (@$hashSourceChildren) {
                 for ( $node->{'name'} ) {
                     /$rgx_url/
-                        and push( @$ref_urls, $1 ), last;
+                        and sendit( \url, \$1 ), last;
                     /$rgx_re/
-                        and push( @$ref_rgxs, $1 ), last;
+                        and sendit( \regex, \$1 ), last;
                 }
             }
         }
@@ -278,7 +297,8 @@ sub cfg_file {
 sub get_blklist_cfg {
 
     # Make sure localhost is in the whitelist of exclusions
-    push( @$ref_excs, 'localhost' );
+    my $exclude = 'localhost';
+    sendit( \exclude, \$exclude );
 
     for ($ref_mode) {
         m/ex-cli|in-cli/ and cfg_active, last;
@@ -296,6 +316,7 @@ sub update_blacklist {
 
     my $exclude = join( "|", @$ref_excs );
     my $regex   = join( "|", @$ref_rgxs );
+    my $strmregex = qr/^\s+|\s+$|\n|\r|^#.*$/;
 
     $exclude = qr/$exclude/;
     $regex   = qr/$regex/;
@@ -308,26 +329,19 @@ sub update_blacklist {
         foreach my $url (@$ref_urls) {
             if ( $url =~ m|^http://| ) {
                 my %hash = map {
-                    (my $val = lc($_)) =~ s/^\s+|\s+$|\n|\r//g;
+                    ( my $val = lc($_) ) =~ s/$strmregex//g;
                     $val => 1;
                 } qx(curl -s $url);
                 my @content = keys %hash;
-#                 uniq( \@content );
-
-                #                 chomp @content;
+                print $entry, $$counter if $$mode ne "ex-cli";
 
                 for my $line (@content) {
-
-                    #                     $line = lc $line;
-                    #                     $line =~ s/^\s+|\s$//g;
-                    print $entry, $$counter if $$mode ne "ex-cli";
                     for ($line) {
-                        length($_) < 1 and print "Triggered length", last;
-                        /''|\n/        and print "Triggered /''|\n/", last;
-                        /$$exclude/    and last;
-                        /$$regex/      and push( @$ref_blst,
-                            sprintf( "address=/%s/%s\n", $1, $$ref_bhip ) ),
-                            push(@debug, $line . "\n"), $$counter++, last;
+                        length($_) < 1 and last;
+                        !defined       and last;
+                        /$exclude/     and last;
+                        /$regex/ and sendit( \blacklist, \$1 ),
+                            push( @debug, $line . "\n" ), $$counter++, last;
                     }
                     print "\b" x length( $entry . $$counter )
                         if $$mode ne "ex-cli";
@@ -345,9 +359,9 @@ uniq($ref_blst);
 @$ref_blst = sort(@$ref_blst);
 write_list( \$blacklist_file, $ref_blst );
 
-my $debug_file="/tmp/debug.txt";
+my $debug_file = "/tmp/debug.txt";
 
-write_list(\$debug_file, @debug);
+write_list( \$debug_file, \@debug );
 
 printf( "Entries processed %d - unique records: %d \n",
     $$counter, scalar(@$ref_blst) )
