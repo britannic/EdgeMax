@@ -23,8 +23,9 @@
 # a file in dnsmasq format
 #
 # **** End License ****
-my $version = 2.1;
+my $version = 2.11;
 
+use diagnostics;
 use integer;
 use strict;
 use warnings;
@@ -35,26 +36,34 @@ use Vyatta::ConfigMgmt;
 use XorpConfigParser;
 
 my @blacklist      = ();
+my $ref_blst       = \@blacklist;
 my @exclusions     = ();
+my $ref_excs       = \@exclusions;
 my @blacklist_urls = ();
+my $ref_urls       = \@blacklist_urls;
 my @blacklist_rgxs = ();
+my $ref_rgxs       = \@blacklist_rgxs;
 
 my $dnsmasq = "/etc/init.d/dnsmasq";
 
 # The IP address below should point to the IP of your router/pixelserver or to 0.0.0.0
 # 0.0.0.0 is easy and doesn't require much from the router
-my $black_hole_ip  = "0.0.0.0";
+my $black_hole_ip;
+my $ref_bhip       = \$black_hole_ip;
 my $blacklist_file = "/etc/dnsmasq.d/dnsmasq.blacklist.conf";
 my $cfg_file;
-my $cmdmode;
-my $i = 0;
+my $ref_mode;
+my $i       = 0;
+my $counter = \$i;
 my $list;
 my $line;
 
+my @debug;
 sub cmd_line {
-    my $std_alone;
+    my $cmdmode = \$ref_mode;
     my $in_cli;
     my $print_ver;
+    my $std_alone;
 
     GetOptions(
         "cfg-file=s" => \$cfg_file,
@@ -67,40 +76,39 @@ sub cmd_line {
         ) and exit 0;
 
     if ( defined($std_alone) ) {
-        $cmdmode = "std-alone";
+        $$cmdmode = "std-alone";
     }
     elsif ( defined($in_cli) ) {
-        $cmdmode = "in-cli";
+        $$cmdmode = "in-cli";
     }
     elsif ( defined($cfg_file) ) {
-        $cmdmode = "cfg-file";
+        $$cmdmode = "cfg-file";
         if ( !-f $cfg_file ) {
             print("$cfg_file doesn't exist!\n");
             exit 0;
         }
     }
     else {
-        $cmdmode = "ex-cli";
+        $$cmdmode = "ex-cli";
     }
 
     if ( defined($print_ver) ) {
         printf( "%s version: %.2f\n", $0, $version );
         exit 0;
     }
-    return $cmdmode;
-
 }
 
 sub uniq {
-    my %hash = map { $_ => 1 } @_;
-    return ( sort keys(%hash) );
+    my $ref = shift;
+    my %hash = map { $_ => 1 } @$ref;
+    @$ref = ( sort keys(%hash) );
 }
 
-sub write_list {
+sub write_list($$) {
     my $fh;
-    my ( $file, @list ) = @_;
-    open( $fh, '>', $file ) or die "Could not open file: '$file' $!";
-    print $fh (@list);
+    my ( $file, $list ) = @_;
+    open( $fh, '>', $$file ) or die "Could not open file: '$file' $!";
+    print $fh (@$list);
     close($fh);
 }
 
@@ -122,7 +130,7 @@ sub cfg_none {
         '^address=/\b([-a-z0-9_\.]+)\b/127\.0\.0\.1'
     );
 
-    # Exclude good hosts
+    # Exclude our own good hosts
     @exclusions = (
         qw|
             localhost msdn.com
@@ -135,8 +143,8 @@ sub cfg_none {
             survey.112.2o7.net|
     );
 
-    # Include bad hosts
-    sendit( 'include', 'beap.gemini.yahoo.com' );
+    # Include our own bad hosts
+    push( @$ref_blst, sprintf("address=/beap.gemini.yahoo.com/0.0.0.0\n") );
     return 1;
 }
 
@@ -145,7 +153,7 @@ sub isblacklist {
     my $blklst_exists;
     my $bool = 0;
     $config->setLevel("service dns forwarding");
-    if ( $cmdmode eq "in-cli" ) {
+    if ( $ref_mode eq "in-cli" ) {
         $blklst_exists = $config->exists("blacklist");
     }
     else {
@@ -160,56 +168,45 @@ sub isblacklist {
     return $bool;
 }
 
-sub sendit {
-    my ( $list, $line ) = @_;
-    if ( defined($line) ) {
-        for ($list) {
-            /blacklisted|include/ and do push( @blacklist,
-                sprintf( "address=/%s/%s\n", $line, $black_hole_ip ) ),
-                last;
-            /blacklist_urls/ and do push( @blacklist_urls, $line ), last;
-            /blacklist_rgxs/ and do push( @blacklist_rgxs, $line ), last;
-            /exclude/        and do push( @exclusions,     $line ), last;
-        }
-    }
-}
-
 sub cfg_active {
     my ( @sources, $source, @includes, $include, @excludes, $exclude );
     my $config = new Vyatta::Config;
 
     if (isblacklist) {
-        if ( $cmdmode eq "in-cli" ) {
+        if ( $ref_mode eq "in-cli" ) {
             $config->setLevel('service dns forwarding blacklist');
-            @includes = $config->returnValues('include');
-            @excludes = $config->returnValues('exclude');
-            @sources  = $config->listNodes('source');
+            @includes  = $config->returnValues('include');
+            @excludes  = $config->returnValues('exclude');
+            @sources   = $config->listNodes('source');
+            $$ref_bhip = $config->returnValue('blackhole') // "0.0.0.0";
         }
         else {
             $config->setLevel('service dns forwarding blacklist');
-            @includes = $config->returnOrigValues('include');
-            @excludes = $config->returnOrigValues('exclude');
-            @sources  = $config->listOrigNodes('source');
+            @includes  = $config->returnOrigValues('include');
+            @excludes  = $config->returnOrigValues('exclude');
+            @sources   = $config->listOrigNodes('source');
+            $$ref_bhip = $config->returnOrigValue('blackhole') // "0.0.0.0";
         }
 
         foreach $include (@includes) {
-            sendit( 'blacklisted', $include );
+            push( @$ref_blst,
+                sprintf( "address=/%s/%s\n", $include, $$ref_bhip ) );
         }
 
         foreach $exclude (@excludes) {
-            sendit( 'exclude', $exclude );
+            push( @$ref_excs, $exclude );
         }
 
         foreach $source (@sources) {
             $config->setLevel(
                 "service dns forwarding blacklist source $source");
-            if ( $cmdmode eq "in-cli" ) {
-                sendit( 'blacklist_urls', $config->returnValue('url') );
-                sendit( 'blacklist_rgxs', $config->returnValue('regex') );
+            if ( $ref_mode eq "in-cli" ) {
+                push( @$ref_urls, $config->returnValue('url') );
+                push( @$ref_rgxs, $config->returnValue('regex') );
             }
             else {
-                sendit( 'blacklist_urls', $config->returnOrigValue('url') );
-                sendit( 'blacklist_rgxs', $config->returnOrigValue('regex') );
+                push( @$ref_urls, $config->returnOrigValue('url') );
+                push( @$ref_rgxs, $config->returnOrigValue('regex') );
             }
         }
     }
@@ -220,7 +217,7 @@ sub cfg_active {
 }
 
 sub cfg_file {
-    my $mode = $cmdmode
+    my $mode = $ref_mode
         ; # not yet sure why $cmdmode ends up undef after this sub, so preserving it
     my $rgx_url = qr/^url\s+(.*)$/;
     my $rgx_re  = qr/^regex\s["{0,1}](.*)["{0,1}].*$/;
@@ -238,15 +235,17 @@ sub cfg_file {
 
         for ( $hashBlacklist->{'name'} ) {
             /^blackhole\s(.*)$/
-                and $black_hole_ip = $_ // $black_hole_ip;
+                and $$ref_bhip = $_ // "0.0.0.0";
         }
 
         foreach my $multiBlacklistExclude (@excludes) {
-            sendit( 'exclude', $multiBlacklistExclude->{'name'} );
+            push( @$ref_excs, $multiBlacklistExclude->{'name'} );
         }
 
         foreach my $multiBlacklistInclude (@includes) {
-            sendit( 'include', $multiBlacklistInclude->{'name'} );
+            push( @$ref_blst,
+                "address=/%s/%s\n", $multiBlacklistInclude->{'name'},
+                $$ref_bhip );
         }
 
         foreach my $multiBlacklistSource (@sources) {
@@ -261,9 +260,9 @@ sub cfg_file {
             foreach my $node (@$hashSourceChildren) {
                 for ( $node->{'name'} ) {
                     /$rgx_url/
-                        and sendit( 'blacklist_urls', $1 ), last;
+                        and push( @$ref_urls, $1 ), last;
                     /$rgx_re/
-                        and sendit( 'blacklist_rgxs', $1 ), last;
+                        and push( @$ref_rgxs, $1 ), last;
                 }
             }
         }
@@ -271,7 +270,7 @@ sub cfg_file {
     else {
         return 0;
     }
-    $cmdmode
+    $ref_mode
         = $mode;   # restoring $cmdmode as this sub is clobbering it somewhere
     return 1;
 }
@@ -279,9 +278,9 @@ sub cfg_file {
 sub get_blklist_cfg {
 
     # Make sure localhost is in the whitelist of exclusions
-    sendit( 'exclusions', 'localhost' );
+    push( @$ref_excs, 'localhost' );
 
-    for ($cmdmode) {
+    for ($ref_mode) {
         m/ex-cli|in-cli/ and cfg_active, last;
         m/cfg-file/      and cfg_file,   last;
         m/std-alone/     and cfg_none,   last;
@@ -290,9 +289,13 @@ sub get_blklist_cfg {
 
 sub update_blacklist {
     get_blklist_cfg;
-    my $entry   = " - Entries processed: ";
-    my $exclude = join( "|", uniq(@exclusions) );
-    my $regex   = join( "|", uniq(@blacklist_rgxs) );
+    my $mode  = \$ref_mode;
+    my $entry = " - Entries processed: ";
+    uniq($ref_excs);
+    uniq($ref_rgxs);
+
+    my $exclude = join( "|", @$ref_excs );
+    my $regex   = join( "|", @$ref_rgxs );
 
     $exclude = qr/$exclude/;
     $regex   = qr/$regex/;
@@ -301,46 +304,54 @@ sub update_blacklist {
     # file. Be paranoid and replace every IP address with $black_hole_ip.
     # We only want the actual blacklist, so we can prepend our own hosts.
     # $black_hole_ip="0.0.0.0" saves router CPU cycles and is more efficient
-    if ( !@blacklist_urls == 0 ) {
-        foreach my $url (@blacklist_urls) {
+    if ( !@$ref_urls == 0 ) {
+        foreach my $url (@$ref_urls) {
             if ( $url =~ m|^http://| ) {
-                my @content = grep {!/^\s+$/} map { chomp; my $val = $_;
-                    (my $key = lc $val) =~ s/^\s+|\s$//g;
-                    $key => $val}
-                    qx(curl -s $url);
-#                 chomp @content;
+                my %hash = map {
+                    (my $val = lc($_)) =~ s/^\s+|\s+$|\n|\r//g;
+                    $val => 1;
+                } qx(curl -s $url);
+                my @content = keys %hash;
+#                 uniq( \@content );
+
+                #                 chomp @content;
 
                 for my $line (@content) {
 
                     #                     $line = lc $line;
                     #                     $line =~ s/^\s+|\s$//g;
-                    print $entry, $i if $cmdmode ne "ex-cli";
+                    print $entry, $$counter if $$mode ne "ex-cli";
                     for ($line) {
-                        length($_) < 1 and last;
-                        !defined       and last;
-                        /$exclude/     and last;
-                        /$regex/ and sendit( 'blacklisted', $1 ), $i++, last;
+                        length($_) < 1 and print "Triggered length", last;
+                        /''|\n/        and print "Triggered /''|\n/", last;
+                        /$$exclude/    and last;
+                        /$$regex/      and push( @$ref_blst,
+                            sprintf( "address=/%s/%s\n", $1, $$ref_bhip ) ),
+                            push(@debug, $line . "\n"), $$counter++, last;
                     }
-                    print "\b" x length( $entry . $i )
-                        if $cmdmode ne "ex-cli";
+                    print "\b" x length( $entry . $$counter )
+                        if $$mode ne "ex-cli";
                 }
             }
         }
-
-}
-
+    }
 }
 
 # main()
 
 cmd_line;
 update_blacklist;
-my @dnsmasq_hosts = uniq(@blacklist);
-write_list( $blacklist_file, @dnsmasq_hosts );
+uniq($ref_blst);
+@$ref_blst = sort(@$ref_blst);
+write_list( \$blacklist_file, $ref_blst );
+
+my $debug_file="/tmp/debug.txt";
+
+write_list(\$debug_file, @debug);
 
 printf( "Entries processed %d - unique records: %d \n",
-    $i, scalar(@dnsmasq_hosts) )
-    if $cmdmode ne "ex-cli";
+    $$counter, scalar(@$ref_blst) )
+    if $ref_mode ne "ex-cli";
 
-system("$dnsmasq force-reload") if $cmdmode ne "in-cli";
+system("$dnsmasq force-reload") if $ref_mode ne "in-cli";
 
