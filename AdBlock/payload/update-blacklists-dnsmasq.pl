@@ -23,7 +23,7 @@
 # a file in dnsmasq format
 #
 # **** End License ****
-my $version = 2.1;
+my $version = 2.11;
 
 use integer;
 use strict;
@@ -184,12 +184,14 @@ sub cfg_active {
             @includes = $config->returnValues('include');
             @excludes = $config->returnValues('exclude');
             @sources  = $config->listNodes('source');
+            $black_hole_ip = $config->returnValue('blackhole') // $black_hole_ip;
         }
         else {
             $config->setLevel('service dns forwarding blacklist');
             @includes = $config->returnOrigValues('include');
             @excludes = $config->returnOrigValues('exclude');
             @sources  = $config->listOrigNodes('source');
+            $black_hole_ip = $config->returnValue('blackhole') // $black_hole_ip;
         }
 
         foreach $include (@includes) {
