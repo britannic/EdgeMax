@@ -304,11 +304,11 @@ sub update_blacklist {
     if ( !@blacklist_urls == 0 ) {
         foreach my $url (@blacklist_urls) {
             if ( $url =~ m|^http://| ) {
-                my @content = grep {!/^\s+$/} map { chomp; my $val = $_;
-                    (my $key = lc $val) =~ s/^\s+|\s$//g;
-                    $key => $val}
-                    qx(curl -s $url);
-#                 chomp @content;
+                my %hash = map {
+                    (my $val = lc($_)) =~ s/^\s+|\s+$|\n|\r//g;
+                    $val => 1;
+                } qx(curl -s $url);
+                my @content = keys %hash;
 
                 for my $line (@content) {
 
