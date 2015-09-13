@@ -23,7 +23,7 @@
 # a file in dnsmasq format
 #
 # **** End License ****
-my $version = 2.11;
+my $version = 2.12;
 
 use diagnostics;
 use integer;
