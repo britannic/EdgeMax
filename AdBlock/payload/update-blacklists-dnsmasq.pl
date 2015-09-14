@@ -311,7 +311,7 @@ sub get_blklist_cfg {
 }
 
 sub update_blacklist {
-    get_blklist_cfg;
+
     my $mode  = \$ref_mode;
     my $entry = " - Entries processed: ";
     uniq($ref_excs);
@@ -357,9 +357,15 @@ sub update_blacklist {
 # main()
 
 cmd_line;
+
+get_blklist_cfg;
+
 update_blacklist;
+
 uniq($ref_blst);
+
 @$ref_blst = sort(@$ref_blst);
+
 write_list( \$blacklist_file, $ref_blst );
 
 my $debug_file = "/tmp/debug.txt";
