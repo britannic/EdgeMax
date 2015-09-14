@@ -133,9 +133,9 @@ sub write_list($$) {
 }
 
 sub cfg_none {
-
+    $$ref_bhip = "0.0.0.0";
     # Source urls for blacklisted adservers and malware servers
-    @blacklist_urls = (
+    @$ref_urls = (
         qw|
             http://winhelp2002.mvps.org/hosts.txt
             http://someonewhocares.org/hosts/zero/
@@ -144,14 +144,14 @@ sub cfg_none {
     );
 
     # regexs strings that will only the return the FQDN or hostname
-    @blacklist_rgxs = (
+    @$ref_rgxs = (
         '^0\.0\.0\.0\s([-a-z0-9_.]+).*',
         '^127\.0\.0\.1\s\s\b([-a-z0-9_\.]*)\b[\s]{0,1}',
         '^address=/\b([-a-z0-9_\.]+)\b/127\.0\.0\.1'
     );
 
     # Exclude our own good hosts
-    @exclusions = (
+    @$ref_excs = (
         qw|
             localhost
             msdn.com
@@ -165,7 +165,7 @@ sub cfg_none {
     );
 
     # Include our own bad hosts
-    my $badhost = "address=/beap.gemini.yahoo.com/0.0.0.0\n";
+    my $badhost = "beap.gemini.yahoo.com";
     sendit( \blacklist, \$badhost );
     return 1;
 }
@@ -254,9 +254,11 @@ sub cfg_file {
         my @includes = $xcp->copy_multis( $hashBlacklistChildren, 'include' );
         my @sources  = $xcp->copy_multis( $hashBlacklistChildren, 'source' );
 
-        for ( $hashBlacklist->{'name'} ) {
-            /^blackhole\s(.*)$/
-                and $$ref_bhip = $_ // "0.0.0.0";
+        for ( my $i = 0; $i < @{ $hashBlacklist->{'children'} }; $i++ ) {
+            for ( $hashBlacklist->{'children'}[$i]{'name'} ) {
+                /^blackhole\s(.*)$/ and $$ref_bhip = $1 // "0.0.0.0";
+            }
+
         }
 
         foreach my $multiBlacklistExclude (@excludes) {
