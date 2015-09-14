@@ -24,7 +24,7 @@
 # Use at your own risk
 #
 
-VERSION="v2.0"
+VERSION="v2.1"
 
 # Uncomment for debugging or syntax checking
 # set -x
@@ -129,8 +129,8 @@ install_adblock_support ()
 	set service dns forwarding blacklist source www.malwaredomainlist.com regex '^127\.0\.0\.1\s\s\b([-a-z0-9_\.]*)\b[\s]{0,1}' || ERROR=1
 	set service dns forwarding blacklist source www.malwaredomainlist.com url 'http://www.malwaredomainlist.com/hostslist/hosts.txt' || ERROR=1
 	set service dns forwarding blacklist source yoyo.org description 'DNSmasq formatted, but with 127.0.0.1 black hole IP' || ERROR=1
-	set service dns forwarding blacklist source yoyo.org regex '^address=/\b([-a-z0-9_\.]+)\b/127\.0\.0\.1' || ERROR=1
-	set service dns forwarding blacklist source yoyo.org url 'http://pgl.yoyo.org/adservers/serverlist.php?hostformat=dnsmasq&showintro=0&mimetype=plaintext' || ERROR=1
+	set service dns forwarding blacklist source yoyo.org regex '^(.*)$' || ERROR=1
+	set service dns forwarding blacklist source yoyo.org url 'http://pgl.yoyo.org/as/serverlist.php?hostformat=nohtml&showintro=1&mimetype=plaintext' || ERROR=1
 	set system task-scheduler task update_blacklists executable path /config/scripts/update-blacklists-dnsmasq.pl || ERROR=1
 	set system task-scheduler task update_blacklists interval 1d || ERROR=1
 

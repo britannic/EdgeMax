@@ -2,6 +2,9 @@ type: txt
 help: Add blacklist source url that provides a list of hostnames and or FQDNs
 
 val_help: http; Example: http://someonewhocares.org/hosts/zero/
-comp_help: Enssure the matching regex search only returns the Fully Qualified Domain Name or hostname.
+comp_help: Ensure the matching regex search only returns the Fully Qualified Domain Name or hostname.
 
 commit:expression: $VAR(../regex) != ""; "A source regex search string must be set"
+create:expression: "touch /tmp/update-blacklists.$PPID"
+delete:expression: "touch /tmp/update-blacklists.$PPID"
+update:expression: "touch /tmp/update-blacklists.$PPID"

@@ -23,7 +23,7 @@
 # a file in dnsmasq format
 #
 # **** End License ****
-my $version = 2.5;
+my $version = 2.51;
 
 use diagnostics;
 use integer;
@@ -48,12 +48,12 @@ my @blacklist_urls = ();
 my $ref_urls       = \@blacklist_urls;
 my @blacklist_rgxs = ();
 my $ref_rgxs       = \@blacklist_rgxs;
-
-my $dnsmasq = "/etc/init.d/dnsmasq";
+my $entry          = " - Entries processed: ";
+my $dnsmasq        = "/etc/init.d/dnsmasq";
 
 # The IP address below should point to the IP of your router/pixelserver or to 0.0.0.0
 # 0.0.0.0 is easy and doesn't require much from the router
-my $black_hole_ip = '0.0.0.0';
+my $black_hole_ip;
 my $ref_bhip       = \$black_hole_ip;
 my $blacklist_file = "/etc/dnsmasq.d/dnsmasq.blacklist.conf";
 my $cfg_file;
@@ -85,6 +85,11 @@ sub cmd_line {
         $$cmdmode = "std-alone";
     }
     elsif ( defined($in_cli) ) {
+        qx(/bin/cli-shell-api inSession);
+        if ($? > 0) {
+            print "You must run $0 inside of configure when '--in-cli' is specified!\n";
+            exit 0;
+        }
         $$cmdmode = "in-cli";
     }
     elsif ( defined($cfg_file) ) {
@@ -119,9 +124,7 @@ sub sendit {
 }
 
 sub uniq {
-    my $ref = shift;
-    my %hash = map { $_ => 1 } @$ref;
-    @$ref = ( sort keys(%hash) );
+    @$_ = ( sort keys %{ { map { $_ => 1 } @$_ } } );
 }
 
 sub write_list($$) {
@@ -312,8 +315,7 @@ sub get_blklist_cfg {
 
 sub update_blacklist {
 
-    my $mode  = \$ref_mode;
-    my $entry = " - Entries processed: ";
+    my $mode = \$ref_mode;
     uniq($ref_excs);
     uniq($ref_rgxs);
 
@@ -329,6 +331,7 @@ sub update_blacklist {
     # We only want the actual blacklist, so we can prepend our own hosts.
     # $black_hole_ip="0.0.0.0" saves router CPU cycles and is more efficient
     if ( !@$ref_urls == 0 ) {
+
         foreach my $url (@$ref_urls) {
             if ( $url =~ m|^http://| ) {
                 my %hash = map {
@@ -336,15 +339,15 @@ sub update_blacklist {
                     $val => 1;
                 } qx(curl -s $url);
                 my @content = keys %hash;
-                print $entry, $$counter if $$mode ne "ex-cli";
 
                 for my $line (@content) {
+                    print $entry, $$counter if $$mode ne "ex-cli";
                     for ($line) {
                         length($_) < 1 and last;
-                        !defined       and last;
+                        !defined($_)   and last;
                         /$exclude/     and last;
                         /$regex/ and sendit( \blacklist, \$1 ),
-                            push( @debug, $line . "\n" ), $$counter++, last;
+                            $$counter++, last;
                     }
                     print "\b" x length( $entry . $$counter )
                         if $$mode ne "ex-cli";
@@ -364,17 +367,12 @@ update_blacklist;
 
 uniq($ref_blst);
 
-@$ref_blst = sort(@$ref_blst);
-
 write_list( \$blacklist_file, $ref_blst );
 
-my $debug_file = "/tmp/debug.txt";
-
-write_list( \$debug_file, \@debug );
-
-printf( "Entries processed %d - unique records: %d \n",
-    $$counter, scalar(@$ref_blst) )
-    if $ref_mode ne "ex-cli";
+printf(
+    "Entries processed %d - unique records: %d \n",
+    $$counter, scalar(@$ref_blst)
+) if $ref_mode ne "ex-cli";
 
 system("$dnsmasq force-reload") if $ref_mode ne "in-cli";
 
