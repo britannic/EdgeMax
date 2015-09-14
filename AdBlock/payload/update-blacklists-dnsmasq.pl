@@ -119,9 +119,7 @@ sub sendit {
 }
 
 sub uniq {
-    my $ref = shift;
-    my %hash = map { $_ => 1 } @$ref;
-    @$ref = ( sort keys(%hash) );
+    @$_ = (sort keys %{{ map { $_ => 1 } @$_ }});
 }
 
 sub write_list($$) {
@@ -343,7 +341,7 @@ sub update_blacklist {
                         !defined       and last;
                         /$exclude/     and last;
                         /$regex/ and sendit( \blacklist, \$1 ),
-                            push( @debug, $line . "\n" ), $$counter++, last;
+                           $$counter++, last;
                     }
                     print "\b" x length( $entry . $$counter )
                         if $$mode ne "ex-cli";
