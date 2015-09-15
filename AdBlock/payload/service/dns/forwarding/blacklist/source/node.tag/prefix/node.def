@@ -1,6 +1,6 @@
 type: txt
-help: Regex string must return only the hostname or FQDN
-val_help: regex; Example: "^0\\.0\\.0\\.0\\s\\b([-a-z0-9_\\.]*\\b).*" - this will return 'animp.org' from a line with: '0.0.0.0 animp.org'
+help: Prefix string must include all text before the hostname or FQDN
+val_help: prefix; Example: "0.0.0.0 " - will remove '0.0.0.0 ' from a line with: '0.0.0.0 animp.org'
 
 commit:expression: $VAR(../url) != ""; "A source URL must be set"
 create:expression: "touch /tmp/update-blacklists.$PPID"

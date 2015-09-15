@@ -120,16 +120,16 @@ install_adblock_support ()
 	set service dns forwarding blacklist exclude survey.112.2o7.net || ERROR=1
 	set service dns forwarding blacklist include beap.gemini.yahoo.com || ERROR=1
 	set service dns forwarding blacklist source someonewhocares.org description 'Zero based host and domain list' || ERROR=1
-	set service dns forwarding blacklist source someonewhocares.org regex '^0\.0\.0\.0\s([-a-z0-9_.]+).*' || ERROR=1
+	set service dns forwarding blacklist source someonewhocares.org prefix '0.0.0.0 ' || ERROR=1
 	set service dns forwarding blacklist source someonewhocares.org url 'http://someonewhocares.org/hosts/zero/' || ERROR=1
 	set service dns forwarding blacklist source winhelp2002.mvps.org description 'Zero based host and domain list' || ERROR=1
-	set service dns forwarding blacklist source winhelp2002.mvps.org regex '^0\.0\.0\.0\s([-a-z0-9_.]+).*' || ERROR=1
+	set service dns forwarding blacklist source winhelp2002.mvps.org prefix '0.0.0.0 ' || ERROR=1
 	set service dns forwarding blacklist source winhelp2002.mvps.org url 'http://winhelp2002.mvps.org/hosts.txt' || ERROR=1
 	set service dns forwarding blacklist source www.malwaredomainlist.com description '127.0.0.1 based host and domain list' || ERROR=1
-	set service dns forwarding blacklist source www.malwaredomainlist.com regex '^127\.0\.0\.1\s\s\b([-a-z0-9_\.]*)\b[\s]{0,1}' || ERROR=1
+	set service dns forwarding blacklist source www.malwaredomainlist.com prefix '127.0.0.1  ' || ERROR=1
 	set service dns forwarding blacklist source www.malwaredomainlist.com url 'http://www.malwaredomainlist.com/hostslist/hosts.txt' || ERROR=1
 	set service dns forwarding blacklist source yoyo.org description 'DNSmasq formatted, but with 127.0.0.1 black hole IP' || ERROR=1
-	set service dns forwarding blacklist source yoyo.org regex '^(.*)$' || ERROR=1
+	set service dns forwarding blacklist source yoyo.org prefix '' || ERROR=1
 	set service dns forwarding blacklist source yoyo.org url 'http://pgl.yoyo.org/as/serverlist.php?hostformat=nohtml&showintro=1&mimetype=plaintext' || ERROR=1
 	set system task-scheduler task update_blacklists executable path /config/scripts/update-blacklists-dnsmasq.pl || ERROR=1
 	set system task-scheduler task update_blacklists interval 1d || ERROR=1

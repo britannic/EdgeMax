@@ -1,7 +1,5 @@
 # UBNT EdgeMax Blacklist and Ad Server Blocking
 https://community.ubnt.com/t5/EdgeMAX/Self-Installer-to-configure-Ad-Server-and-Blacklist-Blocking/td-p/1337892
-git@empirecreekcircle.com
-@britannic
 
 NOTE: THIS IS NOT OFFICIAL UBIQUITI SOFTWARE AND THEREFORE NOT SUPPORTED OR ENDORSED BY Ubiquiti Networks®
 
@@ -14,8 +12,8 @@ EdgeMax Blacklist and Ad Server Blocking is derived from the received wisdom fou
 
 ## Features
 * Generates a dnsmasq configuration file that can be used directly by dnsmasq
-* Any fqdn in the blacklist will return the IP address configured in the update-blacklists-dnsmasq.pl script at line 15
 * Integrated with the EdgeMax OS CLI
+* Any fqdn in the blacklist will return the configured Blackhole IP address
 
 ## Compatibility
 * update-blacklists-dnsmasq.pl has been tested on the EdgeRouter Lite family of routers, version v1.6.0-v1.7.0.
@@ -60,23 +58,22 @@ The script will also install a default blacklist setup, here is the stanza (show
                 include beap.evilmalware.com
                 source someonewhocares.org {
                     description "Zero based host and domain list"
-                    regex "^0.0.0.0\s([-a-z0-9_.]+).*"
+                    prefix "0.0.0.0 "
                     url http://someonewhocares.org/hosts/zero/
                 }
                 source winhelp2002.mvps.org {
                     description "Zero based host and domain list"
-                    regex "^0.0.0.0\s([-a-z0-9_.]+).*"
+                    prefix "0.0.0.0 "
                     url http://winhelp2002.mvps.org/hosts.txt
-                }
-                source www.malwaredomainlist.com {
-                    description "127.0.0.1 based host and domain list"
-                    regex "^127\.0\.0\.1\s\s\b([-a-z0-9_\.]*)\b[\s]{0,1}"
-                    url http://www.malwaredomainlist.com/hostslist/hosts.txt
                 }
                 source yoyo.org {
                     description "DNSmasq formatted, but with 127.0.0.1 black hole IP"
-                    regex "^address=/\b([-a-z0-9_\.]+)\b/127\.0\.0\.1"
-                    url http://pgl.yoyo.org/adservers/serverlist.php?hostformat=dnsmasq&showintro=0&mimetype=plaintext
+                    prefix ""
+                    url http://pgl.yoyo.org/as/serverlist.php?hostformat=nohtml&showintro=1&mimetype=plaintext
+                source www.malwaredomainlist.com {
+                    description "127.0.0.1 based host and domain list"
+                    prefix "127.0.0.1  "
+                    url http://www.malwaredomainlist.com/hostslist/hosts.txt
                 }
             }
             cache-size 150
@@ -90,4 +87,30 @@ The script will also install a default blacklist setup, here is the stanza (show
             system
         }
     }
+```
+
+* CLI commands to configure the ADBlock Blacklist:
+
+```javascript
+    set service dns forwarding blacklist blackhole 0.0.0.0
+    set service dns forwarding blacklist exclude msdn.com
+    set service dns forwarding blacklist exclude appleglobal.112.2o7.net
+    set service dns forwarding blacklist exclude cdn.visiblemeasures.com
+    set service dns forwarding blacklist exclude hb.disney.go.com
+    set service dns forwarding blacklist exclude googleadservices.com
+    set service dns forwarding blacklist exclude hulu.com
+    set service dns forwarding blacklist exclude static.chartbeat.com
+    set service dns forwarding blacklist exclude survey.112.2o7.net
+    set service dns forwarding blacklist include beap.gemini.yahoo.com
+    set service dns forwarding blacklist source someonewhocares.org description 'Zero based host and domain list'
+    set service dns forwarding blacklist source someonewhocares.org prefix '0.0.0.0 '
+    set service dns forwarding blacklist source someonewhocares.org url 'http://someonewhocares.org/hosts/zero/'
+    set service dns forwarding blacklist source winhelp2002.mvps.org description 'Zero based host and domain list'
+    set service dns forwarding blacklist source winhelp2002.mvps.org prefix '0.0.0.0 '
+    set service dns forwarding blacklist source winhelp2002.mvps.org url 'http://winhelp2002.mvps.org/hosts.txt'
+    set service dns forwarding blacklist source yoyo.org description 'DNSmasq formatted, but with 127.0.0.1 black hole IP'
+    set service dns forwarding blacklist source yoyo.org prefix ''
+    set service dns forwarding blacklist source yoyo.org url 'http://pgl.yoyo.org/as/serverlist.php?hostformat=nohtml&showintro=1&mimetype=plaintext'
+    set system task-scheduler task update_blacklists executable path /config/scripts/update-blacklists-dnsmasq.pl
+    set system task-scheduler task update_blacklists interval 1d
 ```
