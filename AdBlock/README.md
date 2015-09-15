@@ -32,6 +32,7 @@ To install:
 
 ## Post Installation
 Here is the scheduler configuration after running install_adblock:
+
 ```javascript
 show system task-scheduler
  task update_blacklists {
