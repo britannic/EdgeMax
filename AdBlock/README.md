@@ -32,7 +32,7 @@ To install:
 
 ## Post Installation
 Here is the scheduler configuration after running install_adblock:
-'''javascript
+```javascript
 show system task-scheduler
  task update_blacklists {
      executable {
@@ -40,10 +40,10 @@ show system task-scheduler
      }
      interval 1d
  }
-'''
+```
 The script will also install a default blacklist setup, here is the stanza (show service dns forwarding):
 
-'''javascript
+```javascript
  dns {
         forwarding {
             blacklist {
@@ -89,4 +89,4 @@ The script will also install a default blacklist setup, here is the stanza (show
             system
         }
     }
-'''
+```
