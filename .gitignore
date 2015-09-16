@@ -4,3 +4,13 @@ Blacklist Blocking/payload/hosts.txt
 Blacklist Blocking/payload/nytprof.out
 
 Blacklist Blocking/payload/update-blacklists-dnsmasq.ptkdb
+
+*.tgz
+
+*.worksheet
+
+*.txt
+
+*.bbprojectdata
+
+*.bbprojectsettings
