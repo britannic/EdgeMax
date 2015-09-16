@@ -128,7 +128,7 @@ install_adblock_support ()
 	set service dns forwarding blacklist source www.malwaredomainlist.com description '127.0.0.1 based host and domain list' || ERROR=1
 	set service dns forwarding blacklist source www.malwaredomainlist.com prefix '127.0.0.1  ' || ERROR=1
 	set service dns forwarding blacklist source www.malwaredomainlist.com url 'http://www.malwaredomainlist.com/hostslist/hosts.txt' || ERROR=1
-	set service dns forwarding blacklist source yoyo.org description 'DNSmasq formatted, but with 127.0.0.1 black hole IP' || ERROR=1
+	set service dns forwarding blacklist source yoyo.org description 'Fully Qualified Domain Names only - no prefix to strip' || ERROR=1
 	set service dns forwarding blacklist source yoyo.org prefix '' || ERROR=1
 	set service dns forwarding blacklist source yoyo.org url 'http://pgl.yoyo.org/as/serverlist.php?hostformat=nohtml&showintro=1&mimetype=plaintext' || ERROR=1
 	set system task-scheduler task update_blacklists executable path /config/scripts/update-blacklists-dnsmasq.pl || ERROR=1

@@ -147,7 +147,7 @@ sub cfg_none {
         qw|
             http://winhelp2002.mvps.org/hosts.txt
             http://someonewhocares.org/hosts/zero/
-            http://pgl.yoyo.org/adservers/serverlist.php?hostformat=dnsmasq&showintro=0&mimetype=plaintext
+            http://pgl.yoyo.org/as/serverlist.php?hostformat=nohtml&showintro=1&mimetype=plaintext
             http://www.malwaredomainlist.com/hostslist/hosts.txt|
     ){
         sendit( \url, \$_ );
