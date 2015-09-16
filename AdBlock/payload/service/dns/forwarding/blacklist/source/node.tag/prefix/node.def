@@ -1,0 +1,8 @@
+type: txt
+help: Prefix string must include all text before the hostname or FQDN
+val_help: prefix; Example: "0.0.0.0 " - will remove '0.0.0.0 ' from a line with: '0.0.0.0 animp.org'
+
+commit:expression: $VAR(../url) != ""; "A source URL must be set"
+create:expression: "touch /tmp/update-blacklists.$PPID"
+delete:expression: "touch /tmp/update-blacklists.$PPID"
+update:expression: "touch /tmp/update-blacklists.$PPID"

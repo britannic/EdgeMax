@@ -1,0 +1,12 @@
+multi:
+type: txt
+help: hostnames and FQDNs to include in the DNS forwarding blacklist
+
+syntax:expression: pattern $VAR(@) "^[[:alnum:]][-.[:alnum:]]*[[:alnum:]]$"
+                   ; "invalid host name $VAR(@)"
+
+create:expression: "touch /tmp/update-blacklists.$PPID"
+delete:expression: "touch /tmp/update-blacklists.$PPID"
+update:expression: "touch /tmp/update-blacklists.$PPID"
+
+
