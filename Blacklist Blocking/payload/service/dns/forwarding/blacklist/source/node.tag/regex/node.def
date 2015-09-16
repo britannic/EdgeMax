@@ -1,4 +1,0 @@
-type: txt
-help: Regex string must return only the domain name or FQDN
-comp_help: Example: '^0\.0\.0\.0\s\b([-a-z0-9_\.]*\b).*' - this will return
-           'animp.org' from a line with: '0.0.0.0 animp.org'

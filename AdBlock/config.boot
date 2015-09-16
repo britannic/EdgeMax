@@ -82,6 +82,7 @@ service {
                 exclude hulu.com
                 exclude static.chartbeat.com
                 exclude survey.112.2o7.net
+                include beap.gemini.yahoo.com
                 source someonewhocares.org {
                     description "Zero based host and domain list"
                     regex "^0.0.0.0\s([-a-z0-9_.]+).*"

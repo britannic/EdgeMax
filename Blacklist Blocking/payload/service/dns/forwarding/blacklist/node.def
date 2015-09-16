@@ -1,5 +1,0 @@
-help: Add and delete blacklist blackhole IP, exclusions and URL sources
-
-create: sudo /config/scripts/update-blacklists-dnsmasq.pl
-delete: sudo /config/scripts/update-blacklists-dnsmasq.pl
-update: sudo /config/scripts/update-blacklists-dnsmasq.pl
