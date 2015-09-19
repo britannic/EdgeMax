@@ -1,0 +1,68 @@
+<div class="instructions">
+	Adware and Malware DNS Blocking
+</div>
+<fieldset name="adblock" class="primary expanded">
+	<legend>ADBlock</legend>
+		<div class="addable" data-object="blackhole-ip">
+			<label data-infotip="IP address to redirect blacklisted hosts to.">Blackhole IP
+			<input type="text" name="blackhole-ip" value="0.0.0.0" style="width:150px;margin-right:5px"/>
+			</label>
+		</div>
+		<div class="addable" data-object="ADBlock-enable" style="float:right;margin-right:15px"><label data-infotip="ADBlock will be added to the task scheduler when box is checked.">
+			<input type="checkbox" name="ADBlock-enable" value="true"/>
+			Enable ADBlock</label>
+		</div>
+
+		</div>
+	<div class="instructions">
+		Configure a source URL and prefix. The source will provide a list of hostnames to block and the prefix contains all of the text that must be stripped to leave the hostname.
+	</div>
+	<div class="addable" data-min="0" data-object="adblock" data-objectify="1">
+		<div class="addable-template">
+			<div><input type="text" name="source-url" value="http://" style="width:300px;margin-right:25px" data-infotip="Source URL providing a downloadable list of blacklisted hosts." /></div>
+			<div><input type="text" name="source-prefix" value="None" style="width:200px;margin-right:25px" data-infotip="The prefix must include everything (spaces, text, numbers etc.) before the hostname." /></div>
+			<div><button type="button" class="addable-remove">Remove</button></div>
+		</div>
+		<table class="addable-container">
+			<tr><th>Source URL</th><th>Prefix</th><th></th>
+			<!-- source and prefix pairs will be inserted here -->
+		</table>
+			<button type="button" class="addable-add">Add New</button>
+	</div>
+</fieldset>
+<fieldset name="include" class="primary">
+	<legend>Include Additional Blacklisted Hosts</legend>
+		<div class="instructions">
+			Add hostnames to the blacklist that aren't in the downloaded source lists.
+		</div>
+		<div class="addable" data-min="0" data-object="include-host" data-objectify="1">
+			<div class="addable-template">
+				<div class="multi">
+					<div><input type="text" name="include" style="width:260px;margin-right:25px" data-infotip="Hostname to be included in the blacklist, that isn't in the source download." /></div>
+					<div><button type="button" class="addable-remove">Remove</button></div>
+				</div>
+			</div>
+			<div class="addable-container">
+				<!-- included blacklist hosts will be inserted here -->
+			</div>
+			<button type="button" class="addable-add">Add New</button>
+		</div>
+</fieldset>
+<fieldset name="exclude" class="primary">
+	<legend>Exclude Additional Blacklisted Hosts</legend>
+		<div class="instructions">
+			Add hostnames to the whitelist that you want to exclude from the downloaded source lists.
+		</div>
+		<div class="addable" data-min="0" data-object="exclude" data-objectify="1">
+			<div class="addable-template">
+				<div class="multi">
+					<div><input type="text" name="exclude-host" style="width:260px;margin-right:25px" data-infotip="Hostname to be exclude from the blacklist, that is already in the source download." /></div>
+					<div><button type="button" class="addable-remove">Remove</button></div>
+				</div>
+			</div>
+			<div class="addable-container">
+				<!-- excluded blacklist hosts will be inserted here -->
+			</div>
+			<button type="button" class="addable-add">Add New</button>
+		</div>
+</fieldset>
