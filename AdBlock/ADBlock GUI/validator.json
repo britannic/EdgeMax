@@ -1,0 +1,22 @@
+{
+  "rules": {
+    "blackholeip": {
+        "required": true
+        },
+    "source": {
+        "required": true
+        },
+    "prefix": {
+        "required": true
+        },
+    "url": {
+        "required": true
+        },
+    "include": {
+        "required": false
+        },
+    "exclude": {
+        "required": false
+        },
+    }
+}

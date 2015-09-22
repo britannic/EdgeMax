@@ -1,0 +1,115 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use lib '/opt/vyatta/share/perl5/';
+use Vyatta::Config;
+use Vyatta::ConfigMgmt;
+use feature qw/say/;
+
+my $action  = $ARGV[0];
+my $input   = $ARGV[1];
+my $cfg_lvl = "service dns forwarding";
+my $config  = new Vyatta::Config;
+
+sub isblacklist {
+    my $blklst_exists;
+    my $bool = 0;
+
+    $config->setLevel($cfg_lvl);
+    $blklst_exists = $config->exists("blacklist");
+
+    if ( defined($blklst_exists) ) {
+        $bool = 1;
+    }
+    else {
+        $bool = 0;
+    }
+
+    return $bool;
+}
+
+sub load {
+
+    if (isblacklist) {
+        $config->setLevel("$cfg_lvl blacklist");
+        my @includes      = $config->returnValues('include');
+        my @excludes      = $config->returnValues('exclude');
+        my @sources       = $config->listNodes('source');
+        my $black_hole_ip = $config->returnValue('blackhole') // "0.0.0.0";
+
+        my $enable = $config->exists('disable') ? 'c' : 'nc';
+
+        my $includes = '"includes":[';
+        my $excludes = '"excludes":[';
+        my $sources  = '"sources":[';
+        my $i        = 0;
+
+        if (@includes) {
+            for ( $i = 0; $i < (@includes) - 1; $i++ ) {
+                $includes .= '{"include":"' . $includes[$i] . '"},';
+            }
+            $includes .= '{"include":"' . $includes[ $i ] if $includes[ $i ];
+        }
+        $includes .= '"}]';
+
+        if (@excludes) {
+            for ( $i = 0; $i < (@excludes) - 1; $i++ ) {
+                $excludes .= '{"exclude":"' . $excludes[$i] . '"},';
+            }
+            $excludes .= '{"exclude":"' . $excludes[ $i ] if $excludes[ $i ];
+        }
+        $excludes .= '"}]';
+
+        if (@sources) {
+            for ( $i = 0; $i < (@sources) - 1; $i++ ) {
+                $config->setLevel("$cfg_lvl blacklist source $sources[ $i ]");
+                my $prefix = $config->returnValue('prefix');
+                $prefix = 'None' if !$prefix;
+
+                $sources
+                    .= '{"source":"'
+                    . $sources[$i]
+                    . '","prefix":"'
+                    . "$prefix"
+                    . '","url":"'
+                    . $config->returnValue('url') . '"},';
+            }
+            $config->setLevel("$cfg_lvl blacklist source $sources[ $i ]");
+            my $prefix = $config->returnValue('prefix');
+            $prefix = 'None' if !$prefix;
+
+            $sources
+                .= '{"source":"'
+                . $sources[ $i ]
+                . '","prefix":"'
+                . "$prefix"
+                . '","url":"'
+                . $config->returnValue('url') if $sources[ $i ];
+        }
+        $sources .= '"}]';
+
+        say '{"success":"1","data":{"adblock":[{"blackholeip":"'
+            . $black_hole_ip
+            . '","enable":"'
+            . $enable . '"}],'
+            . $sources . ','
+            . $includes . ','
+            . $excludes . '}';
+    }
+    else {
+        print "{\"success\":\"0\",\"error\":\"\"\"}";
+    }
+}
+
+sub apply {
+    my $cmd = 'cp ' . $input . ' /tmp/result.json';
+    qx($cmd);
+    print "{\"success\":\"1\"}";
+}
+
+for ($action) {
+    /load/  and load,  last;
+    /apply/ and apply, last;
+}
+
