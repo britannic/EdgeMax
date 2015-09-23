@@ -126,14 +126,17 @@ sub sendit {
 }
 
 sub uniq {
-    @$_ = ( sort keys %{ { map { $_ => 1 } @$_ } } );
+    my @unsorted = @_;
+    my @sorted = ( sort keys %{ { map { $_ => 1 } @unsorted } } );
+    return @sorted;
 }
 
 sub write_list($$) {
     my $fh;
-    my ( $file, $list ) = @_;
+    my $file = $_[0];
+    my @list = @{$_[1]};
     open( $fh, '>', $$file ) or die "Could not open file: '$file' $!";
-    print $fh (@$list);
+    print $fh (@list);
     close($fh);
 }
 
@@ -327,17 +330,14 @@ sub get_blklist_cfg {
 
 sub update_blacklist {
 
-    my $mode = \$ref_mode;
-    uniq($ref_excs);
-    uniq($ref_prfx);
-
-    my $exclude = join( "|", @$ref_excs );
-    my $prefix  = join( "|", @$ref_prfx );
+    my $mode      = \$ref_mode;
+    my $exclude   = join( "|", uniq(@$ref_excs) );
+    my $prefix    = join( "|", uniq(@$ref_prfx) );
     my $strmregex = qr/^\s+|\s+$|\n|\r|^#.*$/;
 
-    $exclude  = qr/$exclude/;
-    $prefix   = qr/^($prefix)$fqdn/;
-    $$counter = scalar(@$ref_blst);
+    $exclude      = qr/$exclude/;
+    $prefix       = qr/^($prefix)$fqdn/;
+    $$counter     = scalar(@$ref_blst);
 
     # Get blacklist and convert the hosts file into a dnsmasq.conf format
     # file. Be paranoid and replace every IP address with $black_hole_ip.
@@ -383,7 +383,7 @@ get_blklist_cfg;
 
 update_blacklist;
 
-uniq( \@blacklist );
+@blacklist = uniq( @blacklist );
 
 write_list( \$blacklist_file, \@blacklist );
 
@@ -392,4 +392,3 @@ printf( "\rEntries processed %d - unique records: %d \n",
     if $ref_mode ne "ex-cli";
 
 system("$dnsmasq force-reload") if $ref_mode ne "in-cli";
-
