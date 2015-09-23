@@ -3,14 +3,96 @@
 use strict;
 use warnings;
 use lib '/opt/vyatta/share/perl5/';
+use JSON qw/decode_json/;
+use Data::Dumper;
 use Vyatta::Config;
 use Vyatta::ConfigMgmt;
-use feature qw/say/;
 
 my $action  = $ARGV[0];
 my $input   = $ARGV[1];
-my $cfg_lvl = "service dns forwarding";
+my $cfg_lvl = "service dns forwarding blacklist";
+my $cmd     = "/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper";
 my $config  = new Vyatta::Config;
+
+my $begin  = "$cmd begin";
+my $commit = "$cmd commit";
+my $del    = "$cmd delete";
+my $end    = "$cmd end";
+my $save   = "$cmd save";
+my $set    = "$cmd set";
+
+sub apply {
+    my $json_data;
+
+    open( my $fh, '<:encoding(UTF-8)', $input )
+        or die("Could not open $input - this shouldn't happen!");
+    while ( my $row = <$fh> ) {
+        chomp $row;
+        $json_data .= $row;
+    }
+    close($fh);
+
+    my $adblock_data  = decode_json($json_data);
+    my $black_hole_ip = $adblock_data->{'blackholeip'};
+    my $enable        = $adblock_data->{'enable'};
+    my @sources       = @{ $adblock_data->{'sources'} };
+    my @excludes      = @{ $adblock_data->{'excludes'} };
+    my @includes      = @{ $adblock_data->{'includes'} };
+
+    my $disabled = ($enable eq 'enable') ? 'false' : 'true';
+
+    my @apply_blacklist
+        = ( "$begin", "$del $cfg_lvl", "$set $cfg_lvl disabled $disabled" );
+
+    for my $source (@sources) {
+        my $prefix = ($source->{'prefix'} eq 'None') ? '""' : "'" . $source->{'prefix'} . "'";
+        push(@apply_blacklist, "$set $cfg_lvl source $source->{'source'} url '" . $source->{'url'} . "'");
+        push(@apply_blacklist, "$set $cfg_lvl source $source->{'source'} prefix $prefix");
+    }
+
+    for my $exclude (@excludes) {
+        push(@apply_blacklist, "$set $cfg_lvl exclude $exclude->{'exclude'}");
+    }
+
+    for my $include (@includes) {
+        push(@apply_blacklist, "$set $cfg_lvl include $include->{'include'}");
+    }
+
+    push(@apply_blacklist, ($commit, $save, $end));
+
+    for (@apply_blacklist) {
+        print $_, "\n";
+    }
+    exit;
+
+#     my $apply_blacklist
+#         = join( ";", $begin, "$del $cfg_lvl", $commit, $save, $end );
+#     my $output = system( $apply_blacklist, '2>&1' );
+
+#     if ($?) {
+#         print "{\"success\":\"1\"}";
+#     }
+#     else {
+#         print "{\"success\":\"0\",\"error\": \"$output\"}";
+#     }
+
+    open( $fh, '>', '/tmp/result.json' );
+    print $fh ( Dumper($adblock_data), "\n" );
+    close($fh);
+    print "{\"success\":\"1\"}";
+}
+
+sub remove {
+    my $remove_blacklist
+        = join( ";", $begin, "$del $cfg_lvl", $commit, $save, $end );
+    my $output = system( $remove_blacklist, '2>&1' );
+    if ($?) {
+        print "{\"success\":\"1\"}";
+    }
+    else {
+        print "{\"success\":\"0\",\"error\": \"$output\"}";
+    }
+}
 
 sub isblacklist {
     my $blklst_exists;
@@ -25,20 +107,24 @@ sub isblacklist {
     else {
         $bool = 0;
     }
-
     return $bool;
 }
 
 sub load {
 
     if (isblacklist) {
-        $config->setLevel("$cfg_lvl blacklist");
+        $config->setLevel($cfg_lvl);
         my @includes      = $config->returnValues('include');
         my @excludes      = $config->returnValues('exclude');
         my @sources       = $config->listNodes('source');
         my $black_hole_ip = $config->returnValue('blackhole') // "0.0.0.0";
+        my $enable        = $config->returnValue('disabled');
 
-        my $enable = $config->exists('disable') ? 'c' : 'nc';
+        for ($enable) {
+            /true/  and $enable = '',       last;
+            /false/ and $enable = 'enable', last;
+            undef   and $enable = '',       last;
+        }
 
         my $includes = '"includes":[';
         my $excludes = '"excludes":[';
@@ -49,7 +135,7 @@ sub load {
             for ( $i = 0; $i < (@includes) - 1; $i++ ) {
                 $includes .= '{"include":"' . $includes[$i] . '"},';
             }
-            $includes .= '{"include":"' . $includes[ $i ] if $includes[ $i ];
+            $includes .= '{"include":"' . $includes[$i] if $includes[$i];
         }
         $includes .= '"}]';
 
@@ -57,13 +143,13 @@ sub load {
             for ( $i = 0; $i < (@excludes) - 1; $i++ ) {
                 $excludes .= '{"exclude":"' . $excludes[$i] . '"},';
             }
-            $excludes .= '{"exclude":"' . $excludes[ $i ] if $excludes[ $i ];
+            $excludes .= '{"exclude":"' . $excludes[$i] if $excludes[$i];
         }
         $excludes .= '"}]';
 
         if (@sources) {
             for ( $i = 0; $i < (@sources) - 1; $i++ ) {
-                $config->setLevel("$cfg_lvl blacklist source $sources[ $i ]");
+                $config->setLevel("$cfg_lvl source $sources[ $i ]");
                 my $prefix = $config->returnValue('prefix');
                 $prefix = 'None' if !$prefix;
 
@@ -75,41 +161,37 @@ sub load {
                     . '","url":"'
                     . $config->returnValue('url') . '"},';
             }
-            $config->setLevel("$cfg_lvl blacklist source $sources[ $i ]");
+            $config->setLevel("$cfg_lvl source $sources[ $i ]");
             my $prefix = $config->returnValue('prefix');
             $prefix = 'None' if !$prefix;
 
             $sources
                 .= '{"source":"'
-                . $sources[ $i ]
+                . $sources[$i]
                 . '","prefix":"'
                 . "$prefix"
                 . '","url":"'
-                . $config->returnValue('url') if $sources[ $i ];
+                . $config->returnValue('url')
+                if $sources[$i];
         }
         $sources .= '"}]';
 
-        say '{"success":"1","data":{"adblock":[{"blackholeip":"'
-            . $black_hole_ip
-            . '","enable":"'
-            . $enable . '"}],'
+        print '{"success":"1","data":{"enable":"'
+            . $enable
+            . '","blackholeip":"'
+            . $black_hole_ip . '",'
             . $sources . ','
             . $includes . ','
-            . $excludes . '}';
+            . $excludes . '}}';
     }
     else {
         print "{\"success\":\"0\",\"error\":\"\"\"}";
     }
 }
 
-sub apply {
-    my $cmd = 'cp ' . $input . ' /tmp/result.json';
-    qx($cmd);
-    print "{\"success\":\"1\"}";
-}
-
 for ($action) {
-    /load/  and load,  last;
-    /apply/ and apply, last;
+    /apply/  and apply,  last;
+    /delete/ and remove, last;
+    /load/   and load,   last;
 }
 
