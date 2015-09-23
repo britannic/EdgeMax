@@ -23,7 +23,7 @@
 # a file in dnsmasq format
 #
 # **** End License ****
-my $version = 2.52;
+my $version = 3.10;
 
 use URI;
 use integer;
@@ -37,7 +37,7 @@ use XorpConfigParser;
 
 use constant blacklist => 'blacklist';
 use constant url       => 'url';
-use constant regex     => 'regex';
+use constant prefix    => 'prefix';
 use constant exclude   => 'exclude';
 
 my @blacklist      = ();
@@ -46,11 +46,13 @@ my @exclusions     = ();
 my $ref_excs       = \@exclusions;
 my @blacklist_urls = ();
 my $ref_urls       = \@blacklist_urls;
-my @blacklist_rgxs = ();
-my $ref_rgxs       = \@blacklist_rgxs;
+my @blacklist_prfx = ();
+my $ref_prfx       = \@blacklist_prfx;
 my $entry          = " - Entries processed: ";
 my $dnsmasq        = "/etc/init.d/dnsmasq";
 my $uri;
+my $fqdn
+    = '((?=.{1,254}$)((?:(?!\d+\.|-)[a-zA-Z0-9_\-]{1,63}(?<!-)\.?)+(?:[a-zA-Z]{2,})$))\s*$';
 
 # The IP address below should point to the IP of your router/pixelserver or to 0.0.0.0
 # 0.0.0.0 is easy and doesn't require much from the router
@@ -63,8 +65,6 @@ my $i       = 0;
 my $counter = \$i;
 my $list;
 my $line;
-
-my @debug;
 
 sub cmd_line {
     my $cmdmode = \$ref_mode;
@@ -118,8 +118,8 @@ sub sendit {
         for ($list) {
             /blacklist/ and push( @$ref_blst, "address=/$line/$$ref_bhip\n" ),
                 last;
-            /url/     and push( @$ref_urls, $line ), last;
-            /regex/   and push( @$ref_rgxs, $line ), last;
+            /url/ and push( @$ref_urls, $line ), last;
+            /prefix/ and push( @$ref_prfx, qq($line) ), last;
             /exclude/ and push( @$ref_excs, $line ), last;
         }
     }
@@ -141,38 +141,48 @@ sub cfg_none {
     $$ref_bhip = "0.0.0.0";
 
     # Source urls for blacklisted adservers and malware servers
-    @$ref_urls = (
+    for (
         qw|
             http://winhelp2002.mvps.org/hosts.txt
             http://someonewhocares.org/hosts/zero/
-            http://pgl.yoyo.org/adservers/serverlist.php?hostformat=dnsmasq&showintro=0&mimetype=plaintext
+            http://pgl.yoyo.org/as/serverlist.php?hostformat=nohtml&showintro=1&mimetype=plaintext
             http://www.malwaredomainlist.com/hostslist/hosts.txt|
-    );
+    ){
+        sendit( \url, \$_ );
+    }
 
-    # regexs strings that will only the return the FQDN or hostname
-    @$ref_rgxs = (
-        '^0\.0\.0\.0\s([-a-z0-9_.]+).*',
-        '^127\.0\.0\.1\s\s\b([-a-z0-9_\.]*)\b[\s]{0,1}',
-        '^address=/\b([-a-z0-9_\.]+)\b/127\.0\.0\.1'
-    );
+# prefix strings to be removed, leaving the FQDN or hostname + trailing suffix
+    for (
+        qw(
+        0.0.0.0..
+        127.0.0.1..
+        address=/
+        )
+        )
+    {
+        sendit( \prefix, \$_ );
+    }
 
     # Exclude our own good hosts
-    @$ref_excs = (
+    for (
         qw|
-            localhost
-            msdn.com
-            appleglobal.112.2o7.net
-            cdn.visiblemeasures.com
-            hb.disney.go.com
-            googleadservices.com
-            hulu.com
-            static.chartbeat.com
-            survey.112.2o7.net|
-    );
+        localhost
+        msdn.com
+        appleglobal.112.2o7.net
+        cdn.visiblemeasures.com
+        hb.disney.go.com
+        googleadservices.com
+        hulu.com
+        static.chartbeat.com
+        survey.112.2o7.net|
+        )
+    {
+        sendit( \exclude, \$_ );
+    }
 
     # Include our own bad hosts
-    my $badhost = "beap.gemini.yahoo.com";
-    sendit( \blacklist, \$badhost );
+    my $include = "beap.gemini.yahoo.com";
+    sendit( \blacklist, \$include );
     return 1;
 }
 
@@ -197,7 +207,7 @@ sub isblacklist {
 }
 
 sub cfg_active {
-    my ( @sources, $source, @includes, $include, @excludes, $exclude );
+    my ( @sources, @includes, @excludes );
     my $config = new Vyatta::Config;
 
     if (isblacklist) {
@@ -216,24 +226,23 @@ sub cfg_active {
             $$ref_bhip = $config->returnOrigValue('blackhole') // "0.0.0.0";
         }
 
-        foreach $include (@includes) {
-            sendit( \blacklist, \$include );
+        for (@includes) {
+            sendit( \blacklist, \$_ );
         }
 
-        foreach $exclude (@excludes) {
-            sendit( \exclude, \$exclude );
+        for (@excludes) {
+            sendit( \exclude, \$_ );
         }
 
-        foreach $source (@sources) {
-            $config->setLevel(
-                "service dns forwarding blacklist source $source");
+        for (@sources) {
+            $config->setLevel("service dns forwarding blacklist source $_");
             if ( $ref_mode eq "in-cli" ) {
-                sendit( \url,   \$config->returnValue('url') );
-                sendit( \regex, \$config->returnValue('regex') );
+                sendit( \url,    \$config->returnValue('url') );
+                sendit( \prefix, \$config->returnValue('prefix') );
             }
             else {
-                sendit( \url,   \$config->returnOrigValue('url') );
-                sendit( \regex, \$config->returnOrigValue('regex') );
+                sendit( \url,    \$config->returnOrigValue('url') );
+                sendit( \prefix, \$config->returnOrigValue('prefix') );
             }
         }
     }
@@ -247,7 +256,7 @@ sub cfg_file {
     my $mode = $ref_mode
         ; # not yet sure why $cmdmode ends up undef after this sub, so preserving it
     my $rgx_url = qr/^url\s+(.*)$/;
-    my $rgx_re  = qr/^regex\s["{0,1}](.*)["{0,1}].*$/;
+    my $prfx_re = qr/^prefix\s+["{0,1}](.*)["{0,1}].*$/;
     my $xcp     = new XorpConfigParser();
     $xcp->parse($cfg_file);
 
@@ -262,20 +271,20 @@ sub cfg_file {
 
         for ( my $i = 0; $i < @{ $hashBlacklist->{'children'} }; $i++ ) {
             for ( $hashBlacklist->{'children'}[$i]{'name'} ) {
-                /^blackhole\s(.*)$/ and $$ref_bhip = $1 // "0.0.0.0";
+                /^blackhole\s+(.*)$/ and $$ref_bhip = $1 // "0.0.0.0";
             }
 
         }
 
-        foreach my $multiBlacklistExclude (@excludes) {
+        for my $multiBlacklistExclude (@excludes) {
             sendit( \exclude, \$multiBlacklistExclude->{'name'} );
         }
 
-        foreach my $multiBlacklistInclude (@includes) {
+        for my $multiBlacklistInclude (@includes) {
             sendit( \blacklist, \$multiBlacklistInclude->{'name'} );
         }
 
-        foreach my $multiBlacklistSource (@sources) {
+        for my $multiBlacklistSource (@sources) {
             my $hashSource = $xcp->get_node(
                 [   'service', 'dns', 'forwarding', 'blacklist',
                     "source $multiBlacklistSource->{'name'}"
@@ -284,12 +293,12 @@ sub cfg_file {
 
             my $hashSourceChildren = $hashSource->{'children'};
 
-            foreach my $node (@$hashSourceChildren) {
-                for ( $node->{'name'} ) {
+            for (@$hashSourceChildren) {
+                for ( $_->{'name'} ) {
                     /$rgx_url/
                         and sendit( \url, \$1 ), last;
-                    /$rgx_re/
-                        and sendit( \regex, \$1 ), last;
+                    /$prfx_re/
+                        and sendit( \prefix, \$1 ), last;
                 }
             }
         }
@@ -319,26 +328,27 @@ sub update_blacklist {
 
     my $mode = \$ref_mode;
     uniq($ref_excs);
-    uniq($ref_rgxs);
+    uniq($ref_prfx);
 
     my $exclude = join( "|", @$ref_excs );
-    my $regex   = join( "|", @$ref_rgxs );
+    my $prefix  = join( "|", @$ref_prfx );
     my $strmregex = qr/^\s+|\s+$|\n|\r|^#.*$/;
 
-    $exclude = qr/$exclude/;
-    $regex   = qr/$regex/;
+    $exclude  = qr/$exclude/;
+    $prefix   = qr/^($prefix)$fqdn/;
     $$counter = scalar(@$ref_blst);
 
     # Get blacklist and convert the hosts file into a dnsmasq.conf format
     # file. Be paranoid and replace every IP address with $black_hole_ip.
     # We only want the actual blacklist, so we can prepend our own hosts.
     # $black_hole_ip="0.0.0.0" saves router CPU cycles and is more efficient
-    if ( !@$ref_urls == 0 ) {
+    if (@$ref_urls) {
 
-        foreach my $url (@$ref_urls) {
+        for my $url (@$ref_urls) {
 
-            if ( $url =~ m|^http://| ) {
+            if ( $url =~ m(^http://|^https://) ) {
                 $uri = new URI($url);
+                my $host = $uri->host;
 
                 my %hash = map {
                     ( my $val = lc($_) ) =~ s/$strmregex//g;
@@ -347,16 +357,18 @@ sub update_blacklist {
                 my @content = keys %hash;
 
                 for my $line (@content) {
-                    print ($uri->host, $entry, $$counter, "\r") if $$mode ne "ex-cli";
+                    print( $host, $entry, $$counter, "\r" )
+                        if $$mode ne "ex-cli";
                     for ($line) {
-                        length($_) < 1 and last;
-                        !defined($_)   and last;
-                        /$exclude/     and last;
-                        /$regex/ and sendit( \blacklist, \$1 ),
+                        !$_        and last;
+                        /$exclude/ and last;
+                        /$prefix/  and sendit( \blacklist, \$2 ),
                             $$counter++, last;
                     }
                 }
-            print("\r", " " x length($uri->host . $entry . $$counter), "\r") if $$mode ne "ex-cli";;
+                print( "\r", " " x length( $host . $entry . $$counter ),
+                    "\r" )
+                    if $$mode ne "ex-cli";
             }
         }
     }
@@ -370,9 +382,9 @@ get_blklist_cfg;
 
 update_blacklist;
 
-uniq($ref_blst);
+uniq(\@blacklist);
 
-write_list( \$blacklist_file, $ref_blst );
+write_list( \$blacklist_file, \@blacklist );
 
 printf( "\rEntries processed %d - unique records: %d \n",
     $$counter, scalar(@$ref_blst) )
