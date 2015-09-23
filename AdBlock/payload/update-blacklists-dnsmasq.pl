@@ -118,9 +118,9 @@ sub sendit {
         for ($list) {
             /blacklist/ and push( @$ref_blst, "address=/$line/$$ref_bhip\n" ),
                 last;
-            /url/ and push( @$ref_urls, $line ), last;
-            /prefix/ and push( @$ref_prfx, qq($line) ), last;
-            /exclude/ and push( @$ref_excs, $line ), last;
+            /url/       and push( @$ref_urls, $line ), last;
+            /prefix/    and push( @$ref_prfx, qq($line) ), last;
+            /exclude/   and push( @$ref_excs, $line ), last;
         }
     }
 }
@@ -143,11 +143,12 @@ sub cfg_none {
     # Source urls for blacklisted adservers and malware servers
     for (
         qw|
-            http://winhelp2002.mvps.org/hosts.txt
-            http://someonewhocares.org/hosts/zero/
-            http://pgl.yoyo.org/as/serverlist.php?hostformat=nohtml&showintro=1&mimetype=plaintext
-            http://www.malwaredomainlist.com/hostslist/hosts.txt|
-    ){
+        http://winhelp2002.mvps.org/hosts.txt
+        http://someonewhocares.org/hosts/zero/
+        http://pgl.yoyo.org/as/serverlist.php?hostformat=nohtml&showintro=1&mimetype=plaintext
+        http://www.malwaredomainlist.com/hostslist/hosts.txt|
+        )
+    {
         sendit( \url, \$_ );
     }
 
@@ -382,7 +383,7 @@ get_blklist_cfg;
 
 update_blacklist;
 
-uniq(\@blacklist);
+uniq( \@blacklist );
 
 write_list( \$blacklist_file, \@blacklist );
 
