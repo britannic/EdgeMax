@@ -23,7 +23,7 @@
 # a file in dnsmasq format
 #
 # **** End License ****
-my $version = 3.00;
+my $version = 3.10;
 
 use URI;
 use integer;
@@ -65,8 +65,6 @@ my $i       = 0;
 my $counter = \$i;
 my $list;
 my $line;
-
-my @debug;
 
 sub cmd_line {
     my $cmdmode = \$ref_mode;
@@ -121,7 +119,7 @@ sub sendit {
             /blacklist/ and push( @$ref_blst, "address=/$line/$$ref_bhip\n" ),
                 last;
             /url/ and push( @$ref_urls, $line ), last;
-            /prefix/ and push( @$ref_prfx, '^' . qq($line) . $fqdn ), last;
+            /prefix/ and push( @$ref_prfx, qq($line) ), last;
             /exclude/ and push( @$ref_excs, $line ), last;
         }
     }
@@ -337,19 +335,20 @@ sub update_blacklist {
     my $strmregex = qr/^\s+|\s+$|\n|\r|^#.*$/;
 
     $exclude  = qr/$exclude/;
-    $prefix   = qr/$prefix/;
+    $prefix   = qr/^($prefix)$fqdn/;
     $$counter = scalar(@$ref_blst);
 
     # Get blacklist and convert the hosts file into a dnsmasq.conf format
     # file. Be paranoid and replace every IP address with $black_hole_ip.
     # We only want the actual blacklist, so we can prepend our own hosts.
     # $black_hole_ip="0.0.0.0" saves router CPU cycles and is more efficient
-    if ( !@$ref_urls == 0 ) {
+    if (@$ref_urls) {
 
         for my $url (@$ref_urls) {
 
-            if ( $url =~ m|^http://| ) {
+            if ( $url =~ m(^http://|^https://) ) {
                 $uri = new URI($url);
+                my $host = $uri->host;
 
                 my %hash = map {
                     ( my $val = lc($_) ) =~ s/$strmregex//g;
@@ -358,17 +357,16 @@ sub update_blacklist {
                 my @content = keys %hash;
 
                 for my $line (@content) {
-                    print( $uri->host, $entry, $$counter, "\r" )
+                    print( $host, $entry, $$counter, "\r" )
                         if $$mode ne "ex-cli";
                     for ($line) {
-                        length($_) < 1 and last;
-                        !defined($_)   and last;
-                        /$exclude/     and last;
-                        /$prefix/ and sendit( \blacklist, \$1 ),
+                        !$_        and last;
+                        /$exclude/ and last;
+                        /$prefix/  and sendit( \blacklist, \$2 ),
                             $$counter++, last;
                     }
                 }
-                print( "\r", " " x length( $uri->host . $entry . $$counter ),
+                print( "\r", " " x length( $host . $entry . $$counter ),
                     "\r" )
                     if $$mode ne "ex-cli";
             }
@@ -384,9 +382,9 @@ get_blklist_cfg;
 
 update_blacklist;
 
-uniq($ref_blst);
+uniq(\@blacklist);
 
-write_list( \$blacklist_file, $ref_blst );
+write_list( \$blacklist_file, \@blacklist );
 
 printf( "\rEntries processed %d - unique records: %d \n",
     $$counter, scalar(@$ref_blst) )
