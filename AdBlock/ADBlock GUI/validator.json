@@ -1,7 +1,8 @@
 {
   "rules": {
     "blackholeip": {
-        "required": true
+        "required": true,
+        "ipv4": 1
         },
     "source": {
         "required": true

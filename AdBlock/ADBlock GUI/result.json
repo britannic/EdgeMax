@@ -1,0 +1,67 @@
+{
+    "enable": "enable",
+    "blackholeip": "255.255.255.255",
+    "adblock": "",
+    "sources":
+    [
+        {
+            "source": "someonewhocares.org",
+            "prefix": "0.0.0.0 ",
+            "url": "http:\/\/someonewhocares.org\/hosts\/zero\/"
+        },
+        {
+            "source": "winhelp2002.mvps.org",
+            "prefix": "0.0.0.0 ",
+            "url": "http:\/\/winhelp2002.mvps.org\/hosts.txt"
+        },
+        {
+            "source": "yoyo.org",
+            "prefix": "None",
+            "url": "http:\/\/pgl.yoyo.org\/as\/serverlist.php?hostformat=nohtml&showintro=1&mimetype=plaintext"
+        },
+        {
+            "source": "banjo.com",
+            "prefix": "address=",
+            "url": "http:\/\/www.banjo.com\/download"
+        }
+    ],
+    "includes":
+    [
+        {
+            "include": "beap.gemini.yahoo.com"
+        },
+        {
+            "include": "hulas.com"
+        }
+    ],
+    "excludes":
+    [
+        {
+            "exclude": "msdn.com"
+        },
+        {
+            "exclude": "appleglobal.112.2o7.net"
+        },
+        {
+            "exclude": "cdn.visiblemeasures.com"
+        },
+        {
+            "exclude": "hb.disney.go.com"
+        },
+        {
+            "exclude": "googleadservices.com"
+        },
+        {
+            "exclude": "hulu.com"
+        },
+        {
+            "exclude": "static.chartbeat.com"
+        },
+        {
+            "exclude": "survey.112.2o7.net"
+        },
+        {
+            "exclude": "bizwax.evil.com"
+        }
+    ]
+}

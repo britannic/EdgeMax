@@ -10,7 +10,7 @@ use Vyatta::ConfigMgmt;
 
 my $action  = $ARGV[0];
 my $input   = $ARGV[1];
-my $cfg_lvl = "service dns forwarding blacklist";
+my $cfg_lvl = "service dns forwarding";
 my $cmd     = "/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper";
 my $config  = new Vyatta::Config;
 
@@ -40,9 +40,12 @@ sub apply {
     my @includes      = @{ $adblock_data->{'includes'} };
 
     my $disabled = ($enable eq 'enable') ? 'false' : 'true';
+    $cfg_lvl .=  ' blacklist';
 
     my @apply_blacklist
         = ( "$begin", "$del $cfg_lvl", "$set $cfg_lvl disabled $disabled" );
+
+    push (@apply_blacklist, "$set $cfg_lvl $black_hole_ip");
 
     for my $source (@sources) {
         my $prefix = ($source->{'prefix'} eq 'None') ? '""' : "'" . $source->{'prefix'} . "'";
@@ -83,6 +86,8 @@ sub apply {
 }
 
 sub remove {
+
+    $cfg_lvl .=  ' blacklist';
     my $remove_blacklist
         = join( ";", $begin, "$del $cfg_lvl", $commit, $save, $end );
     my $output = system( $remove_blacklist, '2>&1' );
@@ -113,7 +118,7 @@ sub isblacklist {
 sub load {
 
     if (isblacklist) {
-        $config->setLevel($cfg_lvl);
+        $config->setLevel("$cfg_lvl blacklist");
         my @includes      = $config->returnValues('include');
         my @excludes      = $config->returnValues('exclude');
         my @sources       = $config->listNodes('source');
@@ -146,6 +151,8 @@ sub load {
             $excludes .= '{"exclude":"' . $excludes[$i] if $excludes[$i];
         }
         $excludes .= '"}]';
+
+        $cfg_lvl .=  ' blacklist';
 
         if (@sources) {
             for ( $i = 0; $i < (@sources) - 1; $i++ ) {
@@ -185,7 +192,7 @@ sub load {
             . $excludes . '}}';
     }
     else {
-        print "{\"success\":\"0\",\"error\":\"\"\"}";
+        print "{\"success\":\"0\",\"error\":\"ADBlock isn't installed!\"\"}";
     }
 }
 
