@@ -3,7 +3,7 @@ export COPY_EXTENDED_ATTRIBUTES_DISABLE=true
 export COPYFILE_DISABLE=true
 
 DROPBOX="/Users/Neil/Dropbox/EdgeMax"
-ADBLOCK="ADBLOCK"
+ADBLOCK="ADBLOCK.3.10."
 INSTALL="install_adblock"
 
 if [[ -e "${0##*/}" ]]; then
