@@ -45,7 +45,7 @@ sub apply {
     my @apply_blacklist
         = ( "$begin", "$del $cfg_lvl", "$set $cfg_lvl disabled $disabled" );
 
-    push (@apply_blacklist, "$set $cfg_lvl $black_hole_ip");
+    push (@apply_blacklist, "$set $cfg_lvl blackhole $black_hole_ip");
 
     for my $source (@sources) {
         my $prefix = ($source->{'prefix'} eq 'None') ? '""' : "'" . $source->{'prefix'} . "'";
@@ -63,26 +63,19 @@ sub apply {
 
     push(@apply_blacklist, ($commit, $save, $end));
 
-    for (@apply_blacklist) {
-        print $_, "\n";
-    }
-    exit;
-
-#     my $apply_blacklist
-#         = join( ";", $begin, "$del $cfg_lvl", $commit, $save, $end );
-#     my $output = system( $apply_blacklist, '2>&1' );
-
-#     if ($?) {
-#         print "{\"success\":\"1\"}";
-#     }
-#     else {
-#         print "{\"success\":\"0\",\"error\": \"$output\"}";
-#     }
+     @apply_blacklist = map { $_ . ";"} @apply_blacklist;
 
     open( $fh, '>', '/tmp/result.json' );
-    print $fh ( Dumper($adblock_data), "\n" );
+    print $fh ( Dumper($adblock_data) );
     close($fh);
-    print "{\"success\":\"1\"}";
+
+    my $output = system( "@apply_blacklist 2>&1" );
+    if (!$?) {
+        print "{\"success\":\"1\"}";
+    }
+    else {
+        print "{\"success\":\"0\",\"error\": \"$output\"}";
+    }
 }
 
 sub remove {
@@ -91,7 +84,7 @@ sub remove {
     my $remove_blacklist
         = join( ";", $begin, "$del $cfg_lvl", $commit, $save, $end );
     my $output = system( $remove_blacklist, '2>&1' );
-    if ($?) {
+    if (!$?) {
         print "{\"success\":\"1\"}";
     }
     else {
@@ -122,7 +115,7 @@ sub load {
         my @includes      = $config->returnValues('include');
         my @excludes      = $config->returnValues('exclude');
         my @sources       = $config->listNodes('source');
-        my $black_hole_ip = $config->returnValue('blackhole') // "0.0.0.0";
+        my $black_hole_ip = $config->returnValue('blackhole') // '0.0.0.0';
         my $enable        = $config->returnValue('disabled');
 
         for ($enable) {

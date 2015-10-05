@@ -109,6 +109,7 @@ install_adblock_support ()
 	begin || ERROR=1
 
 	echo "Creating starter blacklists and task scheduler entry for ${ADBLOCK}..."
+	set service dns forwarding blacklist disabled false  || ERROR=1
 	set service dns forwarding blacklist blackhole 0.0.0.0 || ERROR=1
 	set service dns forwarding blacklist exclude msdn.com || ERROR=1
 	set service dns forwarding blacklist exclude appleglobal.112.2o7.net || ERROR=1

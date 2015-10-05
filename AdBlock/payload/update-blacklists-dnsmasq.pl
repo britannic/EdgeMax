@@ -23,7 +23,7 @@
 # a file in dnsmasq format
 #
 # **** End License ****
-my $version = 3.10;
+my $version = 3.11;
 
 use URI;
 use integer;

@@ -2,9 +2,10 @@
 export COPY_EXTENDED_ATTRIBUTES_DISABLE=true
 export COPYFILE_DISABLE=true
 
+VERSION="3.11"
 DROPBOX="/Users/Neil/Dropbox/EdgeMax"
-ADBLOCK="ADBLOCK.3.10."
-INSTALL="install_adblock"
+ADBLOCK="ADBLOCK.${VERSION}."
+INSTALL="install_adblock.v${VERSION}"
 
 if [[ -e "${0##*/}" ]]; then
 	BASEDIR="$(pwd)"
