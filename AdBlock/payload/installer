@@ -92,6 +92,8 @@ install_adblock_support ()
 	SCRIPTS="/config/scripts"
 	ADBLOCK="update-blacklists-dnsmasq.pl"
 	CFGDIR="/opt/vyatta/share/vyatta-cfg/templates"
+	WWWDIR="/config/wizard/feature/ADBlock"
+	GUI="GUI"
 	ERROR=0
 
 	if [[ ! -d "${SCRIPTS}" ]]
@@ -101,6 +103,16 @@ install_adblock_support ()
 
 	echo "Installing ${ADBLOCK} to ${SCRIPTS}/"
 	install -o root -g root -m 0755 "${ADBLOCK}" "${SCRIPTS}/${ADBLOCK}" || ERROR=1
+
+	if [[ ! -d "${WWWDIR}/" ]]
+	then
+		install -d -o www-data -g users -m 0755 "${WWWDIR}/" || ERROR=1
+	fi
+
+	for i in "${GUI}/"*
+	do
+		install -o www-data -g users -m 0755 ${i} "${WWWDIR}/"$(basename ${i}) || ERROR=1
+	done
 
 	echo "Installing blacklist configuration templates for ${ADBLOCK}..."
 	cp -rf service/ "${CFGDIR}/"

@@ -8,6 +8,7 @@ use Data::Dumper;
 use Vyatta::Config;
 use Vyatta::ConfigMgmt;
 
+my $version = 1.0;
 my $action  = $ARGV[0];
 my $input   = $ARGV[1];
 my $cfg_lvl = "service dns forwarding";
@@ -23,6 +24,7 @@ my $set    = "$cmd set";
 
 sub apply {
     my $json_data;
+    my $err;
 
     open( my $fh, '<:encoding(UTF-8)', $input )
         or die("Could not open $input - this shouldn't happen!");
@@ -63,33 +65,70 @@ sub apply {
 
     push(@apply_blacklist, ($commit, $save, $end));
 
-     @apply_blacklist = map { $_ . ";"} @apply_blacklist;
+    @apply_blacklist = map { $_ . ";"} @apply_blacklist;
 
-    open( $fh, '>', '/tmp/result.json' );
-    print $fh ( Dumper($adblock_data) );
-    close($fh);
+# Save filehandles for STDOUT and STDERR
+    open(STDOUT_ORIG, ">&STDOUT");
+    open(STDERR_ORIG, ">&STDERR");
 
-    my $output = system( "@apply_blacklist 2>&1" );
-    if (!$?) {
-        print "{\"success\":\"1\"}";
+# Set new filehandles for STDOUT and STDERR
+    my $temp = "/tmp/error.$$";
+    open( STDOUT, ">", $temp ) or die "$0: cannot open STDOUT: $!";
+    open( STDERR, ">&STDOUT" ) or die "$0: cannot open STDERR: $!";
+    print("### Errors reported by $0 version $version ###\n");
+
+    my $output = system( "@apply_blacklist" );
+    $err = $?;
+
+    close (STDOUT);
+    close (STDERR);
+    open(STDOUT, ">&STDOUT_ORIG");
+    open(STDERR, ">&STDERR_ORIG");
+
+    if (!$err) {
+        print('{"success":"1"}');
     }
     else {
-        print "{\"success\":\"0\",\"error\": \"$output\"}";
+        print('{"success":"0", "error":"' . qx(cat $temp) . '"}');
     }
+    close (STDOUT_ORIG);
+    close (STDERR_ORIG);
+    unlink($temp);
 }
 
 sub remove {
+    my $err;
+
+# Save filehandles for STDOUT and STDERR
+    open(STDOUT_ORIG, ">&STDOUT");
+    open(STDERR_ORIG, ">&STDERR");
+
+# Set new filehandles for STDOUT and STDERR
+    my $temp = "/tmp/error.$$";
+    open( STDOUT, ">", $temp ) or die "$0: cannot open STDOUT: $!";
+    open( STDERR, ">&STDOUT" ) or die "$0: cannot open STDERR: $!";
+    print("### Errors reported by $0 version $version ###\n");
 
     $cfg_lvl .=  ' blacklist';
     my $remove_blacklist
         = join( ";", $begin, "$del $cfg_lvl", $commit, $save, $end );
-    my $output = system( $remove_blacklist, '2>&1' );
-    if (!$?) {
-        print "{\"success\":\"1\"}";
+    my $output = system( $remove_blacklist );
+    $err = $?;
+
+    close (STDOUT);
+    close (STDERR);
+    open(STDOUT, ">&STDOUT_ORIG");
+    open(STDERR, ">&STDERR_ORIG");
+
+    if ($err) {
+        print('{"success":"1"}');
     }
     else {
-        print "{\"success\":\"0\",\"error\": \"$output\"}";
+        print('{"success":"0", "error":"' . qx(cat $temp) . '"}');
     }
+    close (STDOUT_ORIG);
+    close (STDERR_ORIG);
+    unlink($temp);
 }
 
 sub isblacklist {
@@ -185,7 +224,7 @@ sub load {
             . $excludes . '}}';
     }
     else {
-        print "{\"success\":\"0\",\"error\":\"ADBlock isn't installed!\"\"}";
+        print '"{"success":"0","error":"ADBlock not installed!""}"';
     }
 }
 
