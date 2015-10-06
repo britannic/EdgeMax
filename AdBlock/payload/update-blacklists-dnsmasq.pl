@@ -23,7 +23,7 @@
 # a file in dnsmasq format
 #
 # **** End License ****
-my $version = 3.10;
+my $version = 3.12;
 
 use URI;
 use integer;
@@ -118,9 +118,9 @@ sub sendit {
         for ($list) {
             /blacklist/ and push( @$ref_blst, "address=/$line/$$ref_bhip\n" ),
                 last;
-            /url/       and push( @$ref_urls, $line ), last;
-            /prefix/    and push( @$ref_prfx, qq($line) ), last;
-            /exclude/   and push( @$ref_excs, $line ), last;
+            /url/ and push( @$ref_urls, $line ), last;
+            /prefix/ and push( @$ref_prfx, qq($line) ), last;
+            /exclude/ and push( @$ref_excs, $line ), last;
         }
     }
 }
@@ -134,7 +134,7 @@ sub uniq {
 sub write_list($$) {
     my $fh;
     my $file = $_[0];
-    my @list = @{$_[1]};
+    my @list = @{ $_[1] };
     open( $fh, '>', $$file ) or die "Could not open file: '$file' $!";
     print $fh (@list);
     close($fh);
@@ -333,11 +333,11 @@ sub update_blacklist {
     my $mode      = \$ref_mode;
     my $exclude   = join( "|", uniq(@$ref_excs) );
     my $prefix    = join( "|", uniq(@$ref_prfx) );
-    my $strmregex = qr/^\s+|\s+$|\n|\r|^#.*$/;
+    my $strmregex = qr/^\s+|\s+$|^\n|^#.*$/;
 
-    $exclude      = qr/$exclude/;
-    $prefix       = qr/^($prefix)$fqdn/;
-    $$counter     = scalar(@$ref_blst);
+    $exclude  = qr/$exclude/;
+    $prefix   = qr/^($prefix)$fqdn/;
+    $$counter = scalar(@$ref_blst);
 
     # Get blacklist and convert the hosts file into a dnsmasq.conf format
     # file. Be paranoid and replace every IP address with $black_hole_ip.
@@ -351,25 +351,26 @@ sub update_blacklist {
                 $uri = new URI($url);
                 my $host = $uri->host;
 
-                my %hash = map {
-                    ( my $val = lc($_) ) =~ s/$strmregex//g;
-                    $val => 1;
-                } qx(curl -s $url);
-                my @content = keys %hash;
+                my @content = keys {
+                    my %hash = map {
+                        ( my $val = lc($_) ) =~ s/$strmregex//;
+                        $val => 1;
+                    } qx(curl -s $url)
+                };
+                print( "\r", " " x qx( tput cols ),
+                    "\r" )
+                    if $$mode ne "ex-cli";
 
                 for my $line (@content) {
                     print( $host, $entry, $$counter, "\r" )
                         if $$mode ne "ex-cli";
                     for ($line) {
-                        !$_        and last;
+                        !$_ and last;
                         /$exclude/ and last;
-                        /$prefix/  and sendit( \blacklist, \$2 ),
+                        /$prefix/ and sendit( \blacklist, \$2 ),
                             $$counter++, last;
                     }
                 }
-                print( "\r", " " x length( $host . $entry . $$counter ),
-                    "\r" )
-                    if $$mode ne "ex-cli";
             }
         }
     }
@@ -383,7 +384,7 @@ get_blklist_cfg;
 
 update_blacklist;
 
-@blacklist = uniq( @blacklist );
+@blacklist = uniq(@blacklist);
 
 write_list( \$blacklist_file, \@blacklist );
 
