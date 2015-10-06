@@ -52,7 +52,7 @@ my $entry          = " - Entries processed: ";
 my $dnsmasq        = "/etc/init.d/dnsmasq";
 my $uri;
 my $fqdn
-    = '((?=.{1,254}$)((?:(?!\d+\.|-)[a-zA-Z0-9_\-]{1,63}(?<!-)\.?)+(?:[a-zA-Z]{2,})$))\s*$';
+    = '(\b([a-z0-9_]+(-[a-z0-9_]+)*\.)+[a-z]{2,}\b).*$';
 
 # The IP address below should point to the IP of your router/pixelserver or to 0.0.0.0
 # 0.0.0.0 is easy and doesn't require much from the router
@@ -257,8 +257,7 @@ sub cfg_active {
 }
 
 sub cfg_file {
-    my $mode = $ref_mode
-        ; # not yet sure why $cmdmode ends up undef after this sub, so preserving it
+    my $mode = $ref_mode; # not yet sure why $cmdmode ends up undef after this sub, so preserving it
     my $rgx_url = qr/^url\s+(.*)$/;
     my $prfx_re = qr/^prefix\s+["{0,1}](.*)["{0,1}].*$/;
     my $xcp     = new XorpConfigParser();
@@ -300,7 +299,7 @@ sub cfg_file {
             for (@$hashSourceChildren) {
                 for ( $_->{'name'} ) {
                     /$rgx_url/
-                        and sendit( \url, \$1 ), last;
+                        and sendit( \url, \$1    ), last;
                     /$prfx_re/
                         and sendit( \prefix, \$1 ), last;
                 }
@@ -365,9 +364,9 @@ sub update_blacklist {
                     print( $host, $entry, $$counter, "\r" )
                         if $$mode ne "ex-cli";
                     for ($line) {
-                        !$_ and last;
+                        !$_        and last;
                         /$exclude/ and last;
-                        /$prefix/ and sendit( \blacklist, \$2 ),
+                        /$prefix/  and sendit( \blacklist, \$2 ),
                             $$counter++, last;
                     }
                 }
