@@ -2,9 +2,10 @@
 export COPY_EXTENDED_ATTRIBUTES_DISABLE=true
 export COPYFILE_DISABLE=true
 
+VERSION="3.11"
 DROPBOX="/Users/Neil/Dropbox/EdgeMax"
-ADBLOCK="ADBLOCK"
-INSTALL="install_adblock"
+ADBLOCK="ADBLOCK.${VERSION}."
+INSTALL="install_adblock.v${VERSION}"
 
 if [[ -e "${0##*/}" ]]; then
 	BASEDIR="$(pwd)"
@@ -20,10 +21,10 @@ if [[ -e "${0##*/}" ]]; then
 		exit 1
 	fi
 
-	chmod 755 ${INSTALL}
-	tar zcf ${INSTALL}.tgz ${INSTALL} 
+	chmod 0755 ${INSTALL}
+	tar zcf ${INSTALL}.tgz ${INSTALL}
 	echo "${INSTALL} created"
-	[[ -d "${DROPBOX}/" ]] && install -m 0755 ${INSTALL}.tgz "${DROPBOX}/" 
+	[[ -d "${DROPBOX}/" ]] && install -m 0755 ${INSTALL}.tgz "${DROPBOX}/"
 	cd ..
 	tar -zcf ${ADBLOCK}setup.tgz --exclude='._*' --exclude='.svn' --exclude='.DS_Store' --exclude='*.bak' --exclude='*~' "${BASEDIR}"/*
 	mv ${ADBLOCK}setup.tgz "${BASEDIR}"/
