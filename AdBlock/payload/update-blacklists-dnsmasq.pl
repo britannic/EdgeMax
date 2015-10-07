@@ -23,7 +23,7 @@
 # a file in dnsmasq format
 #
 # **** End License ****
-my $version = 3.11;
+my $version = 3.12;
 
 use URI;
 use integer;
@@ -52,7 +52,7 @@ my $entry          = " - Entries processed: ";
 my $dnsmasq        = "/etc/init.d/dnsmasq";
 my $uri;
 my $fqdn
-    = '((?=.{1,254}$)((?:(?!\d+\.|-)[a-zA-Z0-9_\-]{1,63}(?<!-)\.?)+(?:[a-zA-Z]{2,})$))\s*$';
+    = '(\b([a-z0-9_]+(-[a-z0-9_]+)*\.)+[a-z]{2,}\b).*$';
 
 # The IP address below should point to the IP of your router/pixelserver or to 0.0.0.0
 # 0.0.0.0 is easy and doesn't require much from the router
@@ -126,14 +126,17 @@ sub sendit {
 }
 
 sub uniq {
-    @$_ = ( sort keys %{ { map { $_ => 1 } @$_ } } );
+    my @unsorted = @_;
+    my @sorted = ( sort keys %{ { map { $_ => 1 } @unsorted } } );
+    return @sorted;
 }
 
 sub write_list($$) {
     my $fh;
-    my ( $file, $list ) = @_;
+    my $file = $_[0];
+    my @list = @{ $_[1] };
     open( $fh, '>', $$file ) or die "Could not open file: '$file' $!";
-    print $fh (@$list);
+    print $fh (@list);
     close($fh);
 }
 
@@ -143,11 +146,12 @@ sub cfg_none {
     # Source urls for blacklisted adservers and malware servers
     for (
         qw|
-            http://winhelp2002.mvps.org/hosts.txt
-            http://someonewhocares.org/hosts/zero/
-            http://pgl.yoyo.org/as/serverlist.php?hostformat=nohtml&showintro=1&mimetype=plaintext
-            http://www.malwaredomainlist.com/hostslist/hosts.txt|
-    ){
+        http://winhelp2002.mvps.org/hosts.txt
+        http://someonewhocares.org/hosts/zero/
+        http://pgl.yoyo.org/as/serverlist.php?hostformat=nohtml&showintro=1&mimetype=plaintext
+        http://www.malwaredomainlist.com/hostslist/hosts.txt|
+        )
+    {
         sendit( \url, \$_ );
     }
 
@@ -253,8 +257,7 @@ sub cfg_active {
 }
 
 sub cfg_file {
-    my $mode = $ref_mode
-        ; # not yet sure why $cmdmode ends up undef after this sub, so preserving it
+    my $mode = $ref_mode; # not yet sure why $cmdmode ends up undef after this sub, so preserving it
     my $rgx_url = qr/^url\s+(.*)$/;
     my $prfx_re = qr/^prefix\s+["{0,1}](.*)["{0,1}].*$/;
     my $xcp     = new XorpConfigParser();
@@ -296,7 +299,7 @@ sub cfg_file {
             for (@$hashSourceChildren) {
                 for ( $_->{'name'} ) {
                     /$rgx_url/
-                        and sendit( \url, \$1 ), last;
+                        and sendit( \url, \$1    ), last;
                     /$prfx_re/
                         and sendit( \prefix, \$1 ), last;
                 }
@@ -326,13 +329,10 @@ sub get_blklist_cfg {
 
 sub update_blacklist {
 
-    my $mode = \$ref_mode;
-    uniq($ref_excs);
-    uniq($ref_prfx);
-
-    my $exclude = join( "|", @$ref_excs );
-    my $prefix  = join( "|", @$ref_prfx );
-    my $strmregex = qr/^\s+|\s+$|\n|\r|^#.*$/;
+    my $mode      = \$ref_mode;
+    my $exclude   = join( "|", uniq(@$ref_excs) );
+    my $prefix    = join( "|", uniq(@$ref_prfx) );
+    my $strmregex = qr/^\s+|\s+$|^\n|^#.*$/;
 
     $exclude  = qr/$exclude/;
     $prefix   = qr/^($prefix)$fqdn/;
@@ -350,11 +350,15 @@ sub update_blacklist {
                 $uri = new URI($url);
                 my $host = $uri->host;
 
-                my %hash = map {
-                    ( my $val = lc($_) ) =~ s/$strmregex//g;
-                    $val => 1;
-                } qx(curl -s $url);
-                my @content = keys %hash;
+                my @content = keys {
+                    my %hash = map {
+                        ( my $val = lc($_) ) =~ s/$strmregex//;
+                        $val => 1;
+                    } qx(curl -s $url)
+                };
+                print( "\r", " " x qx( tput cols ),
+                    "\r" )
+                    if $$mode ne "ex-cli";
 
                 for my $line (@content) {
                     print( $host, $entry, $$counter, "\r" )
@@ -366,9 +370,6 @@ sub update_blacklist {
                             $$counter++, last;
                     }
                 }
-                print( "\r", " " x length( $host . $entry . $$counter ),
-                    "\r" )
-                    if $$mode ne "ex-cli";
             }
         }
     }
@@ -382,7 +383,7 @@ get_blklist_cfg;
 
 update_blacklist;
 
-uniq(\@blacklist);
+@blacklist = uniq(@blacklist);
 
 write_list( \$blacklist_file, \@blacklist );
 
@@ -391,4 +392,3 @@ printf( "\rEntries processed %d - unique records: %d \n",
     if $ref_mode ne "ex-cli";
 
 system("$dnsmasq force-reload") if $ref_mode ne "in-cli";
-

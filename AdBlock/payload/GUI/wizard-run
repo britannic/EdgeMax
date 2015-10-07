@@ -120,7 +120,7 @@ sub remove {
     open(STDOUT, ">&STDOUT_ORIG");
     open(STDERR, ">&STDERR_ORIG");
 
-    if ($err) {
+    if (!$err) {
         print('{"success":"1"}');
     }
     else {
