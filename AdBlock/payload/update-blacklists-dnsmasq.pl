@@ -23,7 +23,7 @@
 # a file in dnsmasq format
 #
 # **** End License ****
-my $version = 3.12;
+my $version = 3.13;
 
 use URI;
 use integer;
@@ -31,6 +31,7 @@ use strict;
 use warnings;
 use lib '/opt/vyatta/share/perl5/';
 use Getopt::Long;
+use POSIX qw(strftime);
 use Vyatta::Config;
 use Vyatta::ConfigMgmt;
 use XorpConfigParser;
@@ -40,6 +41,8 @@ use constant url       => 'url';
 use constant prefix    => 'prefix';
 use constant exclude   => 'exclude';
 
+my $debug_flag     = 1;
+my $debug_log      = "/var/log/update-blacklists-dnsmasq.log";
 my @blacklist      = ();
 my $ref_blst       = \@blacklist;
 my @exclusions     = ();
@@ -48,26 +51,22 @@ my @blacklist_urls = ();
 my $ref_urls       = \@blacklist_urls;
 my @blacklist_prfx = ();
 my $ref_prfx       = \@blacklist_prfx;
-my $entry          = " - Entries processed: ";
 my $dnsmasq        = "/etc/init.d/dnsmasq";
-my $uri;
-my $fqdn
-    = '(\b([a-z0-9_]+(-[a-z0-9_]+)*\.)+[a-z]{2,}\b).*$';
-
-# The IP address below should point to the IP of your router/pixelserver or to 0.0.0.0
-# 0.0.0.0 is easy and doesn't require much from the router
+my $fqdn           = '(\b([a-z0-9_]+(-[a-z0-9_]+)*\.)+[a-z]{2,}\b).*$';
 my $black_hole_ip;
 my $ref_bhip       = \$black_hole_ip;
 my $blacklist_file = "/etc/dnsmasq.d/dnsmasq.blacklist.conf";
-my $cfg_file;
-my $ref_mode;
-my $i       = 0;
-my $counter = \$i;
+my $i              = 0;
+my $counter        = \$i;
 my $list;
 my $line;
+my $uri;
+my $loghandle;
+my $cfg_file;
+my $ref_mode;
 
 sub cmd_line {
-    my $cmdmode = \$ref_mode;
+    my $cmdmode    = \$ref_mode;
     my $in_cli;
     my $print_ver;
     my $std_alone;
@@ -76,11 +75,12 @@ sub cmd_line {
         "cfg-file=s" => \$cfg_file,
         "in-cli!"    => \$in_cli,
         "std-alone!" => \$std_alone,
-        "version!"   => \$print_ver
+        "version!"   => \$print_ver,
+        "debug!"     => \$debug_flag
         )
         or print(
-        "Valid options: --in-cli | --std-alone | --version | --cfg_file <filename>\n"
-        ) and exit 0;
+        "Valid options: --in-cli | --std-alone | --version | --cfg_file <filename> | --debug\n"
+        ) and exit(1);
 
     if ( defined($std_alone) ) {
         $$cmdmode = "std-alone";
@@ -90,7 +90,7 @@ sub cmd_line {
         if ( $? > 0 ) {
             print
                 "You must run $0 inside of configure when '--in-cli' is specified!\n";
-            exit 0;
+            exit(1);
         }
         $$cmdmode = "in-cli";
     }
@@ -98,7 +98,7 @@ sub cmd_line {
         $$cmdmode = "cfg-file";
         if ( !-f $cfg_file ) {
             print("$cfg_file doesn't exist!\n");
-            exit 0;
+            exit(1);
         }
     }
     else {
@@ -107,8 +107,10 @@ sub cmd_line {
 
     if ( defined($print_ver) ) {
         printf( "%s version: %.2f\n", $0, $version );
-        exit 0;
+        exit(0);
     }
+
+    $debug_flag = 1 if defined($debug_flag);
 }
 
 sub sendit {
@@ -117,10 +119,10 @@ sub sendit {
     if ( defined($line) ) {
         for ($list) {
             /blacklist/ and push( @$ref_blst, "address=/$line/$$ref_bhip\n" ),
-                last;
-            /url/ and push( @$ref_urls, $line ), last;
-            /prefix/ and push( @$ref_prfx, qq($line) ), last;
-            /exclude/ and push( @$ref_excs, $line ), last;
+                                                            last;
+            /url/       and push( @$ref_urls, $line ),      last;
+            /prefix/    and push( @$ref_prfx, qq($line) ),  last;
+            /exclude/   and push( @$ref_excs, $line ),      last;
         }
     }
 }
@@ -327,8 +329,40 @@ sub get_blklist_cfg {
     }
 }
 
+sub is_online {
+    my $host                 = shift;
+    my $p                    = net::ping->new("tcp", 2);
+         $p->{port_num}      = getservbyname("http", "tcp");
+    if ( $p->ping($host) ) {
+         $p->close();
+         undef($p);
+         return 1;
+    }
+    else {
+        $p->close();
+        undef($p);
+        return 0;
+    }
+}
+
+sub log_msg {
+    my $log_type  = shift;
+    my $message   = shift;
+    my $date = strftime "%b %e %H:%M:%S %Y", localtime;
+
+    if ($debug_flag) {
+        print $loghandle ("$date: $log_type: $message");
+    }
+}
+
 sub update_blacklist {
 
+    if ($debug_flag) {
+      open($loghandle, ">>$debug_log") or $debug_flag = 0;
+    }
+    log_msg("info", "---+++ ADBlock $version +++---\n") if ($debug_flag);
+
+    my $entry     = " - Entries processed: ";
     my $mode      = \$ref_mode;
     my $exclude   = join( "|", uniq(@$ref_excs) );
     my $prefix    = join( "|", uniq(@$ref_prfx) );
@@ -338,10 +372,6 @@ sub update_blacklist {
     $prefix   = qr/^($prefix)$fqdn/;
     $$counter = scalar(@$ref_blst);
 
-    # Get blacklist and convert the hosts file into a dnsmasq.conf format
-    # file. Be paranoid and replace every IP address with $black_hole_ip.
-    # We only want the actual blacklist, so we can prepend our own hosts.
-    # $black_hole_ip="0.0.0.0" saves router CPU cycles and is more efficient
     if (@$ref_urls) {
 
         for my $url (@$ref_urls) {
@@ -350,15 +380,32 @@ sub update_blacklist {
                 $uri = new URI($url);
                 my $host = $uri->host;
 
+                while (my $i = 0; $i++; $i < 5) {
+
+                }
+                if (is_online($host)) {
+
+                }
+
+                log_msg("info", "Connecting to blacklist download host: $host\n");
+
                 my @content = keys {
                     my %hash = map {
                         ( my $val = lc($_) ) =~ s/$strmregex//;
                         $val => 1;
                     } qx(curl -s $url)
                 };
+
+                for (scalar(@content) {
+                    /0/ and log_msg("warning", "Received 0 records from $host\n"), last;
+                    log_msg("info", "Received " . $_ . " records from $host\n");
+                }
+
                 print( "\r", " " x qx( tput cols ),
                     "\r" )
                     if $$mode ne "ex-cli";
+
+                my $records = 0;
 
                 for my $line (@content) {
                     print( $host, $entry, $$counter, "\r" )
@@ -367,9 +414,10 @@ sub update_blacklist {
                         !$_        and last;
                         /$exclude/ and last;
                         /$prefix/  and sendit( \blacklist, \$2 ),
-                            $$counter++, last;
+                            $$counter++, $records++, last;
                     }
                 }
+                log_msg("info", "Processed $records records from $host\n");
             }
         }
     }
@@ -391,4 +439,8 @@ printf( "\rEntries processed %d - unique records: %d \n",
     $$counter, scalar(@$ref_blst) )
     if $ref_mode ne "ex-cli";
 
+log_msg("info", "Entries processed $$counter - unique records: " . scalar(@$ref_blst) . "\n");
+
 system("$dnsmasq force-reload") if $ref_mode ne "in-cli";
+
+close $loghandle if ($debug_flag);

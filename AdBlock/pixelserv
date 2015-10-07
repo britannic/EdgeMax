@@ -1,0 +1,115 @@
+#!/bin/sh
+#
+# $Id: pixelserver.init.d,v 1.0 2015/10/06 15:11:21 ncb Exp $
+#
+
+### BEGIN INIT INFO
+# Provides:          pixelserv
+# Required-Start:    $network
+# Required-Stop:     $network
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: pixelserv server for ad blocking
+# Description:       Server for serving 1x1 pixels
+### END INIT INFO
+
+export LANGUAGE=C
+export LANG=C
+export LC_ALL=C
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+DAEMON=/config/scripts/pixelserv
+NAME=pixelserv
+DESC="pixelserv Daemon, returns a single transparent pixel"
+ENABLED=1
+PORT=8080
+
+[[ -x ${DAEMON} ]] || exit 0
+
+set -e
+
+PIDFILE=/var/run/${NAME}.pid
+
+# Load the VERBOSE setting and other rcS variables
+[ -f /etc/default/rcS ] && . /etc/default/rcS
+
+# Predefine what can be missing from lsb source later on -- necessary to run
+# on sarge. Just present it in a bit more compact way from what was shipped
+log_daemon_msg () {
+	[ -z "${1}" ] && return 1
+	echo -n "${1}:"
+	[ -z "${2}" ] || echo -n " ${2}"
+}
+
+# Define LSB log_* functions.
+# Depend on lsb-base (>= 3.0-6) to ensure that this file is present.
+# Actually has to (>=2.0-7) present in sarge. log_daemon_msg is predefined
+# so we must be ok
+. /lib/lsb/init-functions
+
+#
+# Shortcut function for abnormal init script interruption
+#
+report_bug()
+{
+	echo ${*}
+	echo "${NAME} init script experienced abnormal interruption"
+	exit 1
+}
+
+case "${1}" in
+	start|force-start)
+		if [ -e ${PIDFILE} ]; then
+			status_of_proc -p ${PIDFILE} ${DAEMON} "$NAME process" && status=0 || status=$?
+			# If the status is SUCCESS then don't need to start again.
+			if [ ${status} -eq 0 ]; then
+				exit 0 # Exit
+			fi
+		fi
+		# Start the daemon
+		[ "${VERBOSE}" != no ] && log_daemon_msg "Starting ${DESC}" "${NAME}"
+		if 	start-stop-daemon --start --quiet --background --make-pidfile --pidfile \
+			${PIDFILE} --exec ${DAEMON} -- ${PORT} ; then
+			[ "${VERBOSE}" != no ] && log_end_msg 0
+		else
+			[ "${VERBOSE}" != no ] && log_end_msg 1
+		fi
+		;;
+
+	stop)
+		if [ -e ${PIDFILE} ]; then
+			status_of_proc -p ${PIDFILE} ${DAEMON} "Stoppping the $NAME process" && status=0 || status=$?
+		if [ ${status} -eq 0 ]; then
+				[ "${VERBOSE}" != no ] && log_daemon_msg "Stopping ${DESC}" "${NAME}"
+				start-stop-daemon --stop --quiet --pidfile ${PIDFILE}
+				rm -rf ${PIDFILE} > /dev/null
+				[ "${VERBOSE}" != no ] && log_end_msg 0
+			fi
+		else
+			[ "${VERBOSE}" != no ] && log_daemon_msg "${NAME} process is not running"
+			[ "${VERBOSE}" != no ] && log_end_msg 0
+		fi
+		;;
+
+	restart|force-reload|reload)
+		# Restart the daemon.
+		$0 stop && sleep 2 && $0 start
+		;;
+
+	status)
+		# Check the status of the process.
+		if [ -e ${PIDFILE} ]; then
+			status_of_proc -p ${PIDFILE} ${DAEMON} "${NAME} process" && exit 0 || exit ${?}
+		else
+			log_daemon_msg "${NAME} process is not running"
+			log_end_msg 0
+		fi
+		;;
+
+	*)
+
+		echo "Usage: /etc/init.d/${NAME} {start|stop|status|restart|force-reload|reload}"
+		exit 1
+
+esac
+
+exit 0
