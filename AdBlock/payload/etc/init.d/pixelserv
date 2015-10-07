@@ -19,7 +19,7 @@ export LC_ALL=C
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 DAEMON=/config/scripts/pixelserv
 NAME=pixelserv
-DESC="pixelserv Daemon, returns a single transparent pixel"
+DESC="pixelserv Daemon, the single transparent pixel http server"
 ENABLED=1
 PORT=8080
 

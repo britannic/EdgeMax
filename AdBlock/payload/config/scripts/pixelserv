@@ -11,8 +11,8 @@ my $pixel = pack( "C*",
 );
 
 my $sock = new IO::Socket::INET(
-    LocalHost => 'localhost',
-    LocalPort => '8080',
+    LocalHost => $ARGV[0],
+    LocalPort => $ARGV[1],
     Proto     => 'tcp',
     Listen    => 30,
     Reuse     => 1
