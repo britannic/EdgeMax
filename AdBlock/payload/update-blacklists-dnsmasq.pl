@@ -23,7 +23,7 @@
 # a file in dnsmasq format
 #
 # **** End License ****
-my $version = 3.13;
+my $version = 3.14a;
 
 use URI;
 use integer;
@@ -329,22 +329,6 @@ sub get_blklist_cfg {
     }
 }
 
-sub is_online {
-    my $host                 = shift;
-    my $p                    = net::ping->new("tcp", 2);
-         $p->{port_num}      = getservbyname("http", "tcp");
-    if ( $p->ping($host) ) {
-         $p->close();
-         undef($p);
-         return 1;
-    }
-    else {
-        $p->close();
-        undef($p);
-        return 0;
-    }
-}
-
 sub log_msg {
     my $log_type  = shift;
     my $message   = shift;
@@ -357,11 +341,6 @@ sub log_msg {
 
 sub update_blacklist {
 
-    if ($debug_flag) {
-      open($loghandle, ">>$debug_log") or $debug_flag = 0;
-    }
-    log_msg("info", "---+++ ADBlock $version +++---\n") if ($debug_flag);
-
     my $entry     = " - Entries processed: ";
     my $mode      = \$ref_mode;
     my $exclude   = join( "|", uniq(@$ref_excs) );
@@ -372,52 +351,67 @@ sub update_blacklist {
     $prefix   = qr/^($prefix)$fqdn/;
     $$counter = scalar(@$ref_blst);
 
+    if ($debug_flag) {
+        open($loghandle, ">>$debug_log") or $debug_flag = 0;
+        log_msg("info", "---+++ ADBlock $version +++---\n")
+    }
+
     if (@$ref_urls) {
-
         for my $url (@$ref_urls) {
-
-            if ( $url =~ m(^http://|^https://) ) {
-                $uri = new URI($url);
-                my $host = $uri->host;
-
-                while (my $i = 0; $i++; $i < 5) {
-
-                }
-                if (is_online($host)) {
-
-                }
-
+            if ( $url       =~ m(^http://|^https://) ) {
+                $uri        = new URI($url);
+                my $host    = $uri->host;
+                my $seconds = 1;
+                my $i       = 0;
+                my $max     = 6;
                 log_msg("info", "Connecting to blacklist download host: $host\n");
-
-                my @content = keys {
-                    my %hash = map {
-                        ( my $val = lc($_) ) =~ s/$strmregex//;
-                        $val => 1;
-                    } qx(curl -s $url)
-                };
-
-                for (scalar(@content) {
-                    /0/ and log_msg("warning", "Received 0 records from $host\n"), last;
-                    log_msg("info", "Received " . $_ . " records from $host\n");
-                }
-
-                print( "\r", " " x qx( tput cols ),
-                    "\r" )
-                    if $$mode ne "ex-cli";
-
-                my $records = 0;
-
-                for my $line (@content) {
-                    print( $host, $entry, $$counter, "\r" )
-                        if $$mode ne "ex-cli";
-                    for ($line) {
-                        !$_        and last;
-                        /$exclude/ and last;
-                        /$prefix/  and sendit( \blacklist, \$2 ),
-                            $$counter++, $records++, last;
+                RETRY: while ($i < $max) {
+                    my @content = keys {
+                        my %hash = map {
+                            ( my $val = lc($_) ) =~ s/$strmregex//;
+                            $val => 1;
+                        } qx(curl -s $url)
+                    };
+                    $i++;
+                    if (@content) {
+                        $i = $max;
                     }
+                    elsif (not @content and $i == $max) {
+                        log_msg("error", "Unable to connect to blacklist download host: $host!\n");
+                        last;
+                    }
+                    else {
+                        log_msg("warning", "Unable to connect to blacklist download host: $host, retry in $seconds seconds...\n");
+                        $seconds = $seconds * 2;
+                        sleep $seconds;
+                        next RETRY;
+                    }
+
+                    if (scalar(@content) < 1) {
+                        log_msg("warning", "Received 0 records from $host\n");
+                    }
+                    else {
+                        log_msg("info", "Received " . scalar(@content) . " records from $host\n");
+                    }
+
+                    print( "\r", " " x qx( tput cols ),
+                        "\r" )
+                        if $$mode ne "ex-cli";
+
+                    my $records = 0;
+
+                    for my $line (@content) {
+                        print( $host, $entry, $$counter, "\r" )
+                            if $$mode ne "ex-cli";
+                        for ($line) {
+                            !$_        and last;
+                            /$exclude/ and last;
+                            /$prefix/  and sendit( \blacklist, \$2 ),
+                                $$counter++, $records++, last;
+                        }
+                    }
+                    log_msg("info", "Processed $records records from $host\n");
                 }
-                log_msg("info", "Processed $records records from $host\n");
             }
         }
     }
