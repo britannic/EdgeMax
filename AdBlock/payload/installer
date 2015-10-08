@@ -92,6 +92,8 @@ install_adblock_support ()
 	SCRIPTS="/config/scripts"
 	ADBLOCK="update-blacklists-dnsmasq.pl"
 	CFGDIR="/opt/vyatta/share/vyatta-cfg/templates"
+	WWWDIR="/config/wizard/feature/ADBlock"
+	GUI="GUI"
 	ERROR=0
 
 	if [[ ! -d "${SCRIPTS}" ]]
@@ -102,6 +104,16 @@ install_adblock_support ()
 	echo "Installing ${ADBLOCK} to ${SCRIPTS}/"
 	install -o root -g root -m 0755 "${ADBLOCK}" "${SCRIPTS}/${ADBLOCK}" || ERROR=1
 
+	if [[ ! -d "${WWWDIR}/" ]]
+	then
+		install -d -o www-data -g users -m 0755 "${WWWDIR}/" || ERROR=1
+	fi
+
+	for i in "${GUI}/"*
+	do
+		install -o www-data -g users -m 0755 ${i} "${WWWDIR}/"$(basename ${i}) || ERROR=1
+	done
+
 	echo "Installing blacklist configuration templates for ${ADBLOCK}..."
 	cp -rf service/ "${CFGDIR}/"
 
@@ -109,6 +121,7 @@ install_adblock_support ()
 	begin || ERROR=1
 
 	echo "Creating starter blacklists and task scheduler entry for ${ADBLOCK}..."
+	set service dns forwarding blacklist disabled false  || ERROR=1
 	set service dns forwarding blacklist blackhole 0.0.0.0 || ERROR=1
 	set service dns forwarding blacklist exclude msdn.com || ERROR=1
 	set service dns forwarding blacklist exclude appleglobal.112.2o7.net || ERROR=1
@@ -119,6 +132,9 @@ install_adblock_support ()
 	set service dns forwarding blacklist exclude static.chartbeat.com || ERROR=1
 	set service dns forwarding blacklist exclude survey.112.2o7.net || ERROR=1
 	set service dns forwarding blacklist include beap.gemini.yahoo.com || ERROR=1
+	set service dns forwarding blacklist source openphish.com description 'OpenPhish automatic phishing detection'
+	set service dns forwarding blacklist source openphish.com prefix 'htt.*//'
+	set service dns forwarding blacklist source openphish.com url 'https://openphish.com/feed.txt'
 	set service dns forwarding blacklist source someonewhocares.org description 'Zero based host and domain list' || ERROR=1
 	set service dns forwarding blacklist source someonewhocares.org prefix '0.0.0.0 ' || ERROR=1
 	set service dns forwarding blacklist source someonewhocares.org url 'http://someonewhocares.org/hosts/zero/' || ERROR=1
@@ -131,6 +147,12 @@ install_adblock_support ()
 	set service dns forwarding blacklist source yoyo.org description 'Fully Qualified Domain Names only - no prefix to strip' || ERROR=1
 	set service dns forwarding blacklist source yoyo.org prefix '' || ERROR=1
 	set service dns forwarding blacklist source yoyo.org url 'http://pgl.yoyo.org/as/serverlist.php?hostformat=nohtml&showintro=1&mimetype=plaintext' || ERROR=1
+	set service dns forwarding blacklist source zeustracker.abuse.ch/compromised description 'abuse.ch ZeuS compromised URL blacklist' || ERROR=1
+	set service dns forwarding blacklist source zeustracker.abuse.ch/compromised prefix '' || ERROR=1
+	set service dns forwarding blacklist source zeustracker.abuse.ch/compromised url 'https://zeustracker.abuse.ch/blocklist.php?download=compromised' || ERROR=1
+	set service dns forwarding blacklist source zeustracker.abuse.ch/hostfile description 'abuse.ch ZeuS blocklist host file' || ERROR=1
+	set service dns forwarding blacklist source zeustracker.abuse.ch/hostfile prefix '127.0.0.1\s+' || ERROR=1
+	set service dns forwarding blacklist source zeustracker.abuse.ch/hostfile url 'https://zeustracker.abuse.ch/blocklist.php?download=hostfile' || ERROR=1
 	set system task-scheduler task update_blacklists executable path /config/scripts/update-blacklists-dnsmasq.pl || ERROR=1
 	set system task-scheduler task update_blacklists interval 1d || ERROR=1
 

@@ -23,7 +23,8 @@
 # a file in dnsmasq format
 #
 # **** End License ****
-my $version                                               = 3.14a;
+
+my $version                                               = '3.15';
 
 use URI;
 use integer;
@@ -120,7 +121,7 @@ sub sendit {
     my ( $list, $line )                                   = ( $$listref, $$lineref );
     if ( defined($line) ) {
         for ($list) {
-            /blacklist/ and push( @$ref_blst, "address    = /$line/$$ref_bhip\n" ),
+            /blacklist/ and push( @$ref_blst, "address=/$line/$$ref_bhip\n" ),
                                                             last;
             /url/       and push( @$ref_urls, $line ),      last;
             /prefix/    and push( @$ref_prfx, qq($line) ),  last;
@@ -153,7 +154,9 @@ sub cfg_none {
         http://winhelp2002.mvps.org/hosts.txt
         http://someonewhocares.org/hosts/zero/
         http://pgl.yoyo.org/as/serverlist.php?hostformat=nohtml&showintro=1&mimetype=plaintext
-        http://www.malwaredomainlist.com/hostslist/hosts.txt|
+        http://www.malwaredomainlist.com/hostslist/hosts.txt
+        https://openphish.com/feed.txt
+        https://zeustracker.abuse.ch/blocklist.php?download=compromised|
         )
     {
         sendit( \url, \$_ );
@@ -162,9 +165,10 @@ sub cfg_none {
 # prefix strings to be removed, leaving the FQDN or hostname + trailing suffix
     for (
         qw(
-        0.0.0.0..
-        127.0.0.1..
-        address                                           = /
+        0.0.0.0\s+
+        address=/
+        htt.*//
+        127.0.0.1\s+
         )
         )
     {
@@ -255,7 +259,9 @@ sub cfg_active {
         }
     }
     else {
-        return 0;
+        log_msg("info","service dns forwarding blacklist is not configured, exiting!\n");
+        print("service dns forwarding blacklist is not configured, exiting!\n");
+        exit(1);
     }
     return 1;
 }
@@ -310,7 +316,9 @@ sub cfg_file {
         }
     }
     else {
-        return 0;
+        log_msg("info","service dns forwarding blacklist is not configured, exiting!\n");
+        print("service dns forwarding blacklist is not configured, exiting!\n");
+        exit(1);
     }
     $ref_mode                                             = $mode;   # restoring $cmdmode as this sub is clobbering it somewhere
     return 1;
@@ -329,7 +337,7 @@ sub get_blklist_cfg {
     }
 }
 
-sub log_msg {
+sub log_msg ($ $) {
     my $log_type                                          = shift;
     my $message                                           = shift;
     my $date                                              = strftime "%b %e %H:%M:%S %Y", localtime;
@@ -351,11 +359,6 @@ sub update_blacklist {
     $prefix                                               = qr/^($prefix)$fqdn/;
     $$counter                                             = scalar(@$ref_blst);
 
-    if ($debug_flag) {
-        open( $loghandle, ">>$debug_log" ) or $debug_flag = 0;
-        log_msg( "info", "---+++ ADBlock $version +++---\n" );
-    }
-
     if (@$ref_urls) {
         for my $url (@$ref_urls) {
             if ( $url =~ m(^http://|^https://) ) {
@@ -363,63 +366,64 @@ sub update_blacklist {
                 my $host                                  = $uri->host;
                 my $seconds                               = 1;
                 my $i                                     = 0;
-                my $max                                   = 6;
+                my $max                                   = 8;
                 log_msg( "info",
                     "Connecting to blacklist download host: $host\n" );
-            RETRY: while ( $i < $max ) {
+                while ( $i < $max ) {
                     my @content                           = keys {
                         my %hash                          = map {
                             ( my $val                     = lc($_) ) =~ s/$strmregex//;
                             $val                          => 1;
                         } qx(curl -s $url)
                     };
-                    $i++;
                     if (@content) {
                         $i                                = $max;
-                    }
-                    elsif ( not @content and $i == $max ) {
-                        log_msg( "error",
-                            "Unable to connect to blacklist download host: $host!\n"
-                        );
-                        last;
-                    }
-                    else {
-                        log_msg( "warning",
-                            "Unable to connect to blacklist download host: $host, retry in $seconds seconds...\n"
-                        );
-                        $seconds                          = $seconds * 2;
-                        sleep $seconds;
-                        next RETRY;
-                    }
-
-                    if ( scalar(@content) < 1 ) {
-                        log_msg( "warning",
-                            "Received 0 records from $host\n" );
-                    }
-                    else {
                         log_msg( "info",
                                   "Received "
                                 . scalar(@content)
                                 . " records from $host\n" );
-                    }
-
-                    print( "\r", " " x qx( tput cols ), "\r" )
-                        if $$mode ne "ex-cli";
-
-                    my $records                           = 0;
-
-                    for my $line (@content) {
-                        print( $host, $entry, $$counter, "\r" )
+                        print( "\r", " " x qx( tput cols ), "\r" )
                             if $$mode ne "ex-cli";
-                        for ($line) {
-                            !$_        and last;
-                            /$exclude/ and last;
-                            /$prefix/  and sendit( \blacklist, \$2 ),
-                                $$counter++, $records++, last;
+
+                        my $records                           = 0;
+
+                        for my $line (@content) {
+                            print( $host, $entry, $$counter, "\r" )
+                                if $$mode ne "ex-cli";
+                            for ($line) {
+                                !$_        and last;
+                                /$exclude/ and last;
+                                /$prefix/  and sendit( \blacklist, \$2 ),
+                                    $$counter++, $records++, last;
+                            }
                         }
+                        log_msg( "info",
+                            "Processed $records records from $host\n" );
                     }
-                    log_msg( "info",
-                        "Processed $records records from $host\n" );
+                    elsif ( not @content and $i == $max - 1 ) {
+                        print( "\r", " " x qx( tput cols ), "\r" )
+                            if $$mode ne "ex-cli";
+                        log_msg( "error",
+                            "Unable to connect to blacklist download host: $host!\n"
+                        );
+                        print("\rError: Unable to connect to host: $host!")
+                            if $$mode ne "ex-cli";
+                        log_msg( "warning",
+                            "Received 0 records from $host\n" )
+                            if ( scalar(@content) < 1 );
+                        last;
+                    }
+                    else {
+                        $i++;
+                        log_msg( "warning",
+                            "Unable to connect to: $host, retry in $seconds seconds...\n"
+                        );
+                        print(
+                            "\rWarning: Unable to connect to: $host, retry in $seconds seconds..."
+                        ) if $$mode ne "ex-cli";
+                        $seconds = $seconds * 2;
+                        sleep $seconds;
+                    }
                 }
             }
         }
@@ -427,6 +431,11 @@ sub update_blacklist {
 }
 
 # main()
+
+if ($debug_flag > 0) {
+    open( $loghandle, ">>$debug_log" ) or $debug_flag = 0;
+    log_msg( "info", "---+++ ADBlock $version +++---\n" );
+}
 
 cmd_line;
 
@@ -438,7 +447,7 @@ update_blacklist;
 
 write_list( \$blacklist_file, \@blacklist );
 
-printf( "\rEntries processed %d - unique records: %d \n",
+printf("\nEntries processed %d - unique records: %d \n",
     $$counter, scalar(@$ref_blst) )
     if $ref_mode ne "ex-cli";
 
@@ -450,4 +459,3 @@ log_msg( "info",
 system("$dnsmasq force-reload") if $ref_mode ne "in-cli";
 
 close $loghandle if ($debug_flag);
-
