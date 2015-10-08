@@ -23,7 +23,8 @@
 # a file in dnsmasq format
 #
 # **** End License ****
-my $version = 3.14a;
+
+my $version                                               = '3.15';
 
 use URI;
 use integer;
@@ -36,28 +37,28 @@ use Vyatta::Config;
 use Vyatta::ConfigMgmt;
 use XorpConfigParser;
 
-use constant blacklist => 'blacklist';
-use constant url       => 'url';
-use constant prefix    => 'prefix';
-use constant exclude   => 'exclude';
+use constant blacklist                                    => 'blacklist';
+use constant url                                          => 'url';
+use constant prefix                                       => 'prefix';
+use constant exclude                                      => 'exclude';
 
-my $debug_flag     = 1;
-my $debug_log      = "/var/log/update-blacklists-dnsmasq.log";
-my @blacklist      = ();
-my $ref_blst       = \@blacklist;
-my @exclusions     = ();
-my $ref_excs       = \@exclusions;
-my @blacklist_urls = ();
-my $ref_urls       = \@blacklist_urls;
-my @blacklist_prfx = ();
-my $ref_prfx       = \@blacklist_prfx;
-my $dnsmasq        = "/etc/init.d/dnsmasq";
-my $fqdn           = '(\b([a-z0-9_]+(-[a-z0-9_]+)*\.)+[a-z]{2,}\b).*$';
+my $debug_flag                                            = 1;
+my $debug_log                                             = "/var/log/update-blacklists-dnsmasq.log";
+my @blacklist                                             = ();
+my $ref_blst                                              = \@blacklist;
+my @exclusions                                            = ();
+my $ref_excs                                              = \@exclusions;
+my @blacklist_urls                                        = ();
+my $ref_urls                                              = \@blacklist_urls;
+my @blacklist_prfx                                        = ();
+my $ref_prfx                                              = \@blacklist_prfx;
+my $dnsmasq                                               = "/etc/init.d/dnsmasq";
+my $fqdn                                                  = '(\b([a-z0-9_]+(-[a-z0-9_]+)*\.)+[a-z]{2,}\b).*$';
 my $black_hole_ip;
-my $ref_bhip       = \$black_hole_ip;
-my $blacklist_file = "/etc/dnsmasq.d/dnsmasq.blacklist.conf";
-my $i              = 0;
-my $counter        = \$i;
+my $ref_bhip                                              = \$black_hole_ip;
+my $blacklist_file                                        = "/etc/dnsmasq.d/dnsmasq.blacklist.conf";
+my $i                                                     = 0;
+my $counter                                               = \$i;
 my $list;
 my $line;
 my $uri;
@@ -66,24 +67,26 @@ my $cfg_file;
 my $ref_mode;
 
 sub cmd_line {
-    my $cmdmode    = \$ref_mode;
+    my $cmdmode                                           = \$ref_mode;
     my $in_cli;
     my $print_ver;
     my $std_alone;
 
     GetOptions(
-        "cfg-file=s" => \$cfg_file,
-        "in-cli!"    => \$in_cli,
-        "std-alone!" => \$std_alone,
-        "version!"   => \$print_ver,
-        "debug!"     => \$debug_flag
+        "cfg-file=s"                                      => \$cfg_file,
+        "in-cli!"                                         => \$in_cli,
+        "std-alone!"                                      => \$std_alone,
+        "version!"                                        => \$print_ver,
+        "debug!"                                          => \$debug_flag
         )
         or print(
         "Valid options: --in-cli | --std-alone | --version | --cfg_file <filename> | --debug\n"
-        ) and exit(1);
+        )
+        and exit
+        (1);
 
     if ( defined($std_alone) ) {
-        $$cmdmode = "std-alone";
+        $$cmdmode                                         = "std-alone";
     }
     elsif ( defined($in_cli) ) {
         qx(/bin/cli-shell-api inSession);
@@ -92,17 +95,17 @@ sub cmd_line {
                 "You must run $0 inside of configure when '--in-cli' is specified!\n";
             exit(1);
         }
-        $$cmdmode = "in-cli";
+        $$cmdmode                                         = "in-cli";
     }
     elsif ( defined($cfg_file) ) {
-        $$cmdmode = "cfg-file";
+        $$cmdmode                                         = "cfg-file";
         if ( !-f $cfg_file ) {
             print("$cfg_file doesn't exist!\n");
             exit(1);
         }
     }
     else {
-        $$cmdmode = "ex-cli";
+        $$cmdmode                                         = "ex-cli";
     }
 
     if ( defined($print_ver) ) {
@@ -110,12 +113,12 @@ sub cmd_line {
         exit(0);
     }
 
-    $debug_flag = 1 if defined($debug_flag);
+    $debug_flag                                           = 1 if defined($debug_flag);
 }
 
 sub sendit {
-    my ( $listref, $lineref ) = @_;
-    my ( $list, $line ) = ( $$listref, $$lineref );
+    my ( $listref, $lineref )                             = @_;
+    my ( $list, $line )                                   = ( $$listref, $$lineref );
     if ( defined($line) ) {
         for ($list) {
             /blacklist/ and push( @$ref_blst, "address=/$line/$$ref_bhip\n" ),
@@ -128,22 +131,22 @@ sub sendit {
 }
 
 sub uniq {
-    my @unsorted = @_;
-    my @sorted = ( sort keys %{ { map { $_ => 1 } @unsorted } } );
+    my @unsorted                                          = @_;
+    my @sorted                                            = ( sort keys %{ { map { $_ => 1 } @unsorted } } );
     return @sorted;
 }
 
 sub write_list($$) {
     my $fh;
-    my $file = $_[0];
-    my @list = @{ $_[1] };
+    my $file                                              = $_[0];
+    my @list                                              = @{ $_[1] };
     open( $fh, '>', $$file ) or die "Could not open file: '$file' $!";
     print $fh (@list);
     close($fh);
 }
 
 sub cfg_none {
-    $$ref_bhip = "0.0.0.0";
+    $$ref_bhip                                            = "0.0.0.0";
 
     # Source urls for blacklisted adservers and malware servers
     for (
@@ -151,7 +154,9 @@ sub cfg_none {
         http://winhelp2002.mvps.org/hosts.txt
         http://someonewhocares.org/hosts/zero/
         http://pgl.yoyo.org/as/serverlist.php?hostformat=nohtml&showintro=1&mimetype=plaintext
-        http://www.malwaredomainlist.com/hostslist/hosts.txt|
+        http://www.malwaredomainlist.com/hostslist/hosts.txt
+        https://openphish.com/feed.txt
+        https://zeustracker.abuse.ch/blocklist.php?download=compromised|
         )
     {
         sendit( \url, \$_ );
@@ -160,9 +165,10 @@ sub cfg_none {
 # prefix strings to be removed, leaving the FQDN or hostname + trailing suffix
     for (
         qw(
-        0.0.0.0..
-        127.0.0.1..
+        0.0.0.0\s+
         address=/
+        htt.*//
+        127.0.0.1\s+
         )
         )
     {
@@ -187,49 +193,49 @@ sub cfg_none {
     }
 
     # Include our own bad hosts
-    my $include = "beap.gemini.yahoo.com";
+    my $include                                           = "beap.gemini.yahoo.com";
     sendit( \blacklist, \$include );
     return 1;
 }
 
 sub isblacklist {
-    my $config = new Vyatta::Config;
+    my $config                                            = new Vyatta::Config;
     my $blklst_exists;
-    my $bool = 0;
+    my $bool                                              = 0;
     $config->setLevel("service dns forwarding");
     if ( $ref_mode eq "in-cli" ) {
-        $blklst_exists = $config->exists("blacklist");
+        $blklst_exists                                    = $config->exists("blacklist");
     }
     else {
-        $blklst_exists = $config->existsOrig("blacklist");
+        $blklst_exists                                    = $config->existsOrig("blacklist");
     }
     if ( defined($blklst_exists) ) {
-        $bool = 1;
+        $bool                                             = 1;
     }
     else {
-        $bool = 0;
+        $bool                                             = 0;
     }
     return $bool;
 }
 
 sub cfg_active {
     my ( @sources, @includes, @excludes );
-    my $config = new Vyatta::Config;
+    my $config                                            = new Vyatta::Config;
 
     if (isblacklist) {
         if ( $ref_mode eq "in-cli" ) {
             $config->setLevel('service dns forwarding blacklist');
-            @includes  = $config->returnValues('include');
-            @excludes  = $config->returnValues('exclude');
-            @sources   = $config->listNodes('source');
-            $$ref_bhip = $config->returnValue('blackhole') // "0.0.0.0";
+            @includes                                     = $config->returnValues('include');
+            @excludes                                     = $config->returnValues('exclude');
+            @sources                                      = $config->listNodes('source');
+            $$ref_bhip                                    = $config->returnValue('blackhole') // "0.0.0.0";
         }
         else {
             $config->setLevel('service dns forwarding blacklist');
-            @includes  = $config->returnOrigValues('include');
-            @excludes  = $config->returnOrigValues('exclude');
-            @sources   = $config->listOrigNodes('source');
-            $$ref_bhip = $config->returnOrigValue('blackhole') // "0.0.0.0";
+            @includes                                     = $config->returnOrigValues('include');
+            @excludes                                     = $config->returnOrigValues('exclude');
+            @sources                                      = $config->listOrigNodes('source');
+            $$ref_bhip                                    = $config->returnOrigValue('blackhole') // "0.0.0.0";
         }
 
         for (@includes) {
@@ -253,30 +259,31 @@ sub cfg_active {
         }
     }
     else {
-        return 0;
+        log_msg("info","service dns forwarding blacklist is not configured, exiting!\n");
+        print("service dns forwarding blacklist is not configured, exiting!\n");
+        exit(1);
     }
     return 1;
 }
 
 sub cfg_file {
-    my $mode = $ref_mode; # not yet sure why $cmdmode ends up undef after this sub, so preserving it
-    my $rgx_url = qr/^url\s+(.*)$/;
-    my $prfx_re = qr/^prefix\s+["{0,1}](.*)["{0,1}].*$/;
-    my $xcp     = new XorpConfigParser();
+    my $mode                                              = $ref_mode; # not yet sure why $cmdmode ends up undef after this sub, so preserving it
+    my $rgx_url                                           = qr/^url\s+(.*)$/;
+    my $prfx_re                                           = qr/^prefix\s+["{0,1}](.*)["{0,1}].*$/;
+    my $xcp                                               = new XorpConfigParser();
     $xcp->parse($cfg_file);
 
-    my $hashBlacklist
-        = $xcp->get_node( [ 'service', 'dns', 'forwarding', 'blacklist' ] );
+    my $hashBlacklist                                     = $xcp->get_node( [ 'service', 'dns', 'forwarding', 'blacklist' ] );
 
     if ( defined($hashBlacklist) ) {
-        my $hashBlacklistChildren = $hashBlacklist->{'children'};
-        my @excludes = $xcp->copy_multis( $hashBlacklistChildren, 'exclude' );
-        my @includes = $xcp->copy_multis( $hashBlacklistChildren, 'include' );
-        my @sources  = $xcp->copy_multis( $hashBlacklistChildren, 'source' );
+        my $hashBlacklistChildren                         = $hashBlacklist->{'children'};
+        my @excludes                                      = $xcp->copy_multis( $hashBlacklistChildren, 'exclude' );
+        my @includes                                      = $xcp->copy_multis( $hashBlacklistChildren, 'include' );
+        my @sources                                       = $xcp->copy_multis( $hashBlacklistChildren, 'source' );
 
-        for ( my $i = 0; $i < @{ $hashBlacklist->{'children'} }; $i++ ) {
+        for ( my $i                                       = 0; $i < @{ $hashBlacklist->{'children'} }; $i++ ) {
             for ( $hashBlacklist->{'children'}[$i]{'name'} ) {
-                /^blackhole\s+(.*)$/ and $$ref_bhip = $1 // "0.0.0.0";
+                /^blackhole\s+(.*)$/ and $$ref_bhip       = $1 // "0.0.0.0";
             }
 
         }
@@ -290,13 +297,13 @@ sub cfg_file {
         }
 
         for my $multiBlacklistSource (@sources) {
-            my $hashSource = $xcp->get_node(
+            my $hashSource                                = $xcp->get_node(
                 [   'service', 'dns', 'forwarding', 'blacklist',
                     "source $multiBlacklistSource->{'name'}"
                 ]
             );
 
-            my $hashSourceChildren = $hashSource->{'children'};
+            my $hashSourceChildren                        = $hashSource->{'children'};
 
             for (@$hashSourceChildren) {
                 for ( $_->{'name'} ) {
@@ -309,17 +316,18 @@ sub cfg_file {
         }
     }
     else {
-        return 0;
+        log_msg("info","service dns forwarding blacklist is not configured, exiting!\n");
+        print("service dns forwarding blacklist is not configured, exiting!\n");
+        exit(1);
     }
-    $ref_mode
-        = $mode;   # restoring $cmdmode as this sub is clobbering it somewhere
+    $ref_mode                                             = $mode;   # restoring $cmdmode as this sub is clobbering it somewhere
     return 1;
 }
 
 sub get_blklist_cfg {
 
     # Make sure localhost is in the whitelist of exclusions
-    my $exclude = 'localhost';
+    my $exclude                                           = 'localhost';
     sendit( \exclude, \$exclude );
 
     for ($ref_mode) {
@@ -329,10 +337,10 @@ sub get_blklist_cfg {
     }
 }
 
-sub log_msg {
-    my $log_type  = shift;
-    my $message   = shift;
-    my $date = strftime "%b %e %H:%M:%S %Y", localtime;
+sub log_msg ($ $) {
+    my $log_type                                          = shift;
+    my $message                                           = shift;
+    my $date                                              = strftime "%b %e %H:%M:%S %Y", localtime;
 
     if ($debug_flag) {
         print $loghandle ("$date: $log_type: $message");
@@ -341,76 +349,81 @@ sub log_msg {
 
 sub update_blacklist {
 
-    my $entry     = " - Entries processed: ";
-    my $mode      = \$ref_mode;
-    my $exclude   = join( "|", uniq(@$ref_excs) );
-    my $prefix    = join( "|", uniq(@$ref_prfx) );
-    my $strmregex = qr/^\s+|\s+$|^\n|^#.*$/;
+    my $entry                                             = " - Entries processed: ";
+    my $mode                                              = \$ref_mode;
+    my $exclude                                           = join( "|", uniq(@$ref_excs) );
+    my $prefix                                            = join( "|", uniq(@$ref_prfx) );
+    my $strmregex                                         = qr/^\s+|\s+$|^\n|^#.*$/;
 
-    $exclude  = qr/$exclude/;
-    $prefix   = qr/^($prefix)$fqdn/;
-    $$counter = scalar(@$ref_blst);
-
-    if ($debug_flag) {
-        open($loghandle, ">>$debug_log") or $debug_flag = 0;
-        log_msg("info", "---+++ ADBlock $version +++---\n")
-    }
+    $exclude                                              = qr/$exclude/;
+    $prefix                                               = qr/^($prefix)$fqdn/;
+    $$counter                                             = scalar(@$ref_blst);
 
     if (@$ref_urls) {
         for my $url (@$ref_urls) {
-            if ( $url       =~ m(^http://|^https://) ) {
-                $uri        = new URI($url);
-                my $host    = $uri->host;
-                my $seconds = 1;
-                my $i       = 0;
-                my $max     = 6;
-                log_msg("info", "Connecting to blacklist download host: $host\n");
-                RETRY: while ($i < $max) {
-                    my @content = keys {
-                        my %hash = map {
-                            ( my $val = lc($_) ) =~ s/$strmregex//;
-                            $val => 1;
+            if ( $url =~ m(^http://|^https://) ) {
+                $uri                                      = new URI($url);
+                my $host                                  = $uri->host;
+                my $seconds                               = 1;
+                my $i                                     = 0;
+                my $max                                   = 8;
+                log_msg( "info",
+                    "Connecting to blacklist download host: $host\n" );
+                while ( $i < $max ) {
+                    my @content                           = keys {
+                        my %hash                          = map {
+                            ( my $val                     = lc($_) ) =~ s/$strmregex//;
+                            $val                          => 1;
                         } qx(curl -s $url)
                     };
-                    $i++;
                     if (@content) {
-                        $i = $max;
+                        $i                                = $max;
+                        log_msg( "info",
+                                  "Received "
+                                . scalar(@content)
+                                . " records from $host\n" );
+                        print( "\r", " " x qx( tput cols ), "\r" )
+                            if $$mode ne "ex-cli";
+
+                        my $records                           = 0;
+
+                        for my $line (@content) {
+                            print( $host, $entry, $$counter, "\r" )
+                                if $$mode ne "ex-cli";
+                            for ($line) {
+                                !$_        and last;
+                                /$exclude/ and last;
+                                /$prefix/  and sendit( \blacklist, \$2 ),
+                                    $$counter++, $records++, last;
+                            }
+                        }
+                        log_msg( "info",
+                            "Processed $records records from $host\n" );
                     }
-                    elsif (not @content and $i == $max) {
-                        log_msg("error", "Unable to connect to blacklist download host: $host!\n");
+                    elsif ( not @content and $i == $max - 1 ) {
+                        print( "\r", " " x qx( tput cols ), "\r" )
+                            if $$mode ne "ex-cli";
+                        log_msg( "error",
+                            "Unable to connect to blacklist download host: $host!\n"
+                        );
+                        print("\rError: Unable to connect to host: $host!")
+                            if $$mode ne "ex-cli";
+                        log_msg( "warning",
+                            "Received 0 records from $host\n" )
+                            if ( scalar(@content) < 1 );
                         last;
                     }
                     else {
-                        log_msg("warning", "Unable to connect to blacklist download host: $host, retry in $seconds seconds...\n");
+                        $i++;
+                        log_msg( "warning",
+                            "Unable to connect to: $host, retry in $seconds seconds...\n"
+                        );
+                        print(
+                            "\rWarning: Unable to connect to: $host, retry in $seconds seconds..."
+                        ) if $$mode ne "ex-cli";
                         $seconds = $seconds * 2;
                         sleep $seconds;
-                        next RETRY;
                     }
-
-                    if (scalar(@content) < 1) {
-                        log_msg("warning", "Received 0 records from $host\n");
-                    }
-                    else {
-                        log_msg("info", "Received " . scalar(@content) . " records from $host\n");
-                    }
-
-                    print( "\r", " " x qx( tput cols ),
-                        "\r" )
-                        if $$mode ne "ex-cli";
-
-                    my $records = 0;
-
-                    for my $line (@content) {
-                        print( $host, $entry, $$counter, "\r" )
-                            if $$mode ne "ex-cli";
-                        for ($line) {
-                            !$_        and last;
-                            /$exclude/ and last;
-                            /$prefix/  and sendit( \blacklist, \$2 ),
-                                $$counter++, $records++, last;
-                        }
-                    }
-                    log_msg("info", "Processed $records records from $host\n");
                 }
             }
         }
@@ -419,21 +432,29 @@ sub update_blacklist {
 
 # main()
 
+if ($debug_flag > 0) {
+    open( $loghandle, ">>$debug_log" ) or $debug_flag = 0;
+    log_msg( "info", "---+++ ADBlock $version +++---\n" );
+}
+
 cmd_line;
 
 get_blklist_cfg;
 
 update_blacklist;
 
-@blacklist = uniq(@blacklist);
+@blacklist                                                = uniq(@blacklist);
 
 write_list( \$blacklist_file, \@blacklist );
 
-printf( "\rEntries processed %d - unique records: %d \n",
+printf("\nEntries processed %d - unique records: %d \n",
     $$counter, scalar(@$ref_blst) )
     if $ref_mode ne "ex-cli";
 
-log_msg("info", "Entries processed $$counter - unique records: " . scalar(@$ref_blst) . "\n");
+log_msg( "info",
+          "Entries processed $$counter - unique records: "
+        . scalar(@$ref_blst)
+        . "\n" );
 
 system("$dnsmasq force-reload") if $ref_mode ne "in-cli";
 

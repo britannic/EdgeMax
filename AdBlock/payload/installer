@@ -132,6 +132,9 @@ install_adblock_support ()
 	set service dns forwarding blacklist exclude static.chartbeat.com || ERROR=1
 	set service dns forwarding blacklist exclude survey.112.2o7.net || ERROR=1
 	set service dns forwarding blacklist include beap.gemini.yahoo.com || ERROR=1
+	set service dns forwarding blacklist source openphish.com description 'OpenPhish automatic phishing detection'
+	set service dns forwarding blacklist source openphish.com prefix 'htt.*//'
+	set service dns forwarding blacklist source openphish.com url 'https://openphish.com/feed.txt'
 	set service dns forwarding blacklist source someonewhocares.org description 'Zero based host and domain list' || ERROR=1
 	set service dns forwarding blacklist source someonewhocares.org prefix '0.0.0.0 ' || ERROR=1
 	set service dns forwarding blacklist source someonewhocares.org url 'http://someonewhocares.org/hosts/zero/' || ERROR=1
@@ -144,6 +147,12 @@ install_adblock_support ()
 	set service dns forwarding blacklist source yoyo.org description 'Fully Qualified Domain Names only - no prefix to strip' || ERROR=1
 	set service dns forwarding blacklist source yoyo.org prefix '' || ERROR=1
 	set service dns forwarding blacklist source yoyo.org url 'http://pgl.yoyo.org/as/serverlist.php?hostformat=nohtml&showintro=1&mimetype=plaintext' || ERROR=1
+	set service dns forwarding blacklist source zeustracker.abuse.ch/compromised description 'abuse.ch ZeuS compromised URL blacklist' || ERROR=1
+	set service dns forwarding blacklist source zeustracker.abuse.ch/compromised prefix '' || ERROR=1
+	set service dns forwarding blacklist source zeustracker.abuse.ch/compromised url 'https://zeustracker.abuse.ch/blocklist.php?download=compromised' || ERROR=1
+	set service dns forwarding blacklist source zeustracker.abuse.ch/hostfile description 'abuse.ch ZeuS blocklist host file' || ERROR=1
+	set service dns forwarding blacklist source zeustracker.abuse.ch/hostfile prefix '127.0.0.1\s+' || ERROR=1
+	set service dns forwarding blacklist source zeustracker.abuse.ch/hostfile url 'https://zeustracker.abuse.ch/blocklist.php?download=hostfile' || ERROR=1
 	set system task-scheduler task update_blacklists executable path /config/scripts/update-blacklists-dnsmasq.pl || ERROR=1
 	set system task-scheduler task update_blacklists interval 1d || ERROR=1
 
