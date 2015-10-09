@@ -109,10 +109,10 @@ install_adblock_support ()
 		install -d -o www-data -g users -m 0755 "${WWWDIR}/" || ERROR=1
 	fi
 
-	for i in "${GUI}/"*
-	do
-		install -o www-data -g users -m 0755 ${i} "${WWWDIR}/"$(basename ${i}) || ERROR=1
-	done
+# 	for i in "${GUI}/"*
+# 	do
+# 		install -o www-data -g users -m 0755 ${i} "${WWWDIR}/"$(basename ${i}) || ERROR=1
+# 	done
 
 	echo "Installing blacklist configuration templates for ${ADBLOCK}..."
 	cp -rf service/ "${CFGDIR}/"
@@ -121,7 +121,7 @@ install_adblock_support ()
 	begin || ERROR=1
 
 	echo "Creating starter blacklists and task scheduler entry for ${ADBLOCK}..."
-	set service dns forwarding blacklist disabled false  || ERROR=1
+#	set service dns forwarding blacklist disabled false  || ERROR=1
 	set service dns forwarding blacklist blackhole 0.0.0.0 || ERROR=1
 	set service dns forwarding blacklist exclude msdn.com || ERROR=1
 	set service dns forwarding blacklist exclude appleglobal.112.2o7.net || ERROR=1
@@ -154,7 +154,7 @@ install_adblock_support ()
 	set service dns forwarding blacklist source zeustracker.abuse.ch/hostfile prefix '127.0.0.1\s+' || ERROR=1
 	set service dns forwarding blacklist source zeustracker.abuse.ch/hostfile url 'https://zeustracker.abuse.ch/blocklist.php?download=hostfile' || ERROR=1
 	set system task-scheduler task update_blacklists executable path /config/scripts/update-blacklists-dnsmasq.pl || ERROR=1
-	set system task-scheduler task update_blacklists interval 1d || ERROR=1
+	set system task-scheduler task update_blacklists interval 6h || ERROR=1
 
 	echo "Committing configuration..."
 	commit || ERROR=1
