@@ -42,7 +42,7 @@ use constant url                                          => 'url';
 use constant prefix                                       => 'prefix';
 use constant exclude                                      => 'exclude';
 
-my $debug_flag                                            = 1;
+my $debug_flag                                            = undef;
 my $debug_log                                             = "/var/log/update-blacklists-dnsmasq.log";
 my @blacklist                                             = ();
 my $ref_blst                                              = \@blacklist;
@@ -342,9 +342,10 @@ sub log_msg ($ $) {
     my $message                                           = shift;
     my $date                                              = strftime "%b %e %H:%M:%S %Y", localtime;
 
-    if ($debug_flag) {
-        print $loghandle ("$date: $log_type: $message");
-    }
+    print $loghandle ("$date: $log_type: $message");
+
+    print("$date: $log_type: $message") if $debug_flag;
+
 }
 
 sub update_blacklist {
@@ -399,6 +400,8 @@ sub update_blacklist {
                         }
                         log_msg( "info",
                             "Processed $records records from $host\n" );
+                        print( "\n" )
+                            if $$mode ne "ex-cli";
                     }
                     elsif ( not @content and $i == $max - 1 ) {
                         print( "\r", " " x qx( tput cols ), "\r" )
@@ -432,10 +435,8 @@ sub update_blacklist {
 
 # main()
 
-if ($debug_flag > 0) {
-    open( $loghandle, ">>$debug_log" ) or $debug_flag = 0;
-    log_msg( "info", "---+++ ADBlock $version +++---\n" );
-}
+open( $loghandle, ">>$debug_log" ) or $debug_flag = undef;
+log_msg( "info", "---+++ ADBlock $version +++---\n" );
 
 cmd_line;
 
@@ -443,11 +444,11 @@ get_blklist_cfg;
 
 update_blacklist;
 
-@blacklist                                                = uniq(@blacklist);
+@blacklist = uniq(@blacklist);
 
 write_list( \$blacklist_file, \@blacklist );
 
-printf("\nEntries processed %d - unique records: %d \n",
+printf( "\nEntries processed %d - unique records: %d \n",
     $$counter, scalar(@$ref_blst) )
     if $ref_mode ne "ex-cli";
 
@@ -458,4 +459,4 @@ log_msg( "info",
 
 system("$dnsmasq force-reload") if $ref_mode ne "in-cli";
 
-close $loghandle if ($debug_flag);
+close($loghandle);
