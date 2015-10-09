@@ -53,7 +53,7 @@ To install:
 
 ## Post Installation
 Here is the scheduler configuration after running install_adblock:
-
+```javascript
     show system task-scheduler
          task update_blacklists {
              executable {
@@ -61,9 +61,9 @@ Here is the scheduler configuration after running install_adblock:
              }
              interval 1d
          }
-
+```
 The script will also install a default blacklist setup, here is the stanza (show service dns forwarding):
-
+```javascript
         forwarding {
             blacklist {
                 blackhole 192.168.10.1
@@ -112,7 +112,7 @@ The script will also install a default blacklist setup, here is the stanza (show
                     url https://zeustracker.abuse.ch/blocklist.php?download=hostfile
                 }
             }
-
+```
 CLI commands to configure the ADBlock Blacklist:
 
         set service dns forwarding blacklist blackhole 0.0.0.0
