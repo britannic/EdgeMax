@@ -125,17 +125,29 @@ CLI commands to configure the ADBlock Blacklist:
         set service dns forwarding blacklist exclude static.chartbeat.com
         set service dns forwarding blacklist exclude survey.112.2o7.net
         set service dns forwarding blacklist include beap.gemini.yahoo.com
+        set service dns forwarding blacklist source openphish.com description 'OpenPhish automatic phishing detection'
+        set service dns forwarding blacklist source openphish.com prefix 'htt.*//'
+        set service dns forwarding blacklist source openphish.com url 'https://openphish.com/feed.txt'
         set service dns forwarding blacklist source someonewhocares.org description 'Zero based host and domain list'
         set service dns forwarding blacklist source someonewhocares.org prefix '0.0.0.0 '
         set service dns forwarding blacklist source someonewhocares.org url 'http://someonewhocares.org/hosts/zero/'
         set service dns forwarding blacklist source winhelp2002.mvps.org description 'Zero based host and domain list'
         set service dns forwarding blacklist source winhelp2002.mvps.org prefix '0.0.0.0 '
         set service dns forwarding blacklist source winhelp2002.mvps.org url 'http://winhelp2002.mvps.org/hosts.txt'
-        set service dns forwarding blacklist source yoyo.org description 'DNSmasq formatted, but with 127.0.0.1 black hole IP'
+        set service dns forwarding blacklist source www.malwaredomainlist.com description '127.0.0.1 based host and domain list'
+        set service dns forwarding blacklist source www.malwaredomainlist.com prefix '127.0.0.1  '
+        set service dns forwarding blacklist source www.malwaredomainlist.com url 'http://www.malwaredomainlist.com/hostslist/hosts.txt'
+        set service dns forwarding blacklist source yoyo.org description 'Fully Qualified Domain Names only - no prefix to strip'
         set service dns forwarding blacklist source yoyo.org prefix ''
         set service dns forwarding blacklist source yoyo.org url 'http://pgl.yoyo.org/as/serverlist.php?hostformat=nohtml&showintro=1&mimetype=plaintext'
+        set service dns forwarding blacklist source zeustracker.abuse.ch/compromised description 'abuse.ch ZeuS compromised URL blacklist'
+        set service dns forwarding blacklist source zeustracker.abuse.ch/compromised prefix ''
+        set service dns forwarding blacklist source zeustracker.abuse.ch/compromised url 'https://zeustracker.abuse.ch/blocklist.php?download=compromised'
+        set service dns forwarding blacklist source zeustracker.abuse.ch/hostfile description 'abuse.ch ZeuS blocklist host file'
+        set service dns forwarding blacklist source zeustracker.abuse.ch/hostfile prefix '127.0.0.1\s+'
+        set service dns forwarding blacklist source zeustracker.abuse.ch/hostfile url 'https://zeustracker.abuse.ch/blocklist.php?download=hostfile'
         set system task-scheduler task update_blacklists executable path /config/scripts/update-blacklists-dnsmasq.pl
-        set system task-scheduler task update_blacklists interval 1d
+        set system task-scheduler task update_blacklists interval
 
 ## Notes:
 In order to make this work properly, you will need to first ensure that your dnsmasq is correctly set up. An example configuration is posted below:
