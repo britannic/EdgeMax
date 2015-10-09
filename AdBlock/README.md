@@ -53,7 +53,9 @@ To install:
 
 ## Post Installation
 Here is the scheduler configuration after running install_adblock:
-```json
+
+```python
+>>>>>>> origin/master
     show system task-scheduler
          task update_blacklists {
              executable {
@@ -63,7 +65,9 @@ Here is the scheduler configuration after running install_adblock:
          }
 ```
 The script will also install a default blacklist setup, here is the stanza (show service dns forwarding):
-```json
+
+```python
+>>>>>>> origin/master
         forwarding {
             blacklist {
                 blackhole 192.168.10.1
