@@ -24,7 +24,7 @@
 #
 # **** End License ****
 
-my $version                                               = '3.15';
+my $version                                               = '3.15.1';
 
 use URI;
 use integer;
@@ -367,7 +367,7 @@ sub update_blacklist {
                 my $host                                  = $uri->host;
                 my $seconds                               = 1;
                 my $i                                     = 0;
-                my $max                                   = 8;
+                my $max                                   = 2;
                 log_msg( "info",
                     "Connecting to blacklist download host: $host\n" );
                 while ( $i < $max ) {
