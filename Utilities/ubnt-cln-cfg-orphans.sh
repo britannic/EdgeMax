@@ -5,7 +5,7 @@ VERSION='0.7'
 ME=$(basename ${0})
 
 # Comment/uncomment line below for debug
-DEBUG="echo Dry run, this command would be executed: "
+# DEBUG="echo Dry run, this command would be executed: "
 
 # Make sure script runs as root
 if [[ ${EUID} != 0 ]]
@@ -36,6 +36,14 @@ else
                 echo "Removing directory ${i}..."
                 ${DEBUG} rm -rf "${i}"
             fi
+        fi
+    done
+    for i in /opt/vyatta/config/tmp/*
+    do
+        if [[ -d "${i}" ]]
+        then
+            echo "Removing directory ${i}..."
+            ${DEBUG} rm -rf "${i}"
         fi
     done
     for i in /tmp/changes_only_*
