@@ -23,4 +23,4 @@ set service dns forwarding blacklist source yoyo.org description 'Fully Qualifie
 set service dns forwarding blacklist source yoyo.org prefix ''
 set service dns forwarding blacklist source yoyo.org url 'http://pgl.yoyo.org/as/serverlist.php?hostformat=nohtml&showintro=1&mimetype=plaintext'
 set system task-scheduler task update_blacklists executable path /config/scripts/update-blacklists-dnsmasq.pl
-set system task-scheduler task update_blacklists interval 1d
+set system task-scheduler task update_blacklists interval 6h
