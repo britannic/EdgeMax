@@ -27,7 +27,7 @@ BEGIN { $Pod::Usage::Formatter = 'Pod::Text::Termcap'; }
 
 my $version                                               = '3.2e';
 
-use Data::Dumper;
+# use Data::Dumper;
 use File::Basename;
 use Getopt::Long;
 use integer;
@@ -73,8 +73,6 @@ my $end                                                   = "$cmd end";
 my $save                                                  = "$cmd save";
 my $set                                                   = "$cmd set";
 my $prog                                                  = basename($0);
-my @pinwheel                                              = qw( \ | / -- );
-my $spoke                                                 = 0;
 my $cfg_file;
 my $default;
 my $download;
@@ -153,25 +151,6 @@ sub cmd_line {
     $debug_flag = true if defined($debug_flag);
 }
 
-sub sendit {
-    my ( $listref, $lineref ) = @_;
-    my ( $list, $line )       = ( $$listref, $$lineref );
-    my $ref_bhip              = \$black_hole_ip;
-    my $ref_blst              = \@blacklist;
-    my $ref_excs              = \@exclusions;
-    my $ref_prfx              = \@blacklist_prfx;
-    my $ref_urls              = \@blacklist_urls;
-    if ( defined($line) ) {
-        for ($list) {
-            /blacklist/ and push( @$ref_blst, "address=/$line/$$ref_bhip\n" ),
-                                                            last;
-            /url/       and push( @$ref_urls, $line ),      last;
-            /prefix/    and push( @$ref_prfx, qq($line) ),  last;
-            /exclude/   and push( @$ref_excs, $line ),      last;
-        }
-    }
-}
-
 sub uniq {
     my $unsorted = shift;
     my @sorted   = ( sort keys %{ { map { $_ => 1 } @$unsorted } } );
@@ -189,6 +168,7 @@ sub write_list($$) {
 
 sub cfg_none {
     $black_hole_ip = "0.0.0.0";
+
     # Source urls for blacklisted adservers and malware servers
     for (
         qw|
@@ -202,7 +182,7 @@ sub cfg_none {
         |
         )
     {
-        sendit( \url, \$_ );
+        push( @{ \@blacklist_urls }, $_ );
     }
 
 # prefix strings to be removed, leaving the FQDN or hostname + trailing suffix
@@ -215,7 +195,7 @@ sub cfg_none {
         )
         )
     {
-        sendit( \prefix, \$_ );
+        push( @{ \@blacklist_prfx }, qq($_) );
     }
 
     # Exclude our own good hosts
@@ -233,12 +213,12 @@ sub cfg_none {
         |
         )
     {
-        sendit( \exclude, \$_ );
+        push( @{ \@exclusions }, $_ );
     }
 
     # Include our own bad hosts
     my $include = "beap.gemini.yahoo.com";
-    sendit( \blacklist, \$include );
+    push( @{ \@blacklist }, "address=/$include/${\$black_hole_ip}\n" );
     return 1;
 }
 
@@ -298,7 +278,8 @@ sub cfg_active {
             @includes      = $config->returnOrigValues('include');
             @excludes      = $config->returnOrigValues('exclude');
             @sources       = $config->listOrigNodes('source');
-            $black_hole_ip = $config->returnOrigValue('blackhole') // "0.0.0.0";
+            $black_hole_ip = $config->returnOrigValue('blackhole')
+                // "0.0.0.0";
         }
 
         for ($enabled) {
@@ -307,22 +288,22 @@ sub cfg_active {
         }
 
         for (@includes) {
-            sendit( \blacklist, \$_ );
+            push( @{ \@blacklist }, "address=/$_/${\$black_hole_ip}\n" );
         }
 
         for (@excludes) {
-            sendit( \exclude, \$_ );
+            push( @{ \@exclusions }, $_ );
         }
 
         for (@sources) {
             $config->setLevel("service dns forwarding blacklist source $_");
             if ( $ref_mode eq "in-cli" ) {
-                sendit( \url,    \$config->returnValue('url') );
-                sendit( \prefix, \$config->returnValue('prefix') );
+                push( @{ \@blacklist_urls }, $config->returnValue('url') );
+                push( @{ \@blacklist_prfx }, $config->returnValue('prefix') );
             }
             else {
-                sendit( \url,    \$config->returnOrigValue('url') );
-                sendit( \prefix, \$config->returnOrigValue('prefix') );
+                push( @{ \@blacklist_urls }, $config->returnOrigValue('url') );
+                push( @{ \@blacklist_prfx }, $config->returnOrigValue('prefix') );
             }
         }
     }
@@ -339,7 +320,8 @@ sub cfg_active {
 
 sub cfg_file {
     my $enabled;
-    my $mode = $ref_mode; # not yet sure why $cmdmode ends up undef after this sub, so preserving it
+    my $mode = $ref_mode
+        ; # not yet sure why $cmdmode ends up undef after this sub, so preserving it
     my $rgx_url = qr/^url\s+(.*)$/;
     my $prfx_re = qr/^prefix\s+["{0,1}](.*)["{0,1}].*$/;
     my $xcp     = new XorpConfigParser();
@@ -367,11 +349,11 @@ sub cfg_file {
         }
 
         for my $multiBlacklistExclude (@excludes) {
-            sendit( \exclude, \$multiBlacklistExclude->{'name'} );
+            push( @{ \@exclusions }, $multiBlacklistExclude->{'name'} );
         }
 
         for my $multiBlacklistInclude (@includes) {
-            sendit( \blacklist, \$multiBlacklistInclude->{'name'} );
+            push( @{ \@blacklist }, "address=/$multiBlacklistInclude->{'name'}/${\$black_hole_ip}\n" );
         }
 
         for my $multiBlacklistSource (@sources) {
@@ -385,8 +367,8 @@ sub cfg_file {
 
             for (@$hashSourceChildren) {
                 for ( $_->{'name'} ) {
-                    /$rgx_url/ and sendit( \url,    \$1 ), last;
-                    /$prfx_re/ and sendit( \prefix, \$1 ), last;
+                    /$rgx_url/ and push( @{ \@blacklist_urls }, $1 ), last;
+                    /$prfx_re/ and push( @{ \@blacklist_prfx }, $1 ), last;
                 }
             }
         }
@@ -404,11 +386,9 @@ sub cfg_file {
 }
 
 sub get_blklist_cfg {
-
     # Make sure localhost is in the whitelist of exclusions
     my $exclude = 'localhost';
-    sendit( \exclude, \$exclude );
-
+    push( @{ \@exclusions }, $exclude );
     for ($ref_mode) {
         m/ex-cli|in-cli/ and cfg_active, last;
         m/cfg-file/      and cfg_file,   last;
@@ -498,11 +478,6 @@ sub log_msg ($ $) {
     print("$log_type: $message") if $debug_flag;
 }
 
-sub pinwheel {
-    print STDERR ("$pinwheel[$spoke++]\r");
-    $spoke = 0 if $spoke == scalar(@pinwheel);
-}
-
 sub fetch_url {
     my $get;
     my $secs      = 30;
@@ -543,7 +518,7 @@ sub update_blacklist {
     my $cols      = qx( tput cols );
     my $counter   = \$i;
 
-    $exclude  = qr/$exclude/;
+    $exclude  = qr/^($prefix|)\s*$exclude/;
     $prefix   = qr/^($prefix|)\s*$fqdn/;
     $$counter = scalar( @{ \@blacklist } );
 
@@ -561,9 +536,8 @@ sub update_blacklist {
             print( "Entries processed: ", $records, "\r" )
                 if $$mode ne "ex-cli";
             for ($line) {
-                !$_        and last;
-                /$exclude/ and last;
-                /$prefix/  and sendit( \blacklist, \$2 ),
+                /$$exclude/ and last;
+                /$$prefix/  and push( @{ \@blacklist }, "address=/$2/${\$black_hole_ip}\n" ),
                     $$counter++, $records++, last;
             }
         }
