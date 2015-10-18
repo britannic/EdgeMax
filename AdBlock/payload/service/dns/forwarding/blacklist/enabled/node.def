@@ -1,3 +1,7 @@
 type: bool
 default: true
 help: Enable Adblocking Blacklist
+
+create:expression: "touch /tmp/update-blacklists.$PPID"
+delete:expression: "touch /tmp/update-blacklists.$PPID"
+update:expression: "touch /tmp/update-blacklists.$PPID"

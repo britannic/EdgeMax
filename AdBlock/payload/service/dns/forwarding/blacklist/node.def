@@ -1,14 +1,8 @@
 priority: 999
 help: Add and delete blacklist blackhole IP, exclusions and URL sources
-commit:expression:
-delete:expression:
-end:expression: "if [ "$COMMIT_ACTION" != DELETE ]; then \
-        if [ -f \"/tmp/update-blacklists.$PPID\" ]; then \
+
+end:expression: "if [ -f \"/tmp/update-blacklists.$PPID\" ]; then \
             echo 'ADBLOCK: Updating /etc/dnsmasq.d/dnsmasq.blacklist.conf'; \
             sudo /config/scripts/update-blacklists-dnsmasq.pl --in-cli; \
             sudo rm /tmp/update-blacklists.$PPID; \
-        fi; \
-    else \
-        sudo rm /etc/dnsmasq.d/dnsmasq.blacklist.conf \
-        sudo /opt/vyatta/sbin/vyatta-dns-forwarding.pl --update-dnsforwarding; \
-    fi;"
+            fi;"

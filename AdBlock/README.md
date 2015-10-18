@@ -20,13 +20,20 @@ EdgeMax Blacklist and Ad Server Blocking is derived from the received wisdom fou
 * Since the EdgeOS is a fork and port of Vyatta 6.3, this script could easily be adapted for work on VyOS and Vyatta derived ports
 
 ## Versions
-* 3.15. Added features include:
+* 3.20: Fixes excluded FQDNs by using precise matching instead of fuzzy (i.e. 1.domain.tld won't also exclude b1.domain.tld).
+    - Added enable/disable options
+    - Now uses multi-threading for simultaneous blacklist downloads
+    - HTTP/HTTPS handling uses useragent for improved error/timeout control
+    - New --doc switch prints out condensed man page
+
+* 3.15: Added features include:
     - Logging to /var/log/update-blacklists-dnsmasq.log
     - --debug option: prints status messages
     - Additional download sources added to the default lists
     - Added retry logic for download sources that time out (inspired by @mseeEngineer﻿)
     - Task scheduler update interval is now every 6 hours, as some of the sources change hourly (configure interval using "set system task-scheduler task update_blacklists interval"
     - Status line retains previous downloads for more detail
+
 * Version 3.12: Fixed bug reported by @soehest﻿ where certain FQDNs were being rejected by the stream processor.
 
 * Version 3.10: Now supports https:// source URLs and improved regex handling in the stream processing engine.
