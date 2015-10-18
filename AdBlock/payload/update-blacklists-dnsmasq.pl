@@ -33,7 +33,6 @@ use Getopt::Long;
 use integer;
 use lib '/opt/vyatta/share/perl5/';
 use LWP::UserAgent;
-use Pod::Usage qw(pod2usage);
 use POSIX qw(strftime);
 use strict;
 use threads;
@@ -44,27 +43,31 @@ use Vyatta::ConfigMgmt;
 use warnings;
 use XorpConfigParser;
 
-use constant blacklist                                    => 'blacklist';
-use constant url                                          => 'url';
-use constant prefix                                       => 'prefix';
-use constant exclude                                      => 'exclude';
 use constant true                                         => 1;
 use constant false                                        => 0;
 
+my @blacklist                                             = ();
+my @blacklist_prfx                                        = ();
+my @blacklist_urls                                        = ();
+my @exclusions                                            = ();
+my $black_hole_ip                                         = '0.0.0.0';
+my $blacklist_file                                        = "/etc/dnsmasq.d/dnsmasq.blacklist.conf";
 my $debug_flag                                            = undef;
 my $debug_log                                             = "/var/log/update-blacklists-dnsmasq.log";
-my @blacklist                                             = ();
-my @exclusions                                            = ();
-my @blacklist_urls                                        = ();
-my @blacklist_prfx                                        = ();
-my $dnsmasq                                               = "/etc/init.d/dnsmasq";
-my $fqdn                                                  = '(\b([a-z0-9_]+(-[a-z0-9_]+)*\.)+[a-z]{2,}\b).*$';
-my $black_hole_ip;
-my $blacklist_file                                        = "/etc/dnsmasq.d/dnsmasq.blacklist.conf";
-my $i                                                     = 0;
-my $enable                                                = undef;
 my $disable                                               = undef;
+my $dnsmasq                                               = "/etc/init.d/dnsmasq";
 my $documentation                                         = undef;
+my $enable                                                = undef;
+my $enabled                                               = true;
+my $fqdn                                                  = '(\b([a-z0-9_]+(-[a-z0-9_]+)*\.)+[a-z]{2,}\b).*$';
+my ($i, $records)                                         = 0;
+my $prog                                                  = basename($0);
+
+my ($cfg_file, $default,   $download,  $in_cli,   $line,
+    $list,     $loghandle, $print_ver, $opmode,   $uri
+);
+
+# CLI command set
 my $cmd                                                   = "/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper";
 my $begin                                                 = "$cmd begin";
 my $commit                                                = "$cmd commit";
@@ -72,17 +75,6 @@ my $delete                                                = "$cmd delete";
 my $end                                                   = "$cmd end";
 my $save                                                  = "$cmd save";
 my $set                                                   = "$cmd set";
-my $prog                                                  = basename($0);
-my $cfg_file;
-my $default;
-my $download;
-my $in_cli;
-my $line;
-my $list;
-my $loghandle;
-my $print_ver;
-my $ref_mode;
-my $uri;
 
 my @opts = (
     [ q{--cfg-file <file>  # load a configuration file}, 'cfg-file=s' => \$cfg_file ],
@@ -110,18 +102,19 @@ sub Usage ($ $) {
             "\n";
     }
     else {
-        pod2usage(-verbose => 2)
+        while (<DATA>) {
+            print ();
+        }
+        print ("\n");
     }
     exit $exitcode;
 }
 
 sub cmd_line {
-    my $cmdmode = \$ref_mode;
-
     GetOptions( map { (@$_)[ 1 .. $#$_ ] } @opts ) or Usage(1, 'help');
 
     if ( defined($default) ) {
-        $$cmdmode = "default";
+        ${\$opmode} = "default";
     }
     elsif ( defined($in_cli) ) {
         qx(/bin/cli-shell-api inSession);
@@ -130,17 +123,17 @@ sub cmd_line {
                 "You must run $0 inside of configure when '--in-cli' is specified!\n";
             exit(1);
         }
-        $$cmdmode = "in-cli";
+        ${\$opmode} = "in-cli";
     }
     elsif ( defined($cfg_file) ) {
-        $$cmdmode = "cfg-file";
+        ${\$opmode} = "cfg-file";
         if ( !-f $cfg_file ) {
             print("$cfg_file doesn't exist!\n");
             exit(1);
         }
     }
     else {
-        $$cmdmode = "ex-cli";
+        ${\$opmode} = "ex-cli";
     }
 
     if ( defined($print_ver) ) {
@@ -148,7 +141,7 @@ sub cmd_line {
         exit(0);
     }
 
-    $debug_flag = true if defined($debug_flag);
+    ${\$debug_flag} = true if defined(${\$debug_flag});
 }
 
 sub uniq {
@@ -167,8 +160,6 @@ sub write_list($$) {
 }
 
 sub cfg_none {
-    $black_hole_ip = "0.0.0.0";
-
     # Source urls for blacklisted adservers and malware servers
     for (
         qw|
@@ -228,7 +219,7 @@ sub isblacklist {
 
     $config->setLevel("service dns forwarding");
     $blklst_exists =
-        $ref_mode eq "in-cli"
+        $opmode eq "in-cli"
         ? $config->exists("blacklist")
         : $config->existsOrig("blacklist");
 
@@ -247,7 +238,7 @@ sub isscheduled {
         $config->setLevel("system task-scheduler task");
 
         $schedule_exists =
-            $ref_mode eq "in-cli"
+            $opmode eq "in-cli"
             ? $config->exists("update_blacklists")
             : $config->existsOrig("update_blacklists");
     }
@@ -261,30 +252,29 @@ sub isscheduled {
 sub cfg_active {
     my ( @sources, @includes, @excludes );
     my $config = new Vyatta::Config;
-    my $enabled;
 
     if (isblacklist) {
-        if ( $ref_mode eq "in-cli" ) {
+        if ( $opmode eq "in-cli" ) {
             $config->setLevel('service dns forwarding blacklist');
-            $enabled       = $config->returnValue('enabled') // false;
-            @includes      = $config->returnValues('include');
-            @excludes      = $config->returnValues('exclude');
-            @sources       = $config->listNodes('source');
-            $black_hole_ip = $config->returnValue('blackhole') // "0.0.0.0";
+            ${\$enabled}       = $config->returnValue('enabled') // false;
+            @includes          = $config->returnValues('include');
+            @excludes          = $config->returnValues('exclude');
+            @sources           = $config->listNodes('source');
+            ${\$black_hole_ip} = $config->returnValue('blackhole') // "0.0.0.0";
         }
         else {
             $config->setLevel('service dns forwarding blacklist');
-            $enabled       = $config->returnOrigValue('enabled') // false;
-            @includes      = $config->returnOrigValues('include');
-            @excludes      = $config->returnOrigValues('exclude');
-            @sources       = $config->listOrigNodes('source');
-            $black_hole_ip = $config->returnOrigValue('blackhole')
+            ${\$enabled}       = $config->returnOrigValue('enabled') // false;
+            @includes          = $config->returnOrigValues('include');
+            @excludes          = $config->returnOrigValues('exclude');
+            @sources           = $config->listOrigNodes('source');
+            ${\$black_hole_ip} = $config->returnOrigValue('blackhole')
                 // "0.0.0.0";
         }
 
-        for ($enabled) {
-            /false/ and $enabled = false;
-            /true/  and $enabled = true;
+        for (${\$enabled}) {
+            /false/ and ${\$enabled} = false;
+            /true/  and ${\$enabled} = true;
         }
 
         for (@includes) {
@@ -297,7 +287,7 @@ sub cfg_active {
 
         for (@sources) {
             $config->setLevel("service dns forwarding blacklist source $_");
-            if ( $ref_mode eq "in-cli" ) {
+            if ( $opmode eq "in-cli" ) {
                 push( @{ \@blacklist_urls }, $config->returnValue('url') );
                 push( @{ \@blacklist_prfx }, $config->returnValue('prefix') );
             }
@@ -319,9 +309,6 @@ sub cfg_active {
 }
 
 sub cfg_file {
-    my $enabled;
-    my $mode = $ref_mode
-        ; # not yet sure why $cmdmode ends up undef after this sub, so preserving it
     my $rgx_url = qr/^url\s+(.*)$/;
     my $prfx_re = qr/^prefix\s+["{0,1}](.*)["{0,1}].*$/;
     my $xcp     = new XorpConfigParser();
@@ -338,14 +325,14 @@ sub cfg_file {
 
         for ( my $i = 0; $i < @{ $hashBlacklist->{'children'} }; $i++ ) {
             for ( $hashBlacklist->{'children'}[$i]{'name'} ) {
-                /^blackhole\s+(.*)$/ and $black_hole_ip = $1 // "0.0.0.0";
-                /^enabled\s+(\w)$/   and $enabled       = $1 // false;
+                /^blackhole\s+(.*)$/ and ${\$black_hole_ip} = $1 // "0.0.0.0";
+                /^enabled\s+(\w)$/   and ${\$enabled}       = $1 // false;
             }
         }
 
-        for ($enabled) {
-            /false/ and $enabled = false;
-            /true/  and $enabled = true;
+        for (${\$enabled}) {
+            /false/ and ${\$enabled} = false;
+            /true/  and ${\$enabled} = true;
         }
 
         for my $multiBlacklistExclude (@excludes) {
@@ -380,8 +367,6 @@ sub cfg_file {
             "service dns forwarding blacklist isn't configured, exiting!\n");
         exit(1);
     }
-    $ref_mode
-        = $mode;   # restoring $cmdmode as this sub is clobbering it somewhere
     return (true);
 }
 
@@ -389,7 +374,7 @@ sub get_blklist_cfg {
     # Make sure localhost is in the whitelist of exclusions
     my $exclude = 'localhost';
     push( @{ \@exclusions }, $exclude );
-    for ($ref_mode) {
+    for (${\$opmode}) {
         m/ex-cli|in-cli/ and cfg_active, last;
         m/cfg-file/      and cfg_file,   last;
         m/default/       and cfg_none,   last;
@@ -399,7 +384,7 @@ sub get_blklist_cfg {
 sub enable {
     my $bool;
     my $status;
-    $debug_flag = true;
+    ${\$debug_flag} = true;
 
     if ( not isscheduled ) {
         log_msg( "INFO",
@@ -410,7 +395,7 @@ sub enable {
             "$set system task-scheduler task update_blacklists executable path /config/scripts/update-blacklists-dnsmasq.pl; ",
             "$set system task-scheduler task update_blacklists interval 6h; ",
             "$commit; ",
-            "$end; ",
+            "$end",
         );
         my @output = qx(@schedule 2>&1);
         if ( $? == 0 ) {
@@ -434,10 +419,10 @@ sub enable {
 sub disable {
     my $bool;
     my $status;
-    $debug_flag = true;
+    ${\$debug_flag} = true;
 
     if (isscheduled) {
-        $debug_flag = true;
+        ${\$debug_flag} = true;
         log_msg( "INFO",
             "Disabling ADBlock [delete system task-scheduler task update_blacklists]\n"
         );
@@ -445,7 +430,8 @@ sub disable {
         my @schedule = (
             "$begin; ",
             "$delete system task-scheduler task update_blacklists; ",
-            "$commit; ", "$end;",
+            "$commit; ",
+            "$end",
         );
 
         my @output = qx(@schedule 2>&1);
@@ -475,74 +461,77 @@ sub log_msg ($ $) {
     return(false) if not $message;
 
     print $loghandle ("$date: $log_type: $message");
-    print("$log_type: $message") if $debug_flag;
+    print("$log_type: $message") if ${\$debug_flag};
 }
 
 sub fetch_url {
     my $get;
+    my $lines     = 0;
     my $secs      = 30;
     my $strmregex = qr/^\s+|\s+$|^\n|^#.*$/;
     my $ua        = LWP::UserAgent->new;
     my $url       = shift;
+    my $uri       = new URI($url);
+    my $host      = $uri->host;
 
     $ua->timeout($secs);
 
-    if ( ${\$ref_mode} eq "ex-cli" and not $debug_flag ) {
+    if ( ${ \$opmode } eq "ex-cli" and not ${ \$debug_flag } ) {
         $get = $ua->get($url);
     }
     else {
-        print STDERR ("Downloading blacklist from $url...\n")
-            if not $debug_flag;
-
-        #         $ua->add_handler(response_header => \pinwheel);
-        $ua->show_progress(true) if $debug_flag;
+        print("Downloading blacklist from $host: ")
+            if not ${ \$debug_flag }
+            or ${ \$opmode } ne "ex-cli";
+        $ua->show_progress(true) if ${ \$debug_flag };
         $get = $ua->get($url);
-        #         print STDERR ( $get->status_line(), "\n" );
-        #         print STDERR ( "\n" );
-        #         $ua->remove_handler('response_header');
     }
 
-    return $get->is_success
-        ? keys {
+    my @download = keys {
         my %hash = map {
             ( my $val = lc($_) ) =~ s/$strmregex//;
             $val => 1;
-            } split( qr/\R/, $get->content ) }
+        } split( qr/\R/, $get->content )
+    };
+
+    $lines = scalar(@download);
+
+    print("$lines lines retrieved\n")
+        if not ${ \$debug_flag }
+        or ${ \$opmode } ne "ex-cli";
+    log_msg( "INFO", "$lines lines downloaded from: $host\n" );
+
+    return $get->is_success
+        ? @download
         : "$url download failed";
 }
 
 sub update_blacklist {
-    my $mode      = \$ref_mode;
     my $exclude   = join( "|", @{ uniq(\@exclusions) } );
     my $prefix    = join( "|", @{ uniq(\@blacklist_prfx) } );
     my $cols      = qx( tput cols );
-    my $counter   = \$i;
 
     $exclude  = qr/^($prefix|)\s*$exclude/;
     $prefix   = qr/^($prefix|)\s*$fqdn/;
-    $$counter = scalar( @{ \@blacklist } );
+    $i        = scalar( @{ \@blacklist } );
 
     my @content = map $_->join, map threads->create( \&fetch_url, $_ ),
         @blacklist_urls;
 
     if (@content) {
         log_msg( "INFO", "Received " . scalar(@content) . " records\n" );
-        print( "\r", " " x $cols, "\r" )
-            if $$mode ne "ex-cli";
-
-        my $records = 0;
+        print( "\r", " " x $cols, "\r" ) if ${\$opmode} ne "ex-cli";
 
         for my $line (@content) {
-            print( "Entries processed: ", $records, "\r" )
-                if $$mode ne "ex-cli";
             for ($line) {
                 /$$exclude/ and last;
                 /$$prefix/  and push( @{ \@blacklist }, "address=/$2/${\$black_hole_ip}\n" ),
-                    $$counter++, $records++, last;
+                    ${\$i}++, last;
             }
+            ${\$records}++;
+            print( "Entries processed (unique/total): ", ${\$i}, "/", ${\$records}, "\r" )
+                if ${\$opmode} ne "ex-cli";
         }
-        log_msg( "INFO", "Processed $records records\n" );
-#         print("\n") if $$mode ne "ex-cli";
     }
 }
 
@@ -551,26 +540,20 @@ open( $loghandle, ">>$debug_log" ) or $debug_flag = undef;
 log_msg( "INFO", "---+++ ADBlock $version +++---\n" );
 
 cmd_line;
-
 get_blklist_cfg;
 
-if ( not $enable and not $disable ) {
-
+if ( $enabled and not $disable ) {
     update_blacklist;
-
     write_list( \$blacklist_file, \@{ uniq(\@blacklist) } );
 
-    printf( "\rUnique entries processed %d\n",
-        $i )
-        if $ref_mode ne "ex-cli";
+    printf( "\rRecords processed (unique/total): $i/$records\n")
+        if $opmode ne "ex-cli";
 
     log_msg( "INFO",
-              "Unique entries processed: $i"
-            . $i
-            . "\n" );
+              "Records processed (unique/total): $i/$records\n");
 
     $cmd
-        = $ref_mode ne "in-cli"
+        = $opmode ne "in-cli"
         ? "$dnsmasq force-reload > /dev/null 2>1&"
         : "/opt/vyatta/sbin/vyatta-dns-forwarding.pl --update-dnsforwarding";
 
@@ -585,68 +568,35 @@ elsif ($disable) {
 
 close($loghandle);
 
-__END__
+__DATA__
 
-=head1 B<NAME>
+UBNT EdgeMax Blacklist and Ad Server Blocking
 
-B<UBNT EdgeMax Blacklist and Ad Server Blocking>
+EdgeMax Blacklist and Ad Server Blocking is derived from the received wisdom
+    found at (https://community.ubnt.com/t5/EdgeMAX/bd-p/EdgeMAX)
+    * Generates a dnsmasq configuration file
+    * Integrated with the EdgeMax OS CLI
+    * Uses any fqdn in a downloadable user specified blacklist
 
-=head1 B<SYNOPSIS>
+Compatibility
+    * update-blacklists-dnsmasq.pl has been tested on the EdgeRouter Lite
+        family of routers, version v1.6.0-v1.7.0.
+    * Since the EdgeOS is a fork and port of Vyatta 6.3, this script could
+        easily be adapted for work on VyOS and Vyatta derived ports.
 
-EdgeMax Blacklist and Ad Server Blocking is derived from the received wisdom found at (https://community.ubnt.com/t5/EdgeMAX/bd-p/EdgeMAX)
+Installation
+    * upload install_adblock.tgz to your router
+        (e.g. scp /ersetup.tgz @:/tmp/install_adblock.tgz
+    * on your router: cd /tmp; sudo tar zxvf /tmp/install_adblock.tgz
+    * sudo bash /tmp/install_adblock
+    * The script has a menu to either add or remove (if previously installed)
+        AdBlock. It will set up the system task scheduler (cron) via the CLI
+        to run "/config/scripts/update-blacklists-dnsmasq.pl" at midnight
+        local time.
 
-=over
+License
+    * GNU General Public License, version 3
+    * GNU Lesser General Public License, version 3
 
-=item * Generates a dnsmasq configuration file that can be used directly by dnsmasq
-
-=item * Integrated with the EdgeMax OS CLI
-
-=item * Uses any fqdn in the blacklist will return the configured Blackhole IP address
-
-=back
-
-=head1 B<Compatibility>
-
-=over
-
-=item * update-blacklists-dnsmasq.pl has been tested on the EdgeRouter Lite family of routers, version v1.6.0-v1.7.0.
-
-=item * Since the EdgeOS is a fork and port of Vyatta 6.3, this script could easily be adapted for work on VyOS and Vyatta derived ports.
-
-=back
-
-=head2 B<Installation>
-
-To install:
-
-=over
-
-=item * upload install_adblock.tgz to your router (e.g. scp /ersetup.tgz @:/tmp/install_adblock.tgz
-
-=item * on your router: cd /tmp; sudo tar zxvf /tmp/install_adblock.tgz
-
-=item * sudo bash /tmp/install_adblock
-
-=item * The script has a menu to either add or remove (if previously installed) AdBlock. It will set up the system task scheduler (cron) via the CLI to run "/config/scripts/update-blacklists-dnsmasq.pl" at mindnight local time.
-
-=back
-
-=head1 B<LICENSE>
-
-=over
-
-=item * GNU General Public License, version 3
-
-=item * GNU Lesser General Public License, version 3
-
-=back
-
-=head1 AUTHOR
-
-Neil Beadle - L<https://github.com/britannic/EdgeMax/tree/master/AdBlock>
-
-=head1 SEE ALSO
-
-L<perlpod>, L<perlpodspec>
-
-=cut
+Author
+    * Neil Beadle - https://github.com/britannic/EdgeMax/tree/master/AdBlock
