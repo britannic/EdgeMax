@@ -24,7 +24,7 @@
 # Use at your own risk
 #
 
-VERSION="v2.1"
+VERSION="v2.2"
 
 # Uncomment for debugging or syntax checking
 # set -x
@@ -121,7 +121,7 @@ install_adblock_support ()
 	begin || ERROR=1
 
 	echo "Creating starter blacklists and task scheduler entry for ${ADBLOCK}..."
-    set service dns forwarding blacklist enabled true  || ERROR=1
+	set service dns forwarding blacklist enabled true  || ERROR=1
 	set service dns forwarding blacklist blackhole 0.0.0.0 || ERROR=1
 	set service dns forwarding blacklist exclude msdn.com || ERROR=1
 	set service dns forwarding blacklist exclude appleglobal.112.2o7.net || ERROR=1
@@ -136,7 +136,7 @@ install_adblock_support ()
 	set service dns forwarding blacklist source openphish.com prefix 'htt.*//'
 	set service dns forwarding blacklist source openphish.com url 'https://openphish.com/feed.txt'
 	set service dns forwarding blacklist source someonewhocares.org description 'Zero based host and domain list' || ERROR=1
-	set service dns forwarding blacklist source someonewhocares.org prefix '0.0.0.0 ' || ERROR=1
+	set service dns forwarding blacklist source someonewhocares.org prefix '0.0.0.0' || ERROR=1
 	set service dns forwarding blacklist source someonewhocares.org url 'http://someonewhocares.org/hosts/zero/' || ERROR=1
 	set service dns forwarding blacklist source winhelp2002.mvps.org description 'Zero based host and domain list' || ERROR=1
 	set service dns forwarding blacklist source winhelp2002.mvps.org prefix '0.0.0.0' || ERROR=1
@@ -164,8 +164,6 @@ install_adblock_support ()
 
 	echo "Ending configuration session..."
 	end || ERROR=1
-
-# 	"${SCRIPTS}/${ADBLOCK}"
 
 	return ${ERROR}
 }

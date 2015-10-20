@@ -24,7 +24,7 @@
 # Use at your own risk
 #
 
-VERSION="v2.0"
+VERSION="v2.1"
 
 # Uncomment for debugging or syntax checking
 # set -x
@@ -74,13 +74,10 @@ delete_adblock_support ()
 	ADBLOCK="update-blacklists-dnsmasq.pl"
 	CFGDIR="/opt/vyatta/share/vyatta-cfg/templates/service/dns/forwarding"
 	BLKLIST="blacklist"
-	NODEDEF="node.def"
 	ERROR=0
 
 	echo "Removing ${ADBLOCK} from ${SCRIPTS}/"
 	rm -f "${SCRIPTS}/${ADBLOCK}" || ERROR=1
-
-	echo "help: Add and delete blacklist blackhole IP, exclusions and URL sources" > "${CFGDIR}/${NODEDEF}"
 
 	echo "Opening EdgeMax configuration session..."
 	begin || ERROR=1
@@ -99,7 +96,6 @@ delete_adblock_support ()
 	end || ERROR=1
 
 	echo "Removing blacklist configuration templates for ${ADBLOCK}..."
-	install -o root -g root -m 0644 ${NODEDEF} "${CFGDIR}/"
 	rm -rf "${CFGDIR}/${BLKLIST}/"
 	return ${ERROR}
 }
