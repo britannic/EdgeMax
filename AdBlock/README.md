@@ -20,7 +20,8 @@ EdgeMax Blacklist and Ad Server Blocking is derived from the received wisdom fou
 * Since the EdgeOS is a fork and port of Vyatta 6.3, this script could easily be adapted for work on VyOS and Vyatta derived ports
 
 ## Versions
-* 3.21: Fixes excluded FQDNs by using precise matching instead of fuzzy (i.e. 1.domain.tld won't also exclude b1.domain.tld).
+* 3.21: Added features and bug fixes:
+    - Fixes excluded FQDNs by using precise matching instead of fuzzy (i.e. 1.domain.tld won't also exclude b1.domain.tld).
     - Added enable/disable options
     - Now uses multi-threading for simultaneous blacklist downloads
     - HTTP/HTTPS handling uses useragent for improved error/timeout control
