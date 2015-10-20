@@ -1,8 +1,10 @@
-priority: 999
+priority: 999 # Run after DNS forwarding is configured
 help: Add and delete blacklist blackhole IP, exclusions and URL sources
 
-end:expression: "if [ -f \"/tmp/update-blacklists.$PPID\" ]; then \
-            echo 'ADBLOCK: Updating /etc/dnsmasq.d/dnsmasq.blacklist.conf'; \
-            sudo /config/scripts/update-blacklists-dnsmasq.pl --in-cli; \
-            sudo rm /tmp/update-blacklists.$PPID; \
-            fi;"
+end: if [[ "$COMMIT_ACTION" != "DELETE" ]]; then
+        if [[ "$VAR(./enabled/@@)" == true ]]; then
+            sudo /config/scripts/update-blacklists-dnsmasq.pl --in-cli;
+        elif [[ "$VAR(./enabled/@@)" == false ]]; then
+            sudo /config/scripts/update-blacklists-dnsmasq.pl --in-cli;
+        fi;
+    fi
