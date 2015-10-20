@@ -20,13 +20,22 @@ EdgeMax Blacklist and Ad Server Blocking is derived from the received wisdom fou
 * Since the EdgeOS is a fork and port of Vyatta 6.3, this script could easily be adapted for work on VyOS and Vyatta derived ports
 
 ## Versions
-* 3.15. Added features include:
+* 3.21: Fixes excluded FQDNs by using precise matching instead of fuzzy (i.e. 1.domain.tld won't also exclude b1.domain.tld).
+    - Added enable/disable options
+    - Now uses multi-threading for simultaneous blacklist downloads
+    - HTTP/HTTPS handling uses useragent for improved error/timeout control
+    - New --doc switch prints out condensed man page
+    - New --enable switch enables ADBlock by setting [set service dns forwarding blacklist enabled true]
+    - New --disable switch enables ADBlock by setting [set service dns forwarding blacklist enabled false]
+
+* 3.15: Added features include:
     - Logging to /var/log/update-blacklists-dnsmasq.log
     - --debug option: prints status messages
     - Additional download sources added to the default lists
     - Added retry logic for download sources that time out (inspired by @mseeEngineer﻿)
     - Task scheduler update interval is now every 6 hours, as some of the sources change hourly (configure interval using "set system task-scheduler task update_blacklists interval"
     - Status line retains previous downloads for more detail
+
 * Version 3.12: Fixed bug reported by @soehest﻿ where certain FQDNs were being rejected by the stream processor.
 
 * Version 3.10: Now supports https:// source URLs and improved regex handling in the stream processing engine.
@@ -37,9 +46,9 @@ EdgeMax Blacklist and Ad Server Blocking is derived from the received wisdom fou
 
 To install:
 
-* upload install_adblock.tgz to your router (e.g. scp <local path>/install_adblock.v3.15.tgz <user>@<erl router>:/tmp/install_adblock.v3.15.tgz)
-    - sudo tar zxvf ./install_adblock.v3.15.tgz
-    - sudo bash ./install_adblock.v3.15
+* upload install_adblock.v3.21.tgz to your router (e.g. scp <local path>/install_adblock.v3.21.tgz <user>@<erl router>:/tmp/install_adblock.v3.21.tgz)
+    - sudo tar zxvf ./install_adblock.v3.21.tgz
+    - sudo bash ./install_adblock.v3.21
 
 * Now run configure and make certain your DHCP services don't give out public nameservers, otherwise they will defeat the dnsmasq redirects:
 
@@ -61,7 +70,7 @@ Here is the scheduler configuration after running install_adblock:
              executable {
                  path /config/scripts/update-blacklists-dnsmasq.pl
              }
-             interval 1d
+             interval 6h
          }
 ```
 The script will also install a default blacklist setup, here is the stanza (show service dns forwarding):
@@ -70,6 +79,7 @@ The script will also install a default blacklist setup, here is the stanza (show
 >>>>>>> origin/master
         forwarding {
             blacklist {
+                enabled true
                 blackhole 192.168.10.1
                 exclude msdn.com
                 exclude appleglobal.112.2o7.net
@@ -87,7 +97,7 @@ The script will also install a default blacklist setup, here is the stanza (show
                 }
                 source someonewhocares.org {
                     description "Zero based host and domain list"
-                    prefix "0.0.0.0 "
+                    prefix "0.0.0.0"
                     url http://someonewhocares.org/hosts/zero/
                 }
                 source winhelp2002.mvps.org {
@@ -97,7 +107,7 @@ The script will also install a default blacklist setup, here is the stanza (show
                 }
                 source www.malwaredomainlist.com {
                     description "127.0.0.1 based host and domain list"
-                    prefix "127.0.0.1  "
+                    prefix "127.0.0.1"
                     url http://www.malwaredomainlist.com/hostslist/hosts.txt
                 }
                 source yoyo.org {
@@ -112,13 +122,14 @@ The script will also install a default blacklist setup, here is the stanza (show
                 }
                 source zeustracker.abuse.ch/hostfile {
                     description "abuse.ch ZeuS blocklist host file"
-                    prefix 127.0.0.1\s+
+                    prefix 127.0.0.1
                     url https://zeustracker.abuse.ch/blocklist.php?download=hostfile
                 }
             }
 ```
 CLI commands to configure the ADBlock Blacklist:
 
+        set service dns forwarding blacklist enabled true
         set service dns forwarding blacklist blackhole 0.0.0.0
         set service dns forwarding blacklist exclude msdn.com
         set service dns forwarding blacklist exclude appleglobal.112.2o7.net
@@ -133,13 +144,13 @@ CLI commands to configure the ADBlock Blacklist:
         set service dns forwarding blacklist source openphish.com prefix 'htt.*//'
         set service dns forwarding blacklist source openphish.com url 'https://openphish.com/feed.txt'
         set service dns forwarding blacklist source someonewhocares.org description 'Zero based host and domain list'
-        set service dns forwarding blacklist source someonewhocares.org prefix '0.0.0.0 '
+        set service dns forwarding blacklist source someonewhocares.org prefix '0.0.0.0'
         set service dns forwarding blacklist source someonewhocares.org url 'http://someonewhocares.org/hosts/zero/'
         set service dns forwarding blacklist source winhelp2002.mvps.org description 'Zero based host and domain list'
-        set service dns forwarding blacklist source winhelp2002.mvps.org prefix '0.0.0.0 '
+        set service dns forwarding blacklist source winhelp2002.mvps.org prefix '0.0.0.0'
         set service dns forwarding blacklist source winhelp2002.mvps.org url 'http://winhelp2002.mvps.org/hosts.txt'
         set service dns forwarding blacklist source www.malwaredomainlist.com description '127.0.0.1 based host and domain list'
-        set service dns forwarding blacklist source www.malwaredomainlist.com prefix '127.0.0.1  '
+        set service dns forwarding blacklist source www.malwaredomainlist.com prefix '127.0.0.1'
         set service dns forwarding blacklist source www.malwaredomainlist.com url 'http://www.malwaredomainlist.com/hostslist/hosts.txt'
         set service dns forwarding blacklist source yoyo.org description 'Fully Qualified Domain Names only - no prefix to strip'
         set service dns forwarding blacklist source yoyo.org prefix ''
@@ -148,10 +159,10 @@ CLI commands to configure the ADBlock Blacklist:
         set service dns forwarding blacklist source zeustracker.abuse.ch/compromised prefix ''
         set service dns forwarding blacklist source zeustracker.abuse.ch/compromised url 'https://zeustracker.abuse.ch/blocklist.php?download=compromised'
         set service dns forwarding blacklist source zeustracker.abuse.ch/hostfile description 'abuse.ch ZeuS blocklist host file'
-        set service dns forwarding blacklist source zeustracker.abuse.ch/hostfile prefix '127.0.0.1\s+'
+        set service dns forwarding blacklist source zeustracker.abuse.ch/hostfile prefix '127.0.0.1'
         set service dns forwarding blacklist source zeustracker.abuse.ch/hostfile url 'https://zeustracker.abuse.ch/blocklist.php?download=hostfile'
         set system task-scheduler task update_blacklists executable path /config/scripts/update-blacklists-dnsmasq.pl
-        set system task-scheduler task update_blacklists interval
+        set system task-scheduler task update_blacklists interval 6h
 
 ## Notes:
 In order to make this work properly, you will need to first ensure that your dnsmasq is correctly set up. An example configuration is posted below:
