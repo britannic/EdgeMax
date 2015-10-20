@@ -22,7 +22,7 @@ EdgeMax Blacklist and Ad Server Blocking is derived from the received wisdom fou
 ## Versions
 * 3.21: Added features and bug fixes:
     - Fixes excluded FQDNs by using precise matching instead of fuzzy (i.e. 1.domain.tld won't also exclude b1.domain.tld).
-    - Added enable/disable options
+    - Uses own node.def to maintain configuration changes. This also forces script to run dnsmasq configuration update after DNS is up during boot
     - Now uses multi-threading for simultaneous blacklist downloads
     - HTTP/HTTPS handling uses useragent for improved error/timeout control
     - New --doc switch prints out condensed man page
