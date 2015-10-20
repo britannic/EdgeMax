@@ -24,7 +24,7 @@
 # Use at your own risk
 #
 
-VERSION="v2.0"
+VERSION="v2.1"
 
 # Uncomment for debugging or syntax checking
 # set -x
@@ -70,21 +70,14 @@ atexit ()
 # Install adblock and bogon support
 delete_adblock_support ()
 {
-	ADBLOCK="update-blacklists-dnsmasq.pl"
-	BLKLIST="blacklist"
-	CFGDIR="/opt/vyatta/share/vyatta-cfg/templates/service/dns/forwarding"
-	ERROR=0
-	NODEDEF="node.def"
 	SCRIPTS="/config/scripts"
-	WWWDIR="/config/wizard/feature/ADBlock"
+	ADBLOCK="update-blacklists-dnsmasq.pl"
+	CFGDIR="/opt/vyatta/share/vyatta-cfg/templates/service/dns/forwarding"
+	BLKLIST="blacklist"
+	ERROR=0
 
 	echo "Removing ${ADBLOCK} from ${SCRIPTS}/"
 	rm -f "${SCRIPTS}/${ADBLOCK}" || ERROR=1
-
-	echo "Removing ${ADBLOCK} GUI wizard from ${WWWDIR}/"
-	rm -rf "${WWWDIR}/" || ERROR=1
-
-	echo "help: Add and delete blacklist blackhole IP, exclusions and URL sources" > "${CFGDIR}/${NODEDEF}"
 
 	echo "Opening EdgeMax configuration session..."
 	begin || ERROR=1
@@ -103,8 +96,7 @@ delete_adblock_support ()
 	end || ERROR=1
 
 	echo "Removing blacklist configuration templates for ${ADBLOCK}..."
-	install -o root -g root -m 0644 ${NODEDEF} "${CFGDIR}/" || ERROR=1
-	rm -rf "${CFGDIR}/${BLKLIST}/" || ERROR=1
+	rm -rf "${CFGDIR}/${BLKLIST}/"
 	return ${ERROR}
 }
 
