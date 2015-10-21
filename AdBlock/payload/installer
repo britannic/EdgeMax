@@ -141,9 +141,9 @@ install_adblock_support ()
 	set service dns forwarding blacklist source winhelp2002.mvps.org description 'Zero based host and domain list' || ERROR=1
 	set service dns forwarding blacklist source winhelp2002.mvps.org prefix '0.0.0.0' || ERROR=1
 	set service dns forwarding blacklist source winhelp2002.mvps.org url 'http://winhelp2002.mvps.org/hosts.txt' || ERROR=1
-	set service dns forwarding blacklist source www.malwaredomainlist.com description '127.0.0.1 based host and domain list' || ERROR=1
-	set service dns forwarding blacklist source www.malwaredomainlist.com prefix '127.0.0.1' || ERROR=1
-	set service dns forwarding blacklist source www.malwaredomainlist.com url 'http://www.malwaredomainlist.com/hostslist/hosts.txt' || ERROR=1
+	set service dns forwarding blacklist source malwaredomainlist.com description '127.0.0.1 based host and domain list' || ERROR=1
+	set service dns forwarding blacklist source malwaredomainlist.com prefix '127.0.0.1' || ERROR=1
+	set service dns forwarding blacklist source malwaredomainlist.com url 'http://www.malwaredomainlist.com/hostslist/hosts.txt' || ERROR=1
 	set service dns forwarding blacklist source yoyo.org description 'Fully Qualified Domain Names only - no prefix to strip' || ERROR=1
 	set service dns forwarding blacklist source yoyo.org prefix '' || ERROR=1
 	set service dns forwarding blacklist source yoyo.org url 'http://pgl.yoyo.org/as/serverlist.php?hostformat=nohtml&showintro=1&mimetype=plaintext' || ERROR=1

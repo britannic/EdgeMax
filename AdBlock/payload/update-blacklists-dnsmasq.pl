@@ -23,9 +23,8 @@
 # a file in dnsmasq format
 #
 # **** End License ****
-BEGIN { $Pod::Usage::Formatter = 'Pod::Text::Termcap'; }
 
-my $version                    = '3.21';
+my $version                    = '3.22rc1';
 
 # use Data::Dumper;
 use File::Basename;
@@ -59,12 +58,13 @@ my $dnsmasq                    = "/etc/init.d/dnsmasq";
 my $documentation              = undef;
 my $enable                     = undef;
 my $enabled                    = true;
-my $fqdn                       = '(\b([a-z0-9_]+(-[a-z0-9_]+)*\.)+[a-z]{2,}\b).*$';
+my $fqdn                       = qr/(\b([a-z0-9_-]+(-[a-z0-9_]+)*\.)+[a-z]{2,}\b).*$/;
 my ($i, $records)              = 0;
 my $prog                       = basename($0);
 
 my ($cfg_file, $default,   $download,  $in_cli,   $line,
-    $list,     $loghandle, $print_ver, $opmode,   $uri
+    $list,     $loghandle, $prefix,    $print_ver, $opmode,
+    $uri
 );
 
 # CLI command set
@@ -106,7 +106,6 @@ my @opts = (
            'version'         => \$print_ver
     ],
 );
-
 
 sub Usage ($ $) {
     my $exitcode = shift;
@@ -221,7 +220,7 @@ sub cfg_none {
     my $include = "beap.gemini.yahoo.com";
 
     push( @{ \@blacklist }, "address=/$include/${\$black_hole_ip}\n" );
-    return 1;
+    return (true);
 }
 
 sub isblacklist {
@@ -457,7 +456,7 @@ sub log_msg ($ $) {
     my $message  = shift;
     my $date     = strftime "%b %e %H:%M:%S %Y", localtime;
 
-    return (false) if not $message;
+    return (false) unless $message;
 
     print $loghandle ("$date: $log_type: $message");
     print("$log_type: $message") if ${ \$debug_flag };
@@ -467,17 +466,16 @@ sub fetch_url {
     my $get;
     my $lines     = 0;
     my $secs      = 30;
-    my $strmregex = qr/^\s+|\s+$|^\n|^#.*$/;
     my $ua        = LWP::UserAgent->new;
     my $url       = shift;
     my $uri       = new URI($url);
     my $host      = $uri->host;
 
+    $ua->agent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2227.1 Safari/537.36');
     $ua->timeout($secs);
 
     print("Downloading blacklist from $host: ")
-        if not ${ \$debug_flag }
-        or ${ \$opmode } ne "ex-cli" or ${ \$enable };
+        unless ${ \$opmode } eq "ex-cli";
 
     $ua->show_progress(true) if ${ \$debug_flag };
 
@@ -485,7 +483,7 @@ sub fetch_url {
 
     my @download = keys {
         my %hash = map {
-            ( my $val = lc($_) ) =~ s/$strmregex//;
+            ( my $val = lc($_) ) =~ m/${ \$prefix }/;
             $val => 1;
         } split( qr/\R/, $get->content )
     };
@@ -493,8 +491,8 @@ sub fetch_url {
     $lines = scalar(@download);
 
     print("$lines lines retrieved\n")
-        if not ${ \$debug_flag }
-        or ${ \$opmode } ne "ex-cli";
+        unless ${ \$opmode } eq "ex-cli";
+
     log_msg( "INFO", "$lines lines downloaded from: $host\n" );
 
     return $get->is_success
@@ -503,15 +501,21 @@ sub fetch_url {
 }
 
 sub update_blacklist {
-    my $exclude = join( "|",
+    my $exclude                   = join( "|",
         ( sort keys %{ { map { $_ => 1 } @{ \@exclusions } } } ) );
-    my $prefix = join( "|",
+    ${ \$prefix }                 = join( "|",
         ( sort keys %{ { map { $_ => 1 } @{ \@blacklist_prfx } } } ) );
-    my $cols = qx( tput cols );
+    my $cols                      = qx( tput cols );
+    my $strmregex                 = qr/^\s+|\s+$|^\n|^#.*$/;
 
-    $exclude = qr/^($prefix|)\s*$exclude/;
-    $prefix  = qr/^($prefix|)\s*$fqdn/;
-    ${ \$i } = scalar( @{ \@blacklist } );
+#     $exclude                    = qr/^($prefix|)\s*$exclude/;
+#     $prefix                     = qr/^($prefix|)\s*$fqdn/;
+
+    $exclude                      = qr/$exclude/;
+    ${ \$prefix }                 = qr/^($prefix|)\s*/;
+
+    ${ \$i }                      = scalar( @{ \@blacklist } );
+
 
     my @content = map $_->join, map threads->create( \&fetch_url, $_ ),
         @blacklist_urls;
@@ -523,18 +527,35 @@ sub update_blacklist {
 
         for my $line (@content) {
             for ($line) {
+                /$strmregex/ and last;
+                if (/\s\b/) {
+                    for ( my @splitline = split /\s+\b/ ) {
+                        /$exclude/ and last;
+                        /$fqdn/ and push(
+                            @{ \@blacklist },
+                            "address=/$1/${\$black_hole_ip}\n"
+                            ),
+                            ${ \$i }++, last;
+                    }
+                    last;
+                }
                 /$exclude/ and last;
-                /$prefix/  and push(
+                /$fqdn/ and push(
                     @{ \@blacklist },
-                    "address=/$2/${\$black_hole_ip}\n"
+                    "address=/$1/${\$black_hole_ip}\n"
                     ),
                     ${ \$i }++, last;
             }
             ${ \$records }++;
-            print( "Entries processed: ",
-                ${ \$i }, "host names from: ", ${ \$records }, " lines\r" )
-                if ${ \$opmode } ne "ex-cli";
+            print(
+                "Entries processed: ",
+                ${ \$i },
+                " host names from: ",
+                ${ \$records },
+                " lines\r"
+            ) if ${ \$opmode } ne "ex-cli";
         }
+
         @{ \@blacklist }
             = ( sort keys %{ { map { $_ => 1 } @{ \@blacklist } } } );
         return (true);
@@ -567,7 +588,7 @@ if ( $enabled and not $disable ) {
 }
 elsif ($enable) {
     log_msg( "ERROR", "Unable to enable dnsmasq ADBlock blacklist!\n" )
-        if not enable;
+        unless enable;
 }
 elsif ($disable) {
     if (disable) {
@@ -603,7 +624,7 @@ EdgeMax Blacklist and Ad Server Blocking is derived from the received wisdom
     found at (https://community.ubnt.com/t5/EdgeMAX/bd-p/EdgeMAX)
     * Generates a dnsmasq configuration file
     * Integrated with the EdgeMax OS CLI
-    * Uses any fqdn in a downloadable user specified blacklist
+    * Uses any FQDN in a user specified downloadable blacklist
 
 Compatibility
     * update-blacklists-dnsmasq.pl has been tested on the EdgeRouter Lite
@@ -612,14 +633,18 @@ Compatibility
         easily be adapted for work on VyOS and Vyatta derived ports.
 
 Installation
-    * upload install_adblock.tgz to your router
-        (e.g. scp /ersetup.tgz @:/tmp/install_adblock.tgz
-    * on your router: cd /tmp; sudo tar zxvf /tmp/install_adblock.tgz
-    * sudo bash /tmp/install_adblock
+    * upload install_adblock.<version>.tgz to your router
+        (e.g. scp /install_adblock.<version>.tgz @:/tmp/install_adblock.<version>.tgz
+    * on your router: cd /tmp; sudo tar zxvf /tmp/install_adblock.<version>.tgz
+    * sudo bash /tmp/install_adblock.<version>
+    * select option #1
     * The script has a menu to either add or remove (if previously installed)
         AdBlock. It will set up the system task scheduler (cron) via the CLI
-        to run "/config/scripts/update-blacklists-dnsmasq.pl" at midnight
-        local time.
+        to run "/config/scripts/update-blacklists-dnsmasq.pl" at 6 hourly intervals
+
+Removal
+    * sudo bash ./install_adblock.v3.22rc1
+    * select option #2
 
 License
     * GNU General Public License, version 3
