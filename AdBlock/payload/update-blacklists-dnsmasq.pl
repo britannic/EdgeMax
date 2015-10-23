@@ -121,6 +121,8 @@ sub Usage ($ $) {
 }
 
 sub cmd_line {
+    $ex_cli = false;
+
     GetOptions( map { (@$_)[ 1 .. $#$_ ] } @opts ) or Usage( 1, 'help' );
 
     print STDERR (
@@ -488,7 +490,7 @@ sub update_blacklist {
         ( sort keys %{ { map { $_ => 1 } @{ \@blacklist_prfx } } } ) );
     my $cols                      = qx( tput cols );
     my $splitline                 = qr/\s+\b/;
-    my $strmregex                 = qr/\A\s*(?:#|\z)/;
+    my $strmregex                 = qr/(?:^#|^\n|^\s*$|^\{)/;
     $exclude                      = qr/^(?:$prefix|)\s*$exclude/;
     $prefix                       = qr/^(?:$prefix|)\s*$fqdn/;
     $fqdn                         = qr/$fqdn/;
@@ -516,13 +518,6 @@ sub update_blacklist {
                                 {"address=/$1/${\$black_hole_ip}\n"} } = 1,
                             ${ \$i }++;
                     }
-                    print(
-                        "Entries processed: ",
-                        ${ \$i },
-                        " host names from: ",
-                        ${ \$records },
-                        " lines\r"
-                    ) unless $ex_cli == true;
                 }
                 next if /$exclude/;
                 /$prefix/
