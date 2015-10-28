@@ -1,0 +1,7 @@
+multi:
+type: txt
+help: Hosts to INCLUDE in the DNS forwarding blacklist
+
+syntax:expression: pattern $VAR(@) "^[[:alnum:]][-.[:alnum:]]*[[:alnum:]]$"
+                   ; "invalid host name $VAR(@)"
+
