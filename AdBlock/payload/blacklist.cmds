@@ -34,13 +34,13 @@ set service dns forwarding blacklist hosts source zeustracker.abuse.ch/compromis
 set service dns forwarding blacklist hosts source zeustracker.abuse.ch/hostfile description 'abuse.ch ZeuS blocklist host file'
 set service dns forwarding blacklist hosts source zeustracker.abuse.ch/hostfile prefix 127.0.0.1
 set service dns forwarding blacklist hosts source zeustracker.abuse.ch/hostfile url 'https://zeustracker.abuse.ch/blocklist.php?download=hostfile'
-set service dns forwarding blacklist zones exclude adobedtm.com
-set service dns forwarding blacklist zones exclude coremetrics.com
-set service dns forwarding blacklist zones exclude doubleclick.net
-set service dns forwarding blacklist zones exclude hulu.com
-set service dns forwarding blacklist zones exclude msdn.com
-set service dns forwarding blacklist zones source malc0de.com description 'List of zones serving malicious executables observed by malc0de.com/database/'
-set service dns forwarding blacklist zones source malc0de.com prefix zone
-set service dns forwarding blacklist zones source malc0de.com url 'http://malc0de.com/bl/ZONES'
+set service dns forwarding blacklist hosts exclude adobedtm.com
+set service dns forwarding blacklist hosts exclude coremetrics.com
+set service dns forwarding blacklist hosts exclude doubleclick.net
+set service dns forwarding blacklist hosts exclude hulu.com
+set service dns forwarding blacklist hosts exclude msdn.com
+set service dns forwarding blacklist domains source malc0de.com description 'List of zones serving malicious executables observed by malc0de.com/database/'
+set service dns forwarding blacklist domains source malc0de.com prefix zone
+set service dns forwarding blacklist domains source malc0de.com url 'http://malc0de.com/bl/ZONES'
 set system task-scheduler task update_blacklists executable path /config/scripts/update-blacklists-dnsmasq.pl
 set system task-scheduler task update_blacklists interval 6h
