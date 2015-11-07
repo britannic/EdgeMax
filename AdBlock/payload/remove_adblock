@@ -109,7 +109,8 @@ trap 'report_error $? ${LINENO} ${BASH_LINENO} "${BASH_COMMAND}" $(printf "::%s"
 delete_adblock_support ()
 {
 	CONFIG="/config/scripts"
-	SCRIPT="update-blacklists-dnsmasq.pl"
+	SCRIPT="update-dnsmasq.pl"
+	OSCRIPT="update-blacklists-dnsmasq.pl"
 	DNSMASQ="/etc/dnsmasq.d"
 	CNFFILE="blacklist.conf"
 	CFGDIR="/opt/vyatta/share/vyatta-cfg/templates/service/dns/forwarding"
@@ -124,8 +125,15 @@ delete_adblock_support ()
 		fi
 	done
 
-	echo "Removing ${SCRIPT} from ${CONFIG}/"
-	rm -f "${CONFIG}/${SCRIPT}"
+	if [[ -f "${CONFIG}/${SCRIPT}" ]]; then
+		echo "Removing ${SCRIPT} from ${CONFIG}/"
+		rm -f "${CONFIG}/${SCRIPT}"
+	fi
+
+	if [[ -f "${CONFIG}/${OSCRIPT}" ]]; then
+		echo "Removing ${OSCRIPT} from ${CONFIG}/"
+		rm -f "${CONFIG}/${OSCRIPT}"
+	fi
 
 	echo "Opening EdgeMax configuration session..."
 	begin

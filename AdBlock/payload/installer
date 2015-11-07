@@ -25,7 +25,7 @@
 #
 set -o errtrace
 
-VERSION="v2.4"
+VERSION="v2.6"
 
 # Uncomment for debugging or syntax checking
 # set -x
@@ -126,7 +126,7 @@ trap 'report_error $? ${LINENO} ${BASH_LINENO} "${BASH_COMMAND}" $(printf "::%s"
 install_blacklist_support ()
 {
 	CONFIG="/config/scripts"
-	BLACKLIST="update-blacklists-dnsmasq.pl"
+	BLACKLIST="update-dnsmasq.pl"
 	TEMPLATES="/opt/vyatta/share/vyatta-cfg/templates/service/dns"
 #	WWWDIR="/config/wizard/feature/ADBlock"
 #	GUI="GUI"
@@ -200,7 +200,7 @@ install_blacklist_support ()
     set service dns forwarding blacklist domains source malc0de.com description 'List of zones serving malicious executables observed by malc0de.com/database/'
     set service dns forwarding blacklist domains source malc0de.com prefix zone
     set service dns forwarding blacklist domains source malc0de.com url 'http://malc0de.com/bl/ZONES'
-    set system task-scheduler task update_blacklists executable path /config/scripts/update-blacklists-dnsmasq.pl
+    set system task-scheduler task update_blacklists executable path /config/scripts/update-dnsmasq.pl
     set system task-scheduler task update_blacklists interval 6h
 
 	echo "Committing configuration..."
@@ -224,7 +224,7 @@ then
 	then
 		echo "${ME}ADBlock and Blacklist blocking dnsmasq installation succeeded!"
 		echo "Updating dnsmasq configuration..."
-		/config/scripts/update-blacklists-dnsmasq.pl --showstats
+# 		/config/scripts/update-blacklists-dnsmasq.pl -v
 	else
 		echo "${ME}ADBlock and Blacklist blocking dnsmasq installation failed!"
 	fi
