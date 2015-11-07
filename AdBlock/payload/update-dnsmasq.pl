@@ -76,7 +76,7 @@ my $cfg_ref         = {
         type        => 'hosts',
         unique      => 0,
     },
-    _zones          => {
+    zones          => {
         blackhole   => '0.0.0.0',
         blacklist   => {},
         file        => '/etc/dnsmasq.d/zone.blacklist.conf',
@@ -233,23 +233,6 @@ sub cfg_actv {
     if (is_blacklist) {
         my $config = new Vyatta::Config;
         my ( $listNodes, $returnValue, $returnValues );
-        my $parse_cfg = {
-            blip_hosts   => undef,
-            blip_zones   => undef,
-            blip_domains => undef,
-            excl_hosts   => undef,
-            excl_zones   => undef,
-            excl_domains => undef,
-            incl_hosts   => undef,
-            incl_domains => undef,
-            incl_zones   => undef,
-            listNodes    => undef,
-            returnValue  => undef,
-            returnValues => undef,
-            src_hosts    => undef,
-            src_domains  => undef,
-            src_zones    => undef,
-        };
 
         if ( is_cli() ) {
             $returnValue  = "returnValue";
@@ -265,7 +248,7 @@ sub cfg_actv {
         $config->setLevel('service dns forwarding blacklist');
         $cfg_ref->{'disabled'}
             = $config->$returnValue('disabled') // FALSE;
-        $cfg_ref->{'blip_globl'}
+        $cfg_ref->{'blackhole-ip'}
             = $config->$returnValue('blackhole-ip') // '0.0.0.0';
 
         $cfg_ref->{'disabled'}
@@ -281,37 +264,20 @@ sub cfg_actv {
             $cfg_ref->{$area}->{'blackhole'}
                 = $config->$returnValue('blackhole-ip') // '0.0.0.0'
                 if $area ne 'zones';
-            $parse_cfg->{"incl_$area"}
-                = [ $config->$returnValues('include') ];
-            $parse_cfg->{$area}->{'exclude'}
-                = [ $config->$returnValues('exclude') ];
-            $parse_cfg->{"src_$area"} = [ $config->$listNodes('source') ];
+            $cfg_ref->{$area}->{'include'} = {
+                map{ $_ => 1} $config->$returnValues('include')};
+            $cfg_ref->{$area}->{'exclude'}= {
+                map{ $_ => 1} $config->$returnValues('exclude')};
 
-            for my $src_name ( @{ $parse_cfg->{"src_$area"} } ) {
-                $config->setLevel(
-                    "service dns forwarding blacklist $area source $src_name"
-                );
-                push(
-                    @{ $cfg_ref->{"urls_$area"} },
-                    $config->$returnValue('url')
-                );
-                push(
-                    @{ $cfg_ref->{"prfx_$area"} },
-                    $config->$returnValue('prefix')
-                );
-            }
-
-            for my $include ( @{ $parse_cfg->{"incl_$area"} } ) {
-                push( $cfg_ref->{"inc_$area"}, $include );
-            }
-
-            for my $exclude ( @{ $parse_cfg->{$area}->{'exclude'} } ) {
-                push( $cfg_ref->{$area}->{'exclude'}, $exclude );
+            for my $source ( $config->$listNodes('source') ) {
+                $config->setLevel("service dns forwarding blacklist $area source $source");
+                $cfg_ref->{$area}->{'src'}->{$source}->{'url'} = $config->$returnValue('url');
+                $cfg_ref->{$area}->{'src'}->{$source}->{'prefix'} = $config->$returnValue('prefix');
             }
         }
     }
     else {
-        $cfg_ref->{'debug'} = TRUE;
+        $show = TRUE;
         log_msg(
             {   msg_typ => 'ERROR',
                 msg_str =>
@@ -321,8 +287,8 @@ sub cfg_actv {
 
         exit(1);
     }
-    if (   !( scalar( @{ $cfg_ref->{'urls_domains'} } ) < 1 )
-        || !( scalar( @{ $cfg_ref->{'urls_hosts'} } ) < 1 ) )
+    if (   ( scalar( keys %{ $cfg_ref->{'domains'}->{'src'} } ) < 1 )
+        && ( scalar( keys %{ $cfg_ref->{'hosts'}->{'src'} } ) < 1 ) )
     {
         say STDERR ('At least one domain or host source must be configured');
         exit(1);
@@ -649,7 +615,7 @@ open( $LOGHANDLE, '>>', $cfg_ref->{'log_file'} )
 log_msg(
     {   msg_typ => 'INFO',
         msg_str =>,
-        '---+++ blacklist $version +++---'
+        "---+++ blacklist $version +++---"
     }
 );
 
@@ -670,22 +636,23 @@ if ( not $cfg_ref->{'disabled'} and not $disable ) {
     my (@content, @todo);
 
     # Add areas to process only if they contain sources
-    push(@todo, 'domains') if scalar ($cfg_ref->{'domains'}->{'src'}) > 0;
-    push(@todo, 'hosts')   if scalar ($cfg_ref->{'hosts'  }->{'src'}) > 0;
+    push(@todo, 'domains') if (scalar (keys %{$cfg_ref->{'domains'}->{'src'}}) > 0);
+    push(@todo, 'hosts')   if (scalar (keys %{$cfg_ref->{'hosts'  }->{'src'}}) > 0);
     for my $area (@todo) {
         my @sources = keys %{ $cfg_ref->{$area}->{'src'} };
         $cfg_ref->{$area}->{'icount'}
             = scalar( keys %{ $cfg_ref->{$area}->{'blacklist'} } )
             // 0;
 
-        my $exclude = join(
+        my $exclude
+            = ( scalar( keys %{ $cfg_ref->{$area}->{'exclude'} } ) > 0 )
+            ? join(
             '|',
             (   sort { length($b) <=> length($a) }
                     keys %{ $cfg_ref->{$area}->{'exclude'} }
             )
             )
-            if (
-            scalar( keys %{ $cfg_ref->{$area}->{'exclude'} } ) > 0 );
+            : '^#';
 
         # create asynchronous threaded fetch web content jobs collect downloaded data
         for my $source (@sources) {
@@ -847,10 +814,10 @@ Installation
     * select option #1
     * The script has a menu to either add or remove (if previously installed)
         AdBlock. It will set up the system task scheduler (cron) via the CLI
-        to run "/config/scripts/update-blacklists-dnsmasq.pl" at 6 hourly intervals
+        to run "/config/scripts/update-dnsmasq.pl" at 6 hourly intervals
 
 Removal
-    * sudo bash ./install_adblock.v3.22rc1
+    * sudo bash ./install_adblock.v4.0rc1
     * select option #2
 
 License

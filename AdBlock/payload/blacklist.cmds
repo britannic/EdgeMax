@@ -42,5 +42,5 @@ set service dns forwarding blacklist hosts exclude msdn.com
 set service dns forwarding blacklist domains source malc0de.com description 'List of zones serving malicious executables observed by malc0de.com/database/'
 set service dns forwarding blacklist domains source malc0de.com prefix zone
 set service dns forwarding blacklist domains source malc0de.com url 'http://malc0de.com/bl/ZONES'
-set system task-scheduler task update_blacklists executable path /config/scripts/update-blacklists-dnsmasq.pl
+set system task-scheduler task update_blacklists executable path /config/scripts/update-dnsmasq.pl
 set system task-scheduler task update_blacklists interval 6h
