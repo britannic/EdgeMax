@@ -24,9 +24,10 @@
 #
 # **** End License ****
 
-my $version = '4.0.alpha.110715';
+my $version = '4.0.alpha.110815';
 
-use Data::Dumper;
+use threads;
+use strict;
 
 # use Benchmark qw(cmpthese);
 use File::Basename;
@@ -35,8 +36,6 @@ use integer;
 use lib '/opt/vyatta/share/perl5/';
 use LWP::UserAgent;
 use POSIX qw(geteuid strftime);
-use strict;
-use threads;
 use URI;
 use v5.14;
 use Vyatta::Config;
@@ -86,23 +85,11 @@ my $cfg_ref         = {
         type        => 'zone',
         unique      => 0,
     },
-    load_cfg        => {
-        active      => sub { cfg_actv() },
-        default     => sub { cfg_dflt() },
-        file        => sub { cfg_file() },
-    },
     log_file        => '/var/log/update-blacklists-dnsmasq.log',
 };
-my $re              = {
-        fqdn        =>
-        qr{(\b(?:(?![.]|-)[a-zA-Z0-9_-]{1,63}(?<!-)[.]{1})+(?:[a-zA-Z]{2,63})\b)}o,
-        lspaces     => qr{^\s+}o,
-        rspaces     => qr{\s+$}o,
-        suffix      => qr{(?:#.*$|\{.*$|[/[].*$)}o,
-    };
 
-my ($cfg_file,  $default, $download, $line, $list, $LOGHANDLE,
-    $print_ver, $show,    $loadcfg,  $uri,  $usage
+my ($cfg_file,  $default,   $download, $line, $list,
+    $LOGHANDLE, $print_ver, $show,     $loadcfg
 );
 
 # CLI command set
@@ -112,80 +99,6 @@ my $delete = '/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper delete';
 my $end    = '/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper end';
 my $save   = '/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper save';
 my $set    = '/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper set';
-
-my @opts = (
-    [ q{--i <file>  # load a configuration file},             'i=s'       => \$cfg_file],
-    [ q{--debug     # enable verbose debug output},           'debug'     => \$cfg_ref->{'debug'}],
-    [ q{--default   # use default values for dnsmasq conf},   'default'   => \$default],
-    [ q{--disable   # disable dnsmasq blacklists},            'disable'   => \$disable],
-    [ q{--man       # display documentation},                 'man'       => sub {$usage->{'man'}->(0)}],
-    [ q{--enable    # enable dnsmasq blacklists},             'enable'    => \$enable],
-    [ q{--help      # show help and usage text},              'help'      => sub {$usage->{'help'}->(0)}],
-    [ q{--v         # verbose (outside configure session)},   'v'         => \$show],
-    [ q{--version   # show program version number},           'version'   => sub {$usage->{'version'}->(0)}],
-);
-
-$usage = {
-    cfg_file => sub {
-        my $exitcode = shift;
-        print STDERR (
-            "$cfg_file not found, check path and file name correct\n");
-        exit($exitcode);
-    },
-    cli => sub {
-        my $exitcode = shift;
-        print STDERR (
-            "You must run $0 inside of configure when '--cli' is specified!\n"
-        );
-        exit($exitcode);
-    },
-    enable => sub {
-        my $exitcode = shift;
-        print STDERR (
-            "\n    ERROR: '--enable' and '--disable' are mutually exclusive options!\n\n"
-        );
-        $usage->{'help'}->($exitcode);
-    },
-    default => sub {
-        my $exitcode = shift;
-        print STDERR (
-            "\n    ERROR: '--cfg_file' and '--default' are mutually exclusive options!\n\n"
-        );
-        $usage->{'help'}->($exitcode);
-    },
-    man => sub {
-        my $exitcode = shift;
-        $usage->{'help'}->( 9, 'doc' );
-        while (<DATA>) {
-            print STDERR;
-        }
-        print STDERR "\n";
-        exit($exitcode);
-    },
-    help => sub {
-        my $exitcode = shift;
-        local $, = "\n";
-        print STDERR (@_);
-        print STDERR ("usage: $progname <options>\n");
-        print STDERR (
-            'options:',
-            map( ' ' x 4 . $_->[0],
-                sort { $a->[1] cmp $b->[1] } grep ( $_->[0] ne '', @opts ) ),
-            "\n"
-        );
-        $exitcode == 9 ? return (1) : exit($exitcode);
-    },
-    sudo => sub {
-        my $exitcode = shift;
-        print STDERR ("This script must be run as root, use: sudo $0.\n");
-        exit($exitcode);
-    },
-    version => sub {
-        my $exitcode = shift;
-        printf STDERR ( "%s version: %s\n", $progname, $version );
-        exit($exitcode);
-    },
-};
 
 sub is_cli () {
 
@@ -264,7 +177,7 @@ sub cfg_actv {
             $cfg_ref->{$area}->{'blackhole'}
                 = $config->$returnValue('blackhole-ip') // '0.0.0.0'
                 if $area ne 'zones';
-            $cfg_ref->{$area}->{'include'} = {
+            $cfg_ref->{$area}->{'blacklist'} = {
                 map{ $_ => 1} $config->$returnValues('include')};
             $cfg_ref->{$area}->{'exclude'}= {
                 map{ $_ => 1} $config->$returnValues('exclude')};
@@ -285,13 +198,13 @@ sub cfg_actv {
             }
         );
 
-        exit(1);
+        return(FALSE);
     }
     if (   ( scalar( keys %{ $cfg_ref->{'domains'}->{'src'} } ) < 1 )
         && ( scalar( keys %{ $cfg_ref->{'hosts'}->{'src'} } ) < 1 ) )
     {
         say STDERR ('At least one domain or host source must be configured');
-        exit(1);
+        return(FALSE);
     }
 
     return (TRUE);
@@ -354,10 +267,10 @@ sub cfg_dflt {
             { url => 'http://malc0de.com/bl/ZONES', prefix => 'zone', }, };
 
     # Exclude our own good domains
-    $cfg_ref->{'domains'}->{'exclude'} = { 'msdn.com' => 1 };
+    $cfg_ref->{'domains'}->{'exclude'} = { 'msdn.com' => 1, };
 
     # Include our own redirected domains
-    $cfg_ref->{'domains'}->{'include'} = { 'coolwebhosts.com' => 1 };
+    $cfg_ref->{'domains'}->{'include'} = { 'coolwebhosts.com' => 1, 'centade.com' => 1, };
 
     return (TRUE);
 }
@@ -375,8 +288,8 @@ sub cfg_file {
         type_hosts   => undef,
         type_domains => undef,
     };
-    my $rgx_url = qr{\Aurl\s+(.*)\z}xms;
-    my $prfx_re = qr{\Aprefix\s+["{0,1}](.*)["{0,1}].*\z}xms;
+    my $rgx_url = qr{^url\s+(.*)$}xms;
+    my $prfx_re = qr{^prefix\s+["{0,1}](.*)["{0,1}].*$}xms;
     my $xcp     = new XorpConfigParser();
     $xcp->parse($cfg_file);
     my $blist = $xcp->get_node( [qw/service dns forwarding blacklist/] );
@@ -386,7 +299,7 @@ sub cfg_file {
             for my $child ( @{ $blist->{'children'} } ) {
                 for ( $blist->{'children'}[$child]->{'name'} ) {
                     /^blackhole-ip\s+(.*)$/
-                        and $cfg_ref->{'blip_globl'} = $1
+                        and $cfg_ref->{'blackhole'} = $1
                         // "0.0.0.0";
                     /^disabled\s+(\w)$/
                         and $cfg_ref->{'disabled'} = $1 // FALSE;
@@ -462,7 +375,7 @@ sub cfg_file {
                     q{[service dns forwarding blacklist] isn't configured, exiting!}
             }
         );
-        exit(1);
+        return(FALSE);
     }
     return (TRUE);
 }
@@ -555,40 +468,28 @@ sub fetch_url {
     $ua->agent(
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11) AppleWebKit/601.1.56 (KHTML, like Gecko) Version/9.0 Safari/601.1.56'
     );
-    $ua->timeout(30);
-    my $input     = shift;
+    $ua->timeout(60);
+    my $input               = shift;
     my $get;
-    my $select    = $cfg_ref->{$input->{'area'}}->{src}->{$input->{'src'}}->{'prefix'};
-    $select       = qr{$select};
-    my $reject    = qr{^#|^$|^\n};
-    my $lines     = 0;
-    my $splitline = qr{\R|<br \/>}xms;
-    my $div       = qr{\s+\b}xms;
-    my $uri       = new URI( $input->{'url'} );
-    my $host      = $uri->host;
+    my $data_ref->{'host'}  = $input->{'host'};
+    my $reject              = qr{^#|^$|^\n};
+    my $select              = $input->{'prefix'};
+    my $lines               = 0;
+    my $splitline           = qr{\R|<br \/>}xms;
+    my $div                 = qr{\s+\b}xms;
 
-    log_msg(
-        {   msg_typ => 'INFO',
-            msg_str => "Downloading blacklist from $host"
-        }
-    ) if $show;
-
-    $ua->show_progress(TRUE) if $cfg_ref->{'debug'};
+    $ua->show_progress(TRUE) if $input->{'debug'};
     $get = $ua->get( $input->{'url'} );
 
-    my %download = map { my $key = $_; lc($key) => 1 } grep {/$select/} grep {!/$reject/} split( $splitline, $get->content );
+    $data_ref->{'data'}
+        = { map { my $key = $_; lc($key) => 1 }
+        grep {/$select/}
+        grep { !/$reject/ } split( $splitline, $get->content ) };
 
-    $cfg_ref->{$input->{'area'}}->{'records'} = scalar( keys %download );
-
-    log_msg(
-        {   msg_typ => 'INFO',
-            msg_str => $cfg_ref->{$input->{'area'}}->{'records'}
-                . " lines downloaded from: $host"
-        }
-    );
+    $data_ref->{'records'} = scalar (keys %{$data_ref->{'data'}}) /2;
 
     return $get->is_success
-        ? sort keys %download
+        ? $data_ref
         : undef;
 }
 
@@ -598,16 +499,221 @@ sub is_sudo {
     return (FALSE);
 }
 
+sub get_data {
+    my $input = shift;
+    my (@content, @excl_domains);
+    my $re              = {
+            fqdn        =>
+            qr{(\b(?:(?![.]|-)[a-zA-Z0-9_-]{1,63}(?<!-)[.]{1})+(?:[a-zA-Z]{2,63})\b)}o,
+            lspaces     => qr{^\s+}o,
+            rspaces     => qr{\s+$}o,
+            suffix      => qr{(?:#.*$|\{.*$|[/[].*$)}o,
+        };
+    my @sources = keys %{ $cfg_ref->{$input->{'area'}}->{'src'} };
+    $cfg_ref->{$input->{'area'}}->{'icount'}
+        = scalar( keys %{ $cfg_ref->{$input->{'area'}}->{'blacklist'} } )
+        // 0;
+
+    if ( $input->{'area'} eq 'hosts' ) {
+        @excl_domains
+            = (
+            scalar( keys %{ $cfg_ref->{'domains'}->{'blacklist'} } > 0 ) )
+            ? sort { length($b) <=> length($a) }
+            keys %{ $cfg_ref->{'domains'}->{'blacklist'} }
+            : '^$';
+    }
+
+    my $exclude
+        = ( scalar( keys %{ $cfg_ref->{$input->{'area'}}->{'exclude'} } ) > 0 )
+        ? join(
+        '|',
+        (   sort { length($b) <=> length($a) }
+                keys %{ $cfg_ref->{$input->{'area'}}->{'exclude'} },
+            @excl_domains
+        )
+        )
+        : '^#';
+
+    # create asynchronous threaded fetch web content jobs collect downloaded data
+    for my $source (@sources) {
+        my $prefix      = $cfg_ref->{$input->{'area'}}->{'src'}->{$source}->{'prefix'};
+        my $url         = $cfg_ref->{$input->{'area'}}->{'src'}->{$source}->{'url'};
+        $prefix         = qr{$prefix};
+        my @threads;
+        my $max_threads = 10;
+        my $uri         = new URI( $url );
+        my $host        = $uri->host;
+        log_msg(
+            {   msg_typ => 'INFO',
+                msg_str => "Downloading $input->{'area'} blacklist from $host"
+            }
+            ) if $show;
+        push(
+            @threads,
+            threads->create(
+                { 'context' => 'list', 'exit' => 'thread_only' },
+                \&fetch_url,
+                { area => $input->{'area'}, host => $host, prefix => $prefix, src => $source, url => $url }
+            )
+        );
+        sleep(1)
+            while (
+            scalar threads->list(threads::running) >= $max_threads );
+    }
+
+    for my $thread ( threads->list() ) {
+        my $data_ref = $thread->join();
+        my $host     = $data_ref->{'host'};
+        $cfg_ref->{$input->{'area'}}->{'records'} += $data_ref->{'records'};
+        log_msg(
+            {   msg_typ => 'INFO',
+                msg_str => $cfg_ref->{$input->{'area'}}->{'records'}
+                    . " lines downloaded from: $host"
+            }
+        );
+        push( @content, keys $data_ref->{'data'} );
+    }
+
+    print( "\r", " " x $cols, "\r" ) if $show;
+
+    if ( $cfg_ref->{$input->{'area'}}->{'records'} > 0 ) {
+        log_msg(
+            {   msg_typ => 'INFO',
+                msg_str => "Received "
+                    . $cfg_ref->{$input->{'area'}}->{'records'}
+                    . " total records\n"
+            }
+        );
+
+        LINE:
+        for my $line (@content) {
+            next LINE if $line eq '';
+            $line =~ s/$re->{suffix}//;
+            $line =~ s/$re->{lspaces}//;
+            $line =~ s/$re->{rspaces}//;
+            my @elements = $line =~ m/$re->{fqdn}/gc;
+
+            if ( @elements > 0 ) {
+                map {
+                    $cfg_ref->{$input->{'area'}}->{'blacklist'}->{$_} = 1;
+                    }
+                    grep { !/$exclude/ } @elements;
+                printf(
+                    "Entries processed: %s %s from: %s lines\r",
+                    $cfg_ref->{$input->{'area'}}->{'icount'}
+                    += scalar(@elements),
+                    $cfg_ref->{$input->{'area'}}->{'type'},
+                    $cfg_ref->{$input->{'area'}}->{'records'}
+                ) if $show;
+            }
+        }
+    }
+}
+
+sub get_config {
+    my $input = shift;
+
+    for ($input->{'type'}) {
+        /active/  and return cfg_actv();
+        /default/ and return cfg_dflt();
+        /file/    and return cfg_file();
+    }
+
+    return FALSE;
+}
+
+sub usage {
+    my $input = shift;
+    my $usage = {
+        cfg_file => sub {
+            my $exitcode = shift;
+            print STDERR (
+                "$cfg_file not found, check path and file name correct\n");
+            exit($exitcode);
+        },
+        cli => sub {
+            my $exitcode = shift;
+            print STDERR (
+                "You must run $0 inside of configure when '--cli' is specified!\n"
+            );
+            exit($exitcode);
+        },
+        enable => sub {
+            my $exitcode = shift;
+            print STDERR (
+                "\n    ERROR: '--enable' and '--disable' are mutually exclusive options!\n\n"
+            );
+            usage({option => 'help', exit_code => $exitcode});
+        },
+        default => sub {
+            my $exitcode = shift;
+            print STDERR (
+                "\n    ERROR: '--cfg_file' and '--default' are mutually exclusive options!\n\n"
+            );
+            usage({option => 'help', exit_code => $exitcode});
+        },
+        help => sub {
+            my $exitcode = shift;
+            local $, = "\n";
+            print STDERR (@_);
+            print STDERR ("usage: $progname <options>\n");
+            print STDERR (
+                'options:',
+                map( ' ' x 4 . $_->[0],
+                    sort { $a->[1] cmp $b->[1] } grep ( $_->[0] ne '', @{get_options({option => TRUE})} ) ),
+                "\n"
+            );
+            $exitcode == 9 ? return (1) : exit($exitcode);
+        },
+        sudo => sub {
+            my $exitcode = shift;
+            print STDERR ("This script must be run as root, use: sudo $0.\n");
+            exit($exitcode);
+        },
+        version => sub {
+            my $exitcode = shift;
+            printf STDERR ( "%s version: %s\n", $progname, $version );
+            exit($exitcode);
+        },
+    };
+
+    # Process option argument
+    $usage->{$input->{'option'}}->($input->{'exit_code'})
+}
+
+sub get_options {
+    my $input = shift;
+
+    my @opts = (
+        [ q{--f <file>  # load a configuration file},             'f=s'       => \$cfg_file],
+        [ q{--debug     # enable verbose debug output},           'debug'     => \$cfg_ref->{'debug'}],
+        [ q{--default   # use default values for dnsmasq conf},   'default'   => \$default],
+        [ q{--disable   # disable dnsmasq blacklists},            'disable'   => \$disable],
+        [ q{--enable    # enable dnsmasq blacklists},             'enable'    => \$enable],
+        [ q{--help      # show help and usage text},              'help'      => sub {usage(option => 'help', exit_code => 0)}],
+        [ q{--v         # verbose (outside configure session)},   'v'         => \$show],
+        [ q{--version   # show program version number},           'version'   => sub {usage(option => 'version', exit_code => 0)}],
+        );
+
+    return \@opts if $input->{'option'};
+    # Read command line flags and exit with help message if any are unknown
+    return GetOptions( map { (@$_)[ 1 .. $#$_ ] } @opts );
+}
 ############################### script runs here ###############################
 
-# Read command line flags and exit with help message if any are unknown
-GetOptions( map { (@$_)[ 1 .. $#$_ ] } @opts ) or $usage->{'help'}->( 1, 'help' );
+get_options() || usage( { option => 'help', exit_code => 1 } );
 
 # Find reasons to quit
-$usage->{'sudo'}->(1)     if not is_sudo;
-$usage->{'enable'}->(1)   if defined($enable) and defined($disable);
-$usage->{'default'}->(1)  if defined($default) and defined($cfg_file);
-$usage->{'cfg_file'}->(1) if defined($cfg_file) and not -f $cfg_file;
+usage( { option => 'sudo',   exit_code => 1 } ) if not is_sudo;
+usage( { option => 'enable', exit_code => 1 } )
+    if defined($enable)
+    and defined($disable);
+usage( { option => 'default', exit_code => 1 } )
+    if defined($default)
+    and defined($cfg_file);
+usage( { option => 'cfg_file', exit_code => 1 } )
+    if defined($cfg_file)
+    and not( -f $cfg_file );
 
 # Start logging
 open( $LOGHANDLE, '>>', $cfg_ref->{'log_file'} )
@@ -628,109 +734,52 @@ my $cfg_type
     : defined($cfg_file) ? 'file'
     :                      'active';
 
-# Now load the appropriate data set
-$cfg_ref->{load_cfg}->{$cfg_type}->();
+exit (1) unless get_config( { type => $cfg_type } );
 
 # Now proceed if blacklist is enabled
 if ( not $cfg_ref->{'disabled'} and not $disable ) {
-    my (@content, @todo);
-
+    my @todo;
     # Add areas to process only if they contain sources
     push(@todo, 'domains') if (scalar (keys %{$cfg_ref->{'domains'}->{'src'}}) > 0);
     push(@todo, 'hosts')   if (scalar (keys %{$cfg_ref->{'hosts'  }->{'src'}}) > 0);
     for my $area (@todo) {
-        my @sources = keys %{ $cfg_ref->{$area}->{'src'} };
-        $cfg_ref->{$area}->{'icount'}
-            = scalar( keys %{ $cfg_ref->{$area}->{'blacklist'} } )
-            // 0;
 
-        my $exclude
-            = ( scalar( keys %{ $cfg_ref->{$area}->{'exclude'} } ) > 0 )
-            ? join(
-            '|',
-            (   sort { length($b) <=> length($a) }
-                    keys %{ $cfg_ref->{$area}->{'exclude'} }
-            )
-            )
-            : '^#';
+        get_data({area => $area});
 
-        # create asynchronous threaded fetch web content jobs collect downloaded data
-        for my $source (@sources) {
-            my $url = $cfg_ref->{$area}->{'src'}->{$source}->{'url'};
-            my @data = map $_->join, threads->create( \&fetch_url, { area => $area, url => $url, src => $source } );
-            push (@content, @data);
-        }
+        if ( $cfg_ref->{$area}->{'icount'} > 0 ) {
 
-        print( "\r", " " x $cols, "\r" ) if $show;
+            open( my $FH, '>', $cfg_ref->{$area}->{'file'} )
+                or die sprintf( "Could not open file: s% $!",
+                $cfg_ref->{$area}->{'file'} );
 
-        if ( scalar(@content) > 0 ) {
-            $cfg_ref->{$area}->{'records'} = scalar(@content);
+            ( $area ne 'domains' )
+                ? print {$FH} (map {
+                my $val = $_;
+                $cfg_ref->{$area}->{'target'}, '=/', $val, '/',
+                    $cfg_ref->{$area}->{'blackhole'}, "\n"
+                } sort keys %{ $cfg_ref->{$area}->{'blacklist'} })
+                : print {$FH} (map {
+                my $val = $_;
+                $cfg_ref->{$area}->{'target'}, '=/.', $val, '/',
+                    $cfg_ref->{$area}->{'blackhole'}, "\n"
+                } sort keys %{ $cfg_ref->{$area}->{'blacklist'} });
+
+            close($FH);
+
+            $cfg_ref->{$area}->{'unique'}
+                = scalar( keys %{ $cfg_ref->{$area}->{'blacklist'} } );
 
             log_msg(
                 {   msg_typ => 'INFO',
-                    msg_str => "Received "
-                        . $cfg_ref->{$area}->{'records'}
-                        . " total records\n"
+                    msg_str => sprintf(
+                        'Compiled: %s (unique %s), %s (processed) from %s (source lines)',
+                        $cfg_ref->{$area}->{'unique'},
+                        $cfg_ref->{$area}->{'type'},
+                        $cfg_ref->{$area}->{'icount'},
+                        $cfg_ref->{$area}->{'records'}
+                    )
                 }
             );
-
-            LINE:
-            for my $line (@content) {
-                next LINE if $line eq '';
-                $line =~ s/$re->{suffix}//;
-                $line =~ s/$re->{lspaces}//;
-                $line =~ s/$re->{rspaces}//;
-                my @elements = $line =~ m/$re->{fqdn}/gc;
-
-                if ( @elements > 0 ) {
-                    map {
-                        $cfg_ref->{$area}->{'blacklist'}->{$_} = 1;
-                        }
-                        grep { !/$exclude/ } @elements;
-                    printf(
-                        "Entries processed: %s %s from: %s lines\r",
-                        $cfg_ref->{$area}->{'icount'}
-                        += scalar(@elements),
-                        $cfg_ref->{$area}->{'type'},
-                        $cfg_ref->{$area}->{'records'}
-                    ) if $show;
-                }
-            }
-        }
-
-        if ( $cfg_ref->{$area}->{'icount'} > 0 ) {
-            $cfg_ref->{$area}->{'unique'}
-                = scalar(
-                keys %{ $cfg_ref->{$area}->{'blacklist'} } );
-        open( my $FH, '>', $cfg_ref->{$area}->{'file'} )
-            or die sprintf( "Could not open file: s% $!",
-            $cfg_ref->{$area}->{'file'} );
-
-        ( $area ne 'domains' )
-            ? print $FH map {
-            my $val = $_;
-            $cfg_ref->{$area}->{'target'}, '=/', $val, '/',
-                $cfg_ref->{$area}->{'blackhole'}, "\n"
-            } sort keys %{ $cfg_ref->{$area}->{'blacklist'} }
-            : print $FH map {
-            my $val = $_;
-            $cfg_ref->{$area}->{'target'}, '=/.', $val, '/',
-                $cfg_ref->{$area}->{'blackhole'}, "\n"
-            } sort keys %{ $cfg_ref->{$area}->{'blacklist'} };
-
-        close( $FH );
-
-        log_msg(
-            {   msg_typ => 'INFO',
-                msg_str => sprintf(
-                    'Compiled: %s (unique %s), %s (processed) from %s (source lines)',
-                    $cfg_ref->{$area}->{'unique'},
-                    $cfg_ref->{$area}->{'type'},
-                    $cfg_ref->{$area}->{'icount'},
-                    $cfg_ref->{$area}->{'records'}
-                )
-            }
-        );
         }
         else {
             # Get outta here if no records returned from any area
@@ -755,13 +804,13 @@ elsif ($disable) {
             if ( -f "$cfg_ref->{$area}->{file}" ) {
                 log_msg(
                     {   msg_typ => 'INFO',
-                        msg_str =>
-                            sprintf(
+                        msg_str => sprintf(
                             "Removing blacklist configuration file %s
-                            $cfg_ref->{$area}->{file}" )
+                            $cfg_ref->{$area}->{file}"
+                        )
                     }
                 );
-                unlink( "$cfg_ref->{$area}->{file}" );
+                unlink("$cfg_ref->{$area}->{file}");
             }
         }
     }
@@ -789,40 +838,3 @@ close($LOGHANDLE);
 exit(0);
 
 ################################################################################
-
-__DATA__
-
-UBNT EdgeMax Blacklist and Ad Server Blocking
-
-EdgeMax Blacklist and Ad Server Blocking is derived from the received wisdom
-    found at (https://community.ubnt.com/t5/EdgeMAX/bd-p/EdgeMAX)
-    * Generates a dnsmasq configuration file
-    * Integrated with the EdgeMax OS CLI
-    * Uses any FQDN in a user specified downloadable blacklist
-
-Compatibility
-    * update-blacklists-dnsmasq.pl has been tested on the EdgeRouter Lite
-        family of routers, version v1.6.0-v1.7.0.
-    * Since the EdgeOS is a fork and port of Vyatta 6.3, this script could
-        easily be adapted for work on VyOS and Vyatta derived ports.
-
-Installation
-    * upload install_adblock.<version>.tgz to your router
-        (e.g. scp /install_adblock.<version>.tgz @:/tmp/install_adblock.<version>.tgz
-    * on your router: cd /tmp; sudo tar zxvf /tmp/install_adblock.<version>.tgz
-    * sudo bash /tmp/install_adblock.<version>
-    * select option #1
-    * The script has a menu to either add or remove (if previously installed)
-        AdBlock. It will set up the system task scheduler (cron) via the CLI
-        to run "/config/scripts/update-dnsmasq.pl" at 6 hourly intervals
-
-Removal
-    * sudo bash ./install_adblock.v4.0rc1
-    * select option #2
-
-License
-    * GNU General Public License, version 3
-    * GNU Lesser General Public License, version 3
-
-Author
-    * Neil Beadle - https://github.com/britannic/EdgeMax/tree/master/AdBlock
