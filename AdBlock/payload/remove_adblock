@@ -116,9 +116,9 @@ delete_adblock_support ()
 	CFGDIR="/opt/vyatta/share/vyatta-cfg/templates/service/dns/forwarding"
 	BLKLIST="blacklist"
 
-	for i in fqdn zone
+	for i in domain host zone
 	do
-		if [[ -f ${DNSMASQ}/${i}.${CNFFILE} ]]
+		if [[ -f "${DNSMASQ}/${i}.${CNFFILE}" ]]
 		then
 			echo "Removing ${DNSMASQ}/${i}.${CNFFILE}"
 			rm ${DNSMASQ}/${i}.${CNFFILE}
