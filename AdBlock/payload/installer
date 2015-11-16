@@ -131,10 +131,17 @@ install_adblock_support ()
 	set service dns forwarding blacklist exclude hulu.com || ERROR=1
 	set service dns forwarding blacklist exclude static.chartbeat.com || ERROR=1
 	set service dns forwarding blacklist exclude survey.112.2o7.net || ERROR=1
+	set service dns forwarding blacklist exclude adobedtm.com || ERROR=1
 	set service dns forwarding blacklist include beap.gemini.yahoo.com || ERROR=1
-	set service dns forwarding blacklist source openphish.com description 'OpenPhish automatic phishing detection'
-	set service dns forwarding blacklist source openphish.com prefix 'htt.*//'
-	set service dns forwarding blacklist source openphish.com url 'https://openphish.com/feed.txt'
+	set service dns forwarding blacklist include .adtechus.net || ERROR=1
+	set service dns forwarding blacklist include .adsrvr.org || ERROR=1
+	set service dns forwarding blacklist include .advertising.com || ERROR=1
+	set service dns forwarding blacklist include .doubleclick.net || ERROR=1
+	set service dns forwarding blacklist include .free-counter.co.uk || ERROR=1
+	set service dns forwarding blacklist include .kiosked.com || ERROR=1
+	set service dns forwarding blacklist source openphish.com description 'OpenPhish automatic phishing detection' || ERROR=1
+	set service dns forwarding blacklist source openphish.com prefix 'htt.*//' || ERROR=1
+	set service dns forwarding blacklist source openphish.com url 'https://openphish.com/feed.txt' || ERROR=1
 	set service dns forwarding blacklist source someonewhocares.org description 'Zero based host and domain list' || ERROR=1
 	set service dns forwarding blacklist source someonewhocares.org prefix '0.0.0.0' || ERROR=1
 	set service dns forwarding blacklist source someonewhocares.org url 'http://someonewhocares.org/hosts/zero/' || ERROR=1

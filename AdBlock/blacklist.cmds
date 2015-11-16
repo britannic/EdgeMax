@@ -8,13 +8,21 @@ set service dns forwarding blacklist exclude googleadservices.com
 set service dns forwarding blacklist exclude hulu.com
 set service dns forwarding blacklist exclude static.chartbeat.com
 set service dns forwarding blacklist exclude survey.112.2o7.net
+set service dns forwarding blacklist exclude coremetrics.com
+set service dns forwarding blacklist exclude adobedtm.com
 set service dns forwarding blacklist include beap.gemini.yahoo.com
-set service dns forwarding blacklist source hpHosts description 'hpHosts optimized in hosts format'
-set service dns forwarding blacklist source hpHosts prefix 127.0.0.1
-set service dns forwarding blacklist source hpHosts url 'http://hosts-file.net/download/HOSTS-Optimized.txt'
-set service dns forwarding blacklist source openphish.com description 'OpenPhish automatic phishing detection'
-set service dns forwarding blacklist source openphish.com prefix 'htt.*//'
-set service dns forwarding blacklist source openphish.com url 'https://openphish.com/feed.txt'
+set service dns forwarding blacklist include .adtechus.net
+set service dns forwarding blacklist include .adsrvr.org
+set service dns forwarding blacklist include .advertising.com
+set service dns forwarding blacklist include .doubleclick.net
+set service dns forwarding blacklist include .free-counter.co.uk
+set service dns forwarding blacklist include .kiosked.com
+set service dns forwarding blacklist source isc.sans.edu description 'High Level Sensitivity website URLs'
+set service dns forwarding blacklist source isc.sans.edu prefix ''
+set service dns forwarding blacklist source isc.sans.edu url 'https://isc.sans.edu/feeds/suspiciousdomains_High.txt'
+set service dns forwarding blacklist source malc0de.com description 'List of domains serving malicious executables observed by malc0de.com/database/'
+set service dns forwarding blacklist source malc0de.com prefix zone
+set service dns forwarding blacklist source malc0de.com url 'http://malc0de.com/bl/ZONES'
 set service dns forwarding blacklist source someonewhocares.org description 'Zero based host and domain list'
 set service dns forwarding blacklist source someonewhocares.org prefix 0.0.0.0
 set service dns forwarding blacklist source someonewhocares.org url 'http://someonewhocares.org/hosts/zero/'
