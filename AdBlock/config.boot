@@ -73,7 +73,8 @@ service {
     dns {
         forwarding {
             blacklist {
-                blackhole 0.0.0.0
+                blackhole 192.168.168.1
+                enabled true
                 exclude msdn.com
                 exclude appleglobal.112.2o7.net
                 exclude cdn.visiblemeasures.com
@@ -82,26 +83,64 @@ service {
                 exclude hulu.com
                 exclude static.chartbeat.com
                 exclude survey.112.2o7.net
+                exclude coremetrics.com
+                exclude adobedtm.com
                 include beap.gemini.yahoo.com
+                include .adtechus.net
+                include .adsrvr.org
+                include .advertising.com
+                include .doubleclick.net
+                include .free-counter.co.uk
+                include .kiosked.com
+                source hpHosts {
+                    description "hpHosts optimized in hosts format"
+                    prefix 127.0.0.1
+                    url http://hosts-file.net/download/HOSTS-Optimized.txt
+                }
+                source isc.sans.edu {
+                    description "High Level Sensitivity website URLs"
+                    prefix ""
+                    url https://isc.sans.edu/feeds/suspiciousdomains_High.txt
+                }
+                source malc0de.com {
+                    description "List of domains serving malicious executables observed by malc0de.com/database/"
+                    prefix zone
+                    url http://malc0de.com/bl/ZONES
+                }
                 source someonewhocares.org {
                     description "Zero based host and domain list"
-                    regex "^0.0.0.0\s([-a-z0-9_.]+).*"
+                    prefix 0.0.0.0
                     url http://someonewhocares.org/hosts/zero/
+                }
+                source volkerschatz.com {
+                    description "Ad server blacklists"
+                    prefix "htt.*/"
+                    url http://www.volkerschatz.com/net/adpaths
                 }
                 source winhelp2002.mvps.org {
                     description "Zero based host and domain list"
-                    regex "^0.0.0.0\s([-a-z0-9_.]+).*"
+                    prefix 0.0.0.0
                     url http://winhelp2002.mvps.org/hosts.txt
                 }
                 source www.malwaredomainlist.com {
                     description "127.0.0.1 based host and domain list"
-                    regex "^127\.0\.0\.1\s\s\b([-a-z0-9_\.]*)\b[\s]{0,1}"
+                    prefix 127.0.0.1
                     url http://www.malwaredomainlist.com/hostslist/hosts.txt
                 }
                 source yoyo.org {
-                    description "DNSmasq formatted, but with 127.0.0.1 black hole IP"
-                    regex "^address=/\b([-a-z0-9_\.]+)\b/127\.0\.0\.1"
-                    url http://pgl.yoyo.org/adservers/serverlist.php?hostformat=dnsmasq&showintro=0&mimetype=plaintext
+                    description "Fully Qualified Domain Names only - no prefix to strip"
+                    prefix ""
+                    url http://pgl.yoyo.org/as/serverlist.php?hostformat=nohtml&showintro=1&mimetype=plaintext
+                }
+                source zeustracker.abuse.ch/compromised {
+                    description "abuse.ch ZeuS compromised URL blacklist"
+                    prefix ""
+                    url https://zeustracker.abuse.ch/blocklist.php?download=compromised
+                }
+                source zeustracker.abuse.ch/hostfile {
+                    description "abuse.ch ZeuS blocklist host file"
+                    prefix 127.0.0.1
+                    url https://zeustracker.abuse.ch/blocklist.php?download=hostfile
                 }
             }
             cache-size 150
