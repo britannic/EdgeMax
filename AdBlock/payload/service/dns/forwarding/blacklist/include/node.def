@@ -1,7 +1,0 @@
-multi:
-type: txt
-help: FQDNs to INCLUDE in the DNS forwarding blacklist, use "." for host wildcards, i.e. ".kiosked.com"
-
-syntax:expression: pattern $VAR(@) "^[.[:alnum:]][-.[:alnum:]]*[[:alnum:]]$"
-                   ; "invalid host name $VAR(@)"
-
