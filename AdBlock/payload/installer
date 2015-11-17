@@ -156,9 +156,10 @@ install_blacklist_support ()
 	begin
 
 	echo "Creating starter blacklists and task scheduler for ${BLACKLIST}..."
-    set service dns forwarding blacklist dns-redirect-ip 0.0.0.0
+    set service dns forwarding blacklist dns-redirect-ip 192.168.168.1
     set service dns forwarding blacklist disabled false
     set service dns forwarding blacklist hosts exclude appleglobal.112.2o7.net
+    set service dns forwarding blacklist hosts exclude freedns.afraid.org
     set service dns forwarding blacklist hosts exclude cdn.visiblemeasures.com
     set service dns forwarding blacklist hosts exclude googleadservices.com
     set service dns forwarding blacklist hosts exclude hb.disney.go.com
@@ -166,7 +167,7 @@ install_blacklist_support ()
     set service dns forwarding blacklist hosts exclude survey.112.2o7.net
     set service dns forwarding blacklist hosts include beap.gemini.yahoo.com
     set service dns forwarding blacklist hosts source hpHosts description 'hpHosts optimized in hosts format'
-    set service dns forwarding blacklist hosts source hpHosts prefix '127.0.0.1 '
+    set service dns forwarding blacklist hosts source hpHosts prefix '127.0.0.1'
     set service dns forwarding blacklist hosts source hpHosts url 'http://hosts-file.net/download/HOSTS-Optimized.txt'
     set service dns forwarding blacklist hosts source openphish.com description 'OpenPhish automatic phishing detection'
     set service dns forwarding blacklist hosts source openphish.com prefix 'http'
