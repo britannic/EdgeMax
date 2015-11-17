@@ -24,12 +24,15 @@
 #
 # **** End License ****
 
-my $version = '4.0.alpha.110815';
+my $version = '4.0.alpha.111615';
 
 use threads;
 use strict;
 
 # use Benchmark qw(cmpthese);
+
+use English qw( -no_match_vars );
+use feature qw/switch/;
 use File::Basename;
 use Getopt::Long;
 use integer;
@@ -39,9 +42,8 @@ use POSIX qw(geteuid strftime);
 use URI;
 use v5.14;
 use Vyatta::Config;
-use Vyatta::ConfigMgmt;
 use warnings;
-use XorpConfigParser;
+# no warnings 'experimental::smartmatch';
 
 use constant TRUE  => 1;
 use constant FALSE => 0;
@@ -52,45 +54,43 @@ my $dnsmasq_svc     = '/etc/init.d/dnsmasq';
 my $enable          = undef;
 my $progname        = basename($0);
 my $showstats       = undef;
-my $cfg_ref         = {
-    debug           => 0,
-    disabled        => 0,
-    domains        => {
-        blackhole   => '0.0.0.0',
-        blacklist   => {},
-        file        => '/etc/dnsmasq.d/domain.blacklist.conf',
-        icount      => 0,
-        records     => 0,
-        target      => 'address',
-        type        => 'domains',
-        unique      => 0,
-    },
-    hosts          => {
-        blackhole   => '0.0.0.0',
-        blacklist   => {},
-        file        => '/etc/dnsmasq.d/host.blacklist.conf',
-        icount      => 0,
-        records     => 0,
-        target      => 'address',
-        type        => 'hosts',
-        unique      => 0,
-    },
-    zones          => {
-        blackhole   => '0.0.0.0',
-        blacklist   => {},
-        file        => '/etc/dnsmasq.d/zone.blacklist.conf',
-        icount      => 0,
-        records     => 0,
-        target      => 'server',
-        type        => 'zone',
-        unique      => 0,
-    },
-    log_file        => '/var/log/update-blacklists-dnsmasq.log',
+my $cfg_ref = {
+        debug           => 0,
+        disabled        => 0,
+        domains         => {
+        dns_redirect_ip => '0.0.0.0',
+        blacklist       => {},
+        file            => '/etc/dnsmasq.d/domain.blacklist.conf',
+        icount          => 0,
+        records         => 0,
+        target          => 'address',
+        type            => 'domains',
+        unique          => 0,
+        },
+        hosts => {
+        dns_redirect_ip => '0.0.0.0',
+        blacklist       => {},
+        file            => '/etc/dnsmasq.d/host.blacklist.conf',
+        icount          => 0,
+        records         => 0,
+        target          => 'address',
+        type            => 'hosts',
+        unique          => 0,
+        },
+        zones => {
+        dns_redirect_ip => '0.0.0.0',
+        blacklist       => {},
+        file            => '/etc/dnsmasq.d/zone.blacklist.conf',
+        icount          => 0,
+        records         => 0,
+        target          => 'server',
+        type            => 'zones',
+        unique          => 0,
+        },
+        log_file => '/var/log/update-dnsmasq.log',
 };
 
-my ($cfg_file,  $default,   $download, $line, $list,
-    $LOGHANDLE, $print_ver, $show,     $loadcfg
-);
+my ( $cfg_file, $default, $LH, $show, );
 
 # CLI command set
 my $begin  = '/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper begin';
@@ -159,10 +159,9 @@ sub cfg_actv {
         }
 
         $config->setLevel('service dns forwarding blacklist');
-        $cfg_ref->{'disabled'}
-            = $config->$returnValue('disabled') // FALSE;
-        $cfg_ref->{'blackhole-ip'}
-            = $config->$returnValue('blackhole-ip') // '0.0.0.0';
+        $cfg_ref->{'disabled'} = $config->$returnValue('disabled') // FALSE;
+        $cfg_ref->{'dns_redirect_ip'}
+            = $config->$returnValue('dns-redirect-ip') // '0.0.0.0';
 
         $cfg_ref->{'disabled'}
             = $cfg_ref->{'disabled'} eq 'false'
@@ -172,20 +171,33 @@ sub cfg_actv {
         for my $area (qw/hosts domains zones/) {
             $config->setLevel("service dns forwarding blacklist $area");
             $cfg_ref->{$area}->{'blackhole'}
-                = $config->$returnValue('dns-redirect-ip') // '0.0.0.0'
-                if $area eq 'zones';
-            $cfg_ref->{$area}->{'blackhole'}
-                = $config->$returnValue('blackhole-ip') // '0.0.0.0'
-                if $area ne 'zones';
+                = $config->$returnValue('dns-redirect-ip') // '0.0.0.0';
             $cfg_ref->{$area}->{'blacklist'} = {
-                map{ $_ => 1} $config->$returnValues('include')};
-            $cfg_ref->{$area}->{'exclude'}= {
-                map{ $_ => 1} $config->$returnValues('exclude')};
+                map {
+                    my $element = $_;
+                    my @domain = split( /[.]/, $element );
+                    shift(@domain) if scalar(@domain) > 2;
+                    my $value = join( '.', @domain );
+                    $element => $value
+                } $config->$returnValues('include')
+            };
+            $cfg_ref->{$area}->{'exclude'} = {
+                map {
+                    my $element = $_;
+                    my @domain = split( /[.]/, $element );
+                    shift(@domain) if scalar(@domain) > 2;
+                    my $value = join( '.', @domain );
+                    $element => $value
+                } $config->$returnValues('exclude')
+            };
 
             for my $source ( $config->$listNodes('source') ) {
-                $config->setLevel("service dns forwarding blacklist $area source $source");
-                $cfg_ref->{$area}->{'src'}->{$source}->{'url'} = $config->$returnValue('url');
-                $cfg_ref->{$area}->{'src'}->{$source}->{'prefix'} = $config->$returnValue('prefix');
+                $config->setLevel(
+                    "service dns forwarding blacklist $area source $source");
+                $cfg_ref->{$area}->{'src'}->{$source}->{'url'}
+                    = $config->$returnValue('url');
+                $cfg_ref->{$area}->{'src'}->{$source}->{'prefix'}
+                    = $config->$returnValue('prefix');
             }
         }
     }
@@ -198,13 +210,15 @@ sub cfg_actv {
             }
         );
 
-        return(FALSE);
+        return (FALSE);
     }
-    if (   ( scalar( keys %{ $cfg_ref->{'domains'}->{'src'} } ) < 1 )
-        && ( scalar( keys %{ $cfg_ref->{'hosts'}->{'src'} } ) < 1 ) )
+    if (   ( ! scalar( keys %{ $cfg_ref->{'domains'}->{'src'} } ) )
+        && ( ! scalar( keys %{ $cfg_ref->{'hosts'  }->{'src'} } ) )
+        && ( ! scalar( keys %{ $cfg_ref->{'zones'  }->{'src'} } ) )
+        )
     {
         say STDERR ('At least one domain or host source must be configured');
-        return(FALSE);
+        return (FALSE);
     }
 
     return (TRUE);
@@ -214,7 +228,7 @@ sub cfg_dflt {
 
     # Sources for blacklisted hosts
     $cfg_ref->{'hosts'}->{'src'} = {
-        malwaredomainlist => {
+        malwarehostlist => {
             url    => 'http://www.malwaredomainlist.com/hostslist/hosts.txt',
             prefix => '127.0.0.1',
         },
@@ -247,124 +261,188 @@ sub cfg_dflt {
 
     # Exclude our own good hosts
     $cfg_ref->{'hosts'}->{'exclude'} = {
-        'appleglobal.112.2o7.net' => 1,
-        'cdn.visiblemeasures.com' => 1,
-        'googleadservices.com'    => 1,
-        'hb.disney.go.com'        => 1,
-        'hulu.com'                => 1,
-        'msdn.com'                => 1,
-        'static.chartbeat.com'    => 1,
-        'survey.112.2o7.net'      => 1,
+        'appleglobal.112.2o7.net' => 'appleglobal.112.2o7.net',
+        'cdn.visiblemeasures.com' => 'cdn.visiblemeasures.com',
+        'googleadservices.com'    => 'googleadservices.com',
+        'hb.disney.go.com'        => 'hb.disney.go.com',
+        'hulu.com'                => 'hulu.com',
+        'msdn.com'                => 'msdn.com',
+        'static.chartbeat.com'    => 'static.chartbeat.com',
+        'survey.112.2o7.net'      => 'survey.112.2o7.net'
     };
 
     # Include our own redirected hosts
-    $cfg_ref->{'hosts'}->{'include'}
-        = { 'beap.gemini.yahoo.com' => 1 };
+    $cfg_ref->{'hosts'}->{'blacklist'} = {
+        'beap.gemini.yahoo.com' => 'gemini.yahoo.com',
+        '.kiosked.com'          => '.kiosked.com'
+    };
 
     # Sources for blacklisted domains
-    $cfg_ref->{'domains'}->{'src'}
-        = { malwaredomainlist =>
-            { url => 'http://malc0de.com/bl/ZONES', prefix => 'zone', }, };
+    $cfg_ref->{'domains'}->{'src'} = {
+        malwaredomainlist =>
+            { url => 'http://malc0de.com/bl/ZONES', prefix => 'zone' }
+    };
 
     # Exclude our own good domains
-    $cfg_ref->{'domains'}->{'exclude'} = { 'msdn.com' => 1, };
+    $cfg_ref->{'domains'}->{'exclude'} = {
+        'msdn.com' => 'msdn.com'
+    };
 
     # Include our own redirected domains
-    $cfg_ref->{'domains'}->{'include'} = { 'coolwebhosts.com' => 1, 'centade.com' => 1, };
+    $cfg_ref->{'domains'}->{'blacklist'} = {
+        'coolwebhosts.com' => 'coolwebhosts.com',
+        'centade.com'      => 'centade.com',
+        'kiosked.com'      => 'kiosked.com'
+    };
 
     return (TRUE);
 }
 
-sub cfg_file {
-    my $parse_cfg = {
-        excl_hosts   => undef,
-        excl_domains => undef,
-        incl_hosts   => undef,
-        incl_domains => undef,
-        kids_hosts   => undef,
-        kids_domains => undef,
-        src_hosts    => undef,
-        src_domains  => undef,
-        type_hosts   => undef,
-        type_domains => undef,
+sub get_hash {
+    my $input    = shift;
+    my $hash     = \$input->{'hash_ref'};
+    my @nodes    = @{ $input->{'nodes'} };
+    my $value    = pop(@nodes);
+    my $hash_ref = $$hash;
+
+    for my $key (@nodes) {
+        $hash = \$$hash->{$key};
+    }
+
+    $$hash = $value if $value;
+
+    return $hash_ref;
+}
+
+sub parse_node {
+    my $input   = shift;
+    my ( @hasher, @nodes );
+    my $cfg_ref = {};
+    my $leaf    = 0;
+    my $level   = 0;
+    my $re      = {
+        BRKT => qr/[}]/o,
+        CMNT => qr/^(?<LCMT>[\/*]+).*(?<RCMT>[*\/]+)$/o,
+        DESC => qr/^(?<NAME>[\w-]+)\s"?(?<DESC>[^"]+)?"?$/o,
+        MPTY => qr/^$/o,
+        LEAF => qr/^(?<LEAF>[\w\-]+)\s(?<NAME>[\S]+)\s[{]{1}$/o,
+        LSPC => qr/\s+$/o,
+        MISC => qr/^(?<MISC>[\w-]+)$/o,
+        MULT => qr/^(?<MULT>(?:include|exclude)+)\s(?<VALU>[\S]+)$/o,
+        NAME => qr/^(?<NAME>[\w\-]+)\s(?<VALU>[\S]+)$/o,
+        NODE => qr/^(?<NODE>[\w-]+)\s[{]{1}$/o,
+        RSPC => qr/^\s+/o,
     };
-    my $rgx_url = qr{^url\s+(.*)$}xms;
-    my $prfx_re = qr{^prefix\s+["{0,1}](.*)["{0,1}].*$}xms;
-    my $xcp     = new XorpConfigParser();
-    $xcp->parse($cfg_file);
-    my $blist = $xcp->get_node( [qw/service dns forwarding blacklist/] );
 
-    if ($blist) {
+    for my $line ( @{$input->{'config_data'}} ) {
+        $line =~ s/$re->{LSPC}//;
+        $line =~ s/$re->{RSPC}//;
+
+        given ($line) {
+            when (/$re->{MULT}/) {
+                push( @nodes, $+{MULT} );
+                push (@nodes, $+{VALU});
+                my @domain = split( /[.]/, $+{VALU} );
+                shift(@domain) if scalar(@domain) > 2;
+                my $value = join( '.', @domain );
+                push (@nodes, $value);
+                get_hash({nodes => \@nodes, hash_ref => $cfg_ref});
+                pop(@nodes);
+                pop(@nodes);
+                pop(@nodes);
+            }
+            when (/$re->{NODE}/) {
+                push( @nodes, $+{NODE} );
+            }
+            when (/$re->{LEAF}/) {
+                $level++;
+                push( @nodes, $+{LEAF} );
+                push( @nodes, $+{NAME} );
+            }
+            when (/$re->{NAME}/) {
+                push (@nodes, $+{NAME});
+                push (@nodes, $+{VALU});
+                get_hash({nodes => \@nodes, hash_ref => $cfg_ref});
+                pop(@nodes);
+                pop(@nodes);
+            }
+            when (/$re->{DESC}/) {
+                push (@nodes, $+{NAME});
+                push (@nodes, $+{DESC});
+                get_hash({nodes => \@nodes, hash_ref => $cfg_ref});
+                pop(@nodes);
+                pop(@nodes);
+            }
+            when (/$re->{MISC}/) {
+                push (@nodes, $+{MISC});
+                push (@nodes, $+{MISC});
+                get_hash({nodes => \@nodes, hash_ref => $cfg_ref});
+                pop(@nodes);
+                pop(@nodes);
+            }
+            when (/$re->{CMNT}/) {
+                next;
+            }
+            when (/$re->{BRKT}/) {
+                pop(@nodes);
+                if ( $level > 0 ) {
+                    pop(@nodes);
+                    $level--;
+                }
+            }
+            when (/$re->{MPTY}/) {
+                next;
+            }
+            default {
+                print( sprintf( 'Parse error: "%s"', $line ) );
+            }
+        }
+
+    }
+    return ( $cfg_ref->{'service'}->{'dns'}->{'forwarding'}->{'blacklist'} );
+}
+
+sub get_file {
+    my $input = shift;
+    my @cfg_data;
+
+    if ( exists $input->{'cfg_file'} ) {
+        open( my $CF, '<', $input->{'cfg_file'} )
+            or die "ERROR: Unable to open $cfg_file: $!";
+        chomp( @cfg_data = <$CF> );
+        close($CF);
+        return \@cfg_data;
+    }
+    else {
+        return FALSE;
+    }
+}
+
+sub cfg_file {
+    my $tmp_ref = parse_node(
+        { config_data => get_file( { cfg_file => $cfg_file } ) } );
+    my $configured
+        = (    $tmp_ref->{'domains'}->{'source'}
+            || $tmp_ref->{'hosts'  }->{'source'}
+            || $tmp_ref->{'zones'  }->{'source'} )
+        ? TRUE
+        : FALSE;
+
+    if ($configured) {
+        $cfg_ref->{'dns_redirect_ip'} = $tmp_ref->{'dns-redirect-ip'}
+            // '0.0.0.0';
+        $cfg_ref->{'disabled'}
+            = ( $tmp_ref->{'disabled'} eq 'false' )
+            ? FALSE
+            : TRUE;
+
         for my $area (qw/hosts domains zones/) {
-            for my $child ( @{ $blist->{'children'} } ) {
-                for ( $blist->{'children'}[$child]->{'name'} ) {
-                    /^blackhole-ip\s+(.*)$/
-                        and $cfg_ref->{'blackhole'} = $1
-                        // "0.0.0.0";
-                    /^disabled\s+(\w)$/
-                        and $cfg_ref->{'disabled'} = $1 // FALSE;
-                }
-            }
-
-            $cfg_ref->{'disabled'} eq 'false'
-                ? FALSE
-                : TRUE;
-
-            $parse_cfg->{"type_$area"}
-                = $xcp->get_node(
-                [qw/service dns forwarding blacklist $area/] );
-
-            if ( $parse_cfg->{"type_$area"} ) {
-                $parse_cfg->{"kids_$area"}
-                    = $parse_cfg->{"type_$area"}->{'children'};
-                $parse_cfg->{$area}->{'exclude'}
-                    = $xcp->copy_multis( $parse_cfg->{"kids_$area"},
-                    'exclude' );
-                $parse_cfg->{"incl_$area"}
-                    = $xcp->copy_multis( $parse_cfg->{"kids_$area"},
-                    'include' );
-                $parse_cfg->{"src_$area"}
-                    = $xcp->copy_multis( $parse_cfg->{"kids_$area"},
-                    'source' );
-
-                for my $exclude ( @{ $parse_cfg->{$area}->{'exclude'} } ) {
-                    push(
-                        $cfg_ref->{$area}->{'exclude'},
-                        $exclude->{'name'}
-                    );
-                }
-
-                for my $include ( @{ $parse_cfg->{"incl_$area"} } ) {
-                    push(
-                        $cfg_ref->{$area}->{'include'},
-                        "$include->{'name'}"
-                    );
-                }
-
-                for my $src_name ( @{ $parse_cfg->{"src_$area"} } ) {
-                    my $source = $xcp->get_node(
-                        [   'service',    'dns',
-                            'forwarding', 'blacklist',
-                            $area,        "source $src_name->{'name'}"
-                        ]
-                    );
-
-                    $parse_cfg->{"kids_$area"} = $source->{'children'};
-
-                    for my $src_name ( @{ $parse_cfg->{"kids_$area"} } ) {
-                        for ( $src_name->{'name'} ) {
-                            /$rgx_url/
-                                and
-                                push( $cfg_ref->{'urls_host'}, $1 ),
-                                last;
-                            /$prfx_re/
-                                and
-                                push( $cfg_ref->{'prfx_host'}, $1 ),
-                                last;
-                        }
-                    }
-                }
-            }
+            $cfg_ref->{$area}->{'dns_redirect_ip'}
+                = $cfg_ref->{'dns_redirect_ip'}
+                if !exists( $tmp_ref->{$area}->{'dns-redirect-ip'} );
+            $cfg_ref->{$area}->{'exclude'}   = $tmp_ref->{$area}->{'exclude'};
+            $cfg_ref->{$area}->{'blacklist'} = $tmp_ref->{$area}->{'include'};
+            $cfg_ref->{$area}->{'src'}       = $tmp_ref->{$area}->{'source'};
         }
     }
     else {
@@ -375,7 +453,7 @@ sub cfg_file {
                     q{[service dns forwarding blacklist] isn't configured, exiting!}
             }
         );
-        return(FALSE);
+        return (FALSE);
     }
     return (TRUE);
 }
@@ -456,7 +534,7 @@ sub log_msg {
     return (FALSE)
         unless ( length( $msg_ref->{msg_typ} . $msg_ref->{msg_str} ) > 2 );
 
-    print {$LOGHANDLE} ("$date: $msg_ref->{msg_typ}: $msg_ref->{msg_str}");
+    say {$LH} ("$date: $msg_ref->{msg_typ}: $msg_ref->{msg_str}");
     say("$msg_ref->{msg_typ}: $msg_ref->{msg_str}")
         if $cfg_ref->{'debug'} || $show;
 
@@ -464,29 +542,29 @@ sub log_msg {
 }
 
 sub fetch_url {
-    my $ua = LWP::UserAgent->new;
+    my $input               = shift;
+    my $ua                  = LWP::UserAgent->new;
     $ua->agent(
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11) AppleWebKit/601.1.56 (KHTML, like Gecko) Version/9.0 Safari/601.1.56'
     );
     $ua->timeout(60);
-    my $input               = shift;
     my $get;
     my $data_ref->{'host'}  = $input->{'host'};
-    my $reject              = qr{^#|^$|^\n};
-    my $select              = $input->{'prefix'};
     my $lines               = 0;
-    my $splitline           = qr{\R|<br \/>}xms;
-    my $div                 = qr{\s+\b}xms;
+    $input->{'prefix'}      =~ s/^["](?<UNCMT>.*)["]$/$+{UNCMT}/g;
+    my $re                  = {
+        REJECT    => qr{^#|^$|^\n}o,
+        SELECT    => qr{^$input->{'prefix'}.*$}o,
+        SPLIT     => qr{\R|<br \/>}oms,
+        };
 
     $ua->show_progress(TRUE) if $input->{'debug'};
     $get = $ua->get( $input->{'url'} );
 
     $data_ref->{'data'}
         = { map { my $key = $_; lc($key) => 1 }
-        grep {/$select/}
-        grep { !/$reject/ } split( $splitline, $get->content ) };
-
-    $data_ref->{'records'} = scalar (keys %{$data_ref->{'data'}}) /2;
+        grep { $_ =~ /$re->{SELECT}/ }
+        split( /$re->{SPLIT}/, $get->content ) };
 
     return $get->is_success
         ? $data_ref
@@ -499,111 +577,142 @@ sub is_sudo {
     return (FALSE);
 }
 
+sub write_file {
+    my $input = shift;
+    open( my $FH, '>', $input->{'file'} ) or return FALSE;
+    log_msg (
+        {   msg_typ => 'INFO',
+            msg_str => "Writing dnsmasq configuration data to $input->{'file'}"
+        }
+    );
+    print {$FH} (
+        map {
+            my $val = $_;
+            $input->{'target'}, $input->{'equals'}, $val, '/', $input->{'ip'}, "\n"
+        } @{ $input->{'data'} }
+    );
+    close($FH);
+
+    return TRUE;
+}
+
 sub get_data {
     my $input = shift;
-    my (@content, @excl_domains);
-    my $re              = {
-            fqdn        =>
-            qr{(\b(?:(?![.]|-)[a-zA-Z0-9_-]{1,63}(?<!-)[.]{1})+(?:[a-zA-Z]{2,63})\b)}o,
-            lspaces     => qr{^\s+}o,
-            rspaces     => qr{\s+$}o,
-            suffix      => qr{(?:#.*$|\{.*$|[/[].*$)}o,
-        };
-    my @sources = keys %{ $cfg_ref->{$input->{'area'}}->{'src'} };
-    $cfg_ref->{$input->{'area'}}->{'icount'}
-        = scalar( keys %{ $cfg_ref->{$input->{'area'}}->{'blacklist'} } )
+    my ( @threads, @content );
+    my $re = {
+        FQDN =>
+            qr{(\b(?:(?![.]|-)[\w-]{1,63}(?<!-)[.]{1})+(?:[a-zA-Z]{2,63})\b)}o,
+        LSPACES => qr{^\s+}o,
+        RSPACES => qr{\s+$}o,
+        SUFFIX  => qr{(?:#.*$|\{.*$|[/[].*$)}o,
+    };
+    my @sources = keys %{ $cfg_ref->{ $input->{'area'} }->{'src'} };
+    $cfg_ref->{ $input->{'area'} }->{'icount'}
+        = scalar( keys %{ $cfg_ref->{ $input->{'area'} }->{'blacklist'} } )
         // 0;
+    $cfg_ref->{ $input->{'area'} }->{'records'}
+        = $cfg_ref->{ $input->{'area'} }->{'icount'};
 
-    if ( $input->{'area'} eq 'hosts' ) {
-        @excl_domains
-            = (
-            scalar( keys %{ $cfg_ref->{'domains'}->{'blacklist'} } > 0 ) )
-            ? sort { length($b) <=> length($a) }
-            keys %{ $cfg_ref->{'domains'}->{'blacklist'} }
-            : '^$';
+    if ( $input->{'area'} eq 'hosts'
+        && scalar( keys %{ $cfg_ref->{'domains'}->{'blacklist'} } ) )
+    {
+        @{ $cfg_ref->{ $input->{'area'} }->{'exclude'} }{
+            keys $cfg_ref->{'domains'}->{'blacklist'}
+        } = values %{ $cfg_ref->{'domains'}->{'blacklist'} };
     }
 
-    my $exclude
-        = ( scalar( keys %{ $cfg_ref->{$input->{'area'}}->{'exclude'} } ) > 0 )
-        ? join(
-        '|',
-        (   sort { length($b) <=> length($a) }
-                keys %{ $cfg_ref->{$input->{'area'}}->{'exclude'} },
-            @excl_domains
-        )
-        )
-        : '^#';
-
-    # create asynchronous threaded fetch web content jobs collect downloaded data
+ # create asynchronous threaded fetch web content jobs collect downloaded data
     for my $source (@sources) {
-        my $prefix      = $cfg_ref->{$input->{'area'}}->{'src'}->{$source}->{'prefix'};
-        my $url         = $cfg_ref->{$input->{'area'}}->{'src'}->{$source}->{'url'};
-        $prefix         = qr{$prefix};
-        my @threads;
+        my $url = $cfg_ref->{ $input->{'area'} }->{'src'}->{$source}->{'url'};
         my $max_threads = 10;
-        my $uri         = new URI( $url );
+        my $uri         = new URI($url);
         my $host        = $uri->host;
+        $re->{'PREFIX'}
+            = $cfg_ref->{ $input->{'area'} }->{'src'}->{$source}->{'prefix'}
+            ~~ 'http'
+            ? qr{(?:(?:http:|https:){1}[/]{1,2})}o
+            : $cfg_ref->{ $input->{'area'} }->{'src'}->{$source}->{'prefix'};
         log_msg(
             {   msg_typ => 'INFO',
                 msg_str => "Downloading $input->{'area'} blacklist from $host"
             }
-            ) if $show;
-        push(
-            @threads,
+        ) if $show;
+        push @threads,
             threads->create(
-                { 'context' => 'list', 'exit' => 'thread_only' },
-                \&fetch_url,
-                { area => $input->{'area'}, host => $host, prefix => $prefix, src => $source, url => $url }
-            )
-        );
+            { 'context' => 'list', 'exit' => 'thread_only' },
+            \&fetch_url,
+            {   area   => $input->{'area'},
+                host   => $host,
+                prefix => $re->{'PREFIX'},
+                src    => $source,
+                url    => $url
+            }
+            );
         sleep(1)
-            while (
-            scalar threads->list(threads::running) >= $max_threads );
+            while ( scalar threads->list(threads::running) >= $max_threads );
     }
 
-    for my $thread ( threads->list() ) {
+    for my $thread (@threads) {
         my $data_ref = $thread->join();
-        my $host     = $data_ref->{'host'};
-        $cfg_ref->{$input->{'area'}}->{'records'} += $data_ref->{'records'};
+        my $rec_count
+            = ( exists $data_ref->{'data'} )
+            ? scalar( keys %{ $data_ref->{'data'} } )
+            : 0;
+        $cfg_ref->{ $input->{'area'} }->{'records'} += $rec_count;
+
         log_msg(
             {   msg_typ => 'INFO',
-                msg_str => $cfg_ref->{$input->{'area'}}->{'records'}
-                    . " lines downloaded from: $host"
+                msg_str => $rec_count
+                    . " lines downloaded from: $data_ref->{'host'}"
             }
-        );
+        ) if exists $data_ref->{'host'};
+
         push( @content, keys $data_ref->{'data'} );
     }
-
     print( "\r", " " x $cols, "\r" ) if $show;
 
-    if ( $cfg_ref->{$input->{'area'}}->{'records'} > 0 ) {
+    if ( $cfg_ref->{ $input->{'area'} }->{'records'} > 0 ) {
         log_msg(
             {   msg_typ => 'INFO',
                 msg_str => "Received "
-                    . $cfg_ref->{$input->{'area'}}->{'records'}
+                    . $cfg_ref->{ $input->{'area'} }->{'records'}
                     . " total records\n"
             }
         );
 
-        LINE:
+    LINE:
         for my $line (@content) {
             next LINE if $line eq '';
-            $line =~ s/$re->{suffix}//;
-            $line =~ s/$re->{lspaces}//;
-            $line =~ s/$re->{rspaces}//;
-            my @elements = $line =~ m/$re->{fqdn}/gc;
+            $line =~ s/$re->{PREFIX}//;
+            $line =~ s/$re->{SUFFIX}//;
+            $line =~ s/$re->{LSPACES}//;
+            $line =~ s/$re->{RSPACES}//;
+            my @elements = $line =~ m/$re->{FQDN}/gc;
+            my @domain;
 
-            if ( @elements > 0 ) {
+            if ( scalar(@elements) > 0 ) {
                 map {
-                    $cfg_ref->{$input->{'area'}}->{'blacklist'}->{$_} = 1;
+                    my $element = $_;
+                    @domain = split( /[.]/, $element );
+                    if ( $input->{'area'} ne 'domain' ) {
+                        given ( scalar(@domain) ) {
+                            when ( $_ > 2 ) { shift(@domain); }
+                            when ( $_ < 2 ) { unshift( @domain, '.' ); }
+                        }
                     }
-                    grep { !/$exclude/ } @elements;
+                    my $value = join( '.', @domain );
+                    $cfg_ref->{ $input->{'area'} }->{'blacklist'}->{$element}
+                        = $value
+                        if !
+                        exists $cfg_ref->{ $input->{'area'} }->{'exclude'}
+                        ->{$value};
+                } @elements;
                 printf(
                     "Entries processed: %s %s from: %s lines\r",
-                    $cfg_ref->{$input->{'area'}}->{'icount'}
-                    += scalar(@elements),
-                    $cfg_ref->{$input->{'area'}}->{'type'},
-                    $cfg_ref->{$input->{'area'}}->{'records'}
+                    $cfg_ref->{ $input->{'area'} }->{'icount'}
+                        += scalar(@elements),
+                    $cfg_ref->{ $input->{'area'} }->{'type'},
+                    $cfg_ref->{ $input->{'area'} }->{'records'}
                 ) if $show;
             }
         }
@@ -628,7 +737,7 @@ sub usage {
         cfg_file => sub {
             my $exitcode = shift;
             print STDERR (
-                "$cfg_file not found, check path and file name correct\n");
+                "$cfg_file not found, check path and file name is correct\n");
             exit($exitcode);
         },
         cli => sub {
@@ -683,16 +792,15 @@ sub usage {
 
 sub get_options {
     my $input = shift;
-
     my @opts = (
-        [ q{--f <file>  # load a configuration file},             'f=s'       => \$cfg_file],
+        [ q{-f <file>   # load a configuration file},             'f=s'       => \$cfg_file],
         [ q{--debug     # enable verbose debug output},           'debug'     => \$cfg_ref->{'debug'}],
         [ q{--default   # use default values for dnsmasq conf},   'default'   => \$default],
         [ q{--disable   # disable dnsmasq blacklists},            'disable'   => \$disable],
         [ q{--enable    # enable dnsmasq blacklists},             'enable'    => \$enable],
-        [ q{--help      # show help and usage text},              'help'      => sub {usage(option => 'help', exit_code => 0)}],
-        [ q{--v         # verbose (outside configure session)},   'v'         => \$show],
-        [ q{--version   # show program version number},           'version'   => sub {usage(option => 'version', exit_code => 0)}],
+        [ q{--help      # show help and usage text},              'help'      => sub {usage({ option => 'help', exit_code => 0} )}],
+        [ q{-v          # verbose (outside configure session)},   'v'         => \$show],
+        [ q{--version   # show program version number},           'version'   => sub {usage({ option => 'version', exit_code => 0} )}],
         );
 
     return \@opts if $input->{'option'};
@@ -716,7 +824,7 @@ usage( { option => 'cfg_file', exit_code => 1 } )
     and not( -f $cfg_file );
 
 # Start logging
-open( $LOGHANDLE, '>>', $cfg_ref->{'log_file'} )
+open( $LH, '>>', $cfg_ref->{'log_file'} )
     or die(q{Cannot open log file - this shouldn't happen!});
 log_msg(
     {   msg_typ => 'INFO',
@@ -738,36 +846,33 @@ exit (1) unless get_config( { type => $cfg_type } );
 
 # Now proceed if blacklist is enabled
 if ( not $cfg_ref->{'disabled'} and not $disable ) {
-    my @todo;
+    my @areas;
     # Add areas to process only if they contain sources
-    push(@todo, 'domains') if (scalar (keys %{$cfg_ref->{'domains'}->{'src'}}) > 0);
-    push(@todo, 'hosts')   if (scalar (keys %{$cfg_ref->{'hosts'  }->{'src'}}) > 0);
-    for my $area (@todo) {
+    for my $area (qw/domains hosts zones/) {
+        push(@areas, $area) if (scalar (keys %{$cfg_ref->{$area}->{'src'}}));
+    }
+
+    for my $area (@areas) {
 
         get_data({area => $area});
 
         if ( $cfg_ref->{$area}->{'icount'} > 0 ) {
-
-            open( my $FH, '>', $cfg_ref->{$area}->{'file'} )
-                or die sprintf( "Could not open file: s% $!",
-                $cfg_ref->{$area}->{'file'} );
-
-            ( $area ne 'domains' )
-                ? print {$FH} (map {
-                my $val = $_;
-                $cfg_ref->{$area}->{'target'}, '=/', $val, '/',
-                    $cfg_ref->{$area}->{'blackhole'}, "\n"
-                } sort keys %{ $cfg_ref->{$area}->{'blacklist'} })
-                : print {$FH} (map {
-                my $val = $_;
-                $cfg_ref->{$area}->{'target'}, '=/.', $val, '/',
-                    $cfg_ref->{$area}->{'blackhole'}, "\n"
-                } sort keys %{ $cfg_ref->{$area}->{'blacklist'} });
-
-            close($FH);
+            my $equals = ( $area ne 'domains' ) ? '=/' : '=/.';
+            write_file(
+                {   file   => $cfg_ref->{$area}->{'file'},
+                    target => $cfg_ref->{$area}->{'target'},
+                    equals => $equals,
+                    ip     => $cfg_ref->{$area}->{'dns_redirect_ip'},
+                    data   => [sort keys $cfg_ref->{$area}->{'blacklist'}],
+                }
+            )
+            or die(
+            sprintf( "Could not open file: s% $!",
+                $cfg_ref->{$area}->{'file'} )
+            );
 
             $cfg_ref->{$area}->{'unique'}
-                = scalar( keys %{ $cfg_ref->{$area}->{'blacklist'} } );
+                = scalar( keys %{$cfg_ref->{$area}->{'blacklist'}} );
 
             log_msg(
                 {   msg_typ => 'INFO',
@@ -787,7 +892,7 @@ if ( not $cfg_ref->{'disabled'} and not $disable ) {
                 {   msg_typ => 'ERROR',
                     msg_str => 'Zero source records returned from $area!'
                 }
-                );
+            );
         }
     }
 }
@@ -800,7 +905,7 @@ elsif ($enable) {
 }
 elsif ($disable) {
     if ( disable or $cfg_ref->{'disabled'} ) {
-        for my $area (qw{domains hosts _zones}) {
+        for my $area (qw{domains hosts zones}) {
             if ( -f "$cfg_ref->{$area}->{file}" ) {
                 log_msg(
                     {   msg_typ => 'INFO',
@@ -832,7 +937,7 @@ my $cmd
 qx($cmd);
 
 # Close the log
-close($LOGHANDLE);
+close($LH);
 
 # Exit normally
 exit(0);
