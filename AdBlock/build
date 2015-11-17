@@ -2,7 +2,7 @@
 export COPY_EXTENDED_ATTRIBUTES_DISABLE=true
 export COPYFILE_DISABLE=true
 
-VERSION="4.0.alpha.110715"
+VERSION="4.0.alpha.111715"
 DROPBOX="/Users/Neil/Dropbox/EdgeMax"
 ADBLOCK="ADBLOCK.${VERSION}."
 INSTALL="install_adblock.v${VERSION}"

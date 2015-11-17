@@ -16,3 +16,5 @@ Blacklist Blocking/payload/update-blacklists-dnsmasq.ptkdb
 *.bbprojectsettings
 
 Blacklist Blocking/ersetup
+
+*.boot
