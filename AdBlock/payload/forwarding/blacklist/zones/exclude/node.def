@@ -1,10 +1,6 @@
 multi:
 type: txt
-<<<<<<< HEAD:AdBlock/payload/service/dns/forwarding/blacklist/include/node.def
-help: FQDNs to INCLUDE in the DNS forwarding blacklist, use "." for host wildcards, i.e. ".kiosked.com"
-=======
 help: Domains to EXCLUDE from DNS forwarding blacklist
->>>>>>> Domain-and-hostname-rejection:AdBlock/payload/forwarding/blacklist/zones/exclude/node.def
 
 syntax:expression: pattern $VAR(@) "^[.[:alnum:]][-.[:alnum:]]*[[:alnum:]]$"
                    ; "invalid host name $VAR(@)"

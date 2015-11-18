@@ -4,5 +4,9 @@ help: A conditional DNS forwarding source file with a list of domain names
 val_help: http; Example: /config/user-data/zones.txt
 comp_help: The file must contain valid domain names, one domain name per line
 
-commit:expression: !-f $VAR(./@@); "File must exist and be readable by root"
-
+end: if [[ "$COMMIT_ACTION" != "DELETE" ]]; then
+        if [[ "$VAR(./@@)" != "" ]]; then
+            sudo /config/scripts/update-dnsmasq.pl -chkfile "$VAR(./@@)";
+            [[ $? == 1 ]] && exit 1;
+        fi;
+    fi
