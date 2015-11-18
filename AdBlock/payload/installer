@@ -25,7 +25,7 @@
 #
 set -o errtrace
 
-VERSION="v2.6"
+VERSION="v2.7"
 
 # Uncomment for debugging or syntax checking
 # set -x
@@ -125,11 +125,18 @@ trap 'report_error $? ${LINENO} ${BASH_LINENO} "${BASH_COMMAND}" $(printf "::%s"
 # Install blacklist support
 install_blacklist_support ()
 {
-	CONFIG="/config/scripts"
-	BLACKLIST="update-dnsmasq.pl"
-	TEMPLATES="/opt/vyatta/share/vyatta-cfg/templates/service/dns"
+	CONFIG='/config/scripts'
+	BLACKLIST='update-dnsmasq.pl'
+	TEMPLATES='/opt/vyatta/share/vyatta-cfg/templates/service/dns'
+	OLDCONF='dnsmasq.blacklist.conf'
+	DNSMASQ='/etc/dnsmasq.d'
 #	WWWDIR="/config/wizard/feature/ADBlock"
 #	GUI="GUI"
+
+	if [[ -f "${DNSMASQ}/${OLDCONF}" ]]
+	then
+		rm -f "${DNSMASQ}/${OLDCONF}"
+	fi
 
 	if [[ ! -d "${CONFIG}" ]]
 	then
@@ -137,68 +144,22 @@ install_blacklist_support ()
 	fi
 
 	echo "Installing ${BLACKLIST} to ${CONFIG}/"
-	install -o root -g root -m 0755 "${BLACKLIST}" "${CONFIG}/${BLACKLIST}" || ERROR=1
+	install -o root -g root -m 0755 "${BLACKLIST}" "${CONFIG}/${BLACKLIST}"
 
 #	if [[ ! -d "${WWWDIR}/" ]]
 #	then
-#		install -d -o www-data -g users -m 0755 "${WWWDIR}/" || ERROR=1
+#		install -d -o www-data -g users -m 0755 "${WWWDIR}/"
 #	fi
 
 #	for i in "${GUI}/"*
 #	do
-#		install -o www-data -g users -m 0755 ${i} "${WWWDIR}/"$(basename ${i}) || ERROR=1
+#		install -o www-data -g users -m 0755 ${i} "${WWWDIR}/"$(basename ${i})
 #	done
 
 	echo "Installing blacklist configuration templates for ${BLACKLIST}..."
 	cp -rf forwarding/ "${TEMPLATES}/"
 
 	echo "Opening EdgeMax configuration session..."
-<<<<<<< HEAD
-	begin || ERROR=1
-
-	echo "Creating starter blacklists and task scheduler entry for ${ADBLOCK}..."
-	set service dns forwarding blacklist enabled true  || ERROR=1
-	set service dns forwarding blacklist blackhole 0.0.0.0 || ERROR=1
-	set service dns forwarding blacklist exclude msdn.com || ERROR=1
-	set service dns forwarding blacklist exclude appleglobal.112.2o7.net || ERROR=1
-	set service dns forwarding blacklist exclude cdn.visiblemeasures.com || ERROR=1
-	set service dns forwarding blacklist exclude hb.disney.go.com || ERROR=1
-	set service dns forwarding blacklist exclude googleadservices.com || ERROR=1
-	set service dns forwarding blacklist exclude hulu.com || ERROR=1
-	set service dns forwarding blacklist exclude static.chartbeat.com || ERROR=1
-	set service dns forwarding blacklist exclude survey.112.2o7.net || ERROR=1
-	set service dns forwarding blacklist exclude adobedtm.com || ERROR=1
-	set service dns forwarding blacklist include beap.gemini.yahoo.com || ERROR=1
-	set service dns forwarding blacklist include .adtechus.net || ERROR=1
-	set service dns forwarding blacklist include .adsrvr.org || ERROR=1
-	set service dns forwarding blacklist include .advertising.com || ERROR=1
-	set service dns forwarding blacklist include .doubleclick.net || ERROR=1
-	set service dns forwarding blacklist include .free-counter.co.uk || ERROR=1
-	set service dns forwarding blacklist include .kiosked.com || ERROR=1
-	set service dns forwarding blacklist source openphish.com description 'OpenPhish automatic phishing detection' || ERROR=1
-	set service dns forwarding blacklist source openphish.com prefix 'htt.*//' || ERROR=1
-	set service dns forwarding blacklist source openphish.com url 'https://openphish.com/feed.txt' || ERROR=1
-	set service dns forwarding blacklist source someonewhocares.org description 'Zero based host and domain list' || ERROR=1
-	set service dns forwarding blacklist source someonewhocares.org prefix '0.0.0.0' || ERROR=1
-	set service dns forwarding blacklist source someonewhocares.org url 'http://someonewhocares.org/hosts/zero/' || ERROR=1
-	set service dns forwarding blacklist source winhelp2002.mvps.org description 'Zero based host and domain list' || ERROR=1
-	set service dns forwarding blacklist source winhelp2002.mvps.org prefix '0.0.0.0' || ERROR=1
-	set service dns forwarding blacklist source winhelp2002.mvps.org url 'http://winhelp2002.mvps.org/hosts.txt' || ERROR=1
-	set service dns forwarding blacklist source malwaredomainlist.com description '127.0.0.1 based host and domain list' || ERROR=1
-	set service dns forwarding blacklist source malwaredomainlist.com prefix '127.0.0.1' || ERROR=1
-	set service dns forwarding blacklist source malwaredomainlist.com url 'http://www.malwaredomainlist.com/hostslist/hosts.txt' || ERROR=1
-	set service dns forwarding blacklist source yoyo.org description 'Fully Qualified Domain Names only - no prefix to strip' || ERROR=1
-	set service dns forwarding blacklist source yoyo.org prefix '' || ERROR=1
-	set service dns forwarding blacklist source yoyo.org url 'http://pgl.yoyo.org/as/serverlist.php?hostformat=nohtml&showintro=1&mimetype=plaintext' || ERROR=1
-	set service dns forwarding blacklist source zeustracker.abuse.ch/compromised description 'abuse.ch ZeuS compromised URL blacklist' || ERROR=1
-	set service dns forwarding blacklist source zeustracker.abuse.ch/compromised prefix '' || ERROR=1
-	set service dns forwarding blacklist source zeustracker.abuse.ch/compromised url 'https://zeustracker.abuse.ch/blocklist.php?download=compromised' || ERROR=1
-	set service dns forwarding blacklist source zeustracker.abuse.ch/hostfile description 'abuse.ch ZeuS blocklist host file' || ERROR=1
-	set service dns forwarding blacklist source zeustracker.abuse.ch/hostfile prefix '127.0.0.1' || ERROR=1
-	set service dns forwarding blacklist source zeustracker.abuse.ch/hostfile url 'https://zeustracker.abuse.ch/blocklist.php?download=hostfile' || ERROR=1
-	set system task-scheduler task update_blacklists executable path /config/scripts/update-blacklists-dnsmasq.pl || ERROR=1
-	set system task-scheduler task update_blacklists interval 6h || ERROR=1
-=======
 	begin
 
 	echo "Creating starter blacklists and task scheduler for ${BLACKLIST}..."
@@ -250,7 +211,6 @@ install_blacklist_support ()
     set service dns forwarding blacklist domains include centade.com
     set system task-scheduler task update_blacklists executable path /config/scripts/update-dnsmasq.pl
     set system task-scheduler task update_blacklists interval 6h
->>>>>>> Domain-and-hostname-rejection
 
 	echo "Committing configuration..."
 	commit
@@ -261,14 +221,13 @@ install_blacklist_support ()
 	echo "Ending configuration session..."
 	end
 
-	return ${ERROR}
 }
 
 # This is where we run the script using the above functions
 
 if is_version
 then
-	echo "${ME}Installing BLACKLIST and Blacklist blocking dnsmasq support..."
+	echo "${ME}Installing ADBlock and Blacklist blocking dnsmasq support..."
 	if install_blacklist_support
 	then
 		echo "${ME}ADBlock and Blacklist blocking dnsmasq installation succeeded!"
