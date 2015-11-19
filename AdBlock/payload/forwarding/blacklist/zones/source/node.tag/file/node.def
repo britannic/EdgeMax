@@ -5,8 +5,7 @@ val_help: http; Example: /config/user-data/zones.txt
 comp_help: The file must contain valid domain names, one domain name per line
 
 end: if [[ "$COMMIT_ACTION" != "DELETE" ]]; then
-        if [[ "$VAR(./@@)" != "" ]]; then
-            sudo /config/scripts/update-dnsmasq.pl -chkfile "$VAR(./@@)";
-            [[ $? == 1 ]] && exit 1;
+        if [[ ! -f "$VAR(./@@)" ]]; then
+            exit 1;
         fi;
     fi
