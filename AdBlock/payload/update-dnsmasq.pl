@@ -24,11 +24,11 @@
 #
 # **** End License ****
 
-my $version = '4.0.beta.111715';
+my $version = '4.0.beta.111815';
 
 use threads;
 use strict;
-
+use Data::Dumper;
 # use Benchmark qw(cmpthese);
 
 use English qw( -no_match_vars );
@@ -48,7 +48,6 @@ use constant TRUE  => 1;
 use constant FALSE => 0;
 
 my $cols        = qx( tput cols );
-my $chk_file    = undef;
 my $disable     = undef;
 my $dnsmasq_svc = '/etc/init.d/dnsmasq';
 my $enable      = undef;
@@ -152,7 +151,7 @@ sub cfg_actv {
 
     for my $area (qw/hosts domains zones/) {
       $config->setLevel("service dns forwarding blacklist $area");
-      $cfg_ref->{$area}->{'blackhole'}
+      $cfg_ref->{$area}->{'dns_redirect_ip'}
         = $config->$returnValue('dns-redirect-ip') // '0.0.0.0';
       $cfg_ref->{$area}->{'blacklist'} = {
         map {
@@ -617,7 +616,7 @@ sub get_web_content {
     ) if exists $data_ref->{'host'};
 
     push( my @content, keys %{ $data_ref->{'data'} } );
-    return scalar(@content) ? { data => \@content } : FALSE;
+    return scalar(@content) ? \@content : [];
   }
 }
 
@@ -630,47 +629,38 @@ sub get_data {
   $cfg_ref->{ $input->{'area'} }->{'records'}
     = $cfg_ref->{ $input->{'area'} }->{'icount'};
 
-  # Feed all the domains from the zones and domains into host's exclude list
-  if (
-    $input->{'area'} eq 'hosts'
-    && ( scalar( keys %{ $cfg_ref->{'domains'}->{'blacklist'} } )
-      || scalar( keys %{ $cfg_ref->{'zones'}->{'blacklist'} } ) )
-    )
-  {
-    push(
-      @{ $cfg_ref->{ $input->{'area'} }->{'exclude'} },
-      [
-        keys %{ $cfg_ref->{'domains'}->{'blacklist'} }
-          = values %{ $cfg_ref->{'domains'}->{'blacklist'} }
-      ],
-      [
-        keys %{ $cfg_ref->{'zones'}->{'blacklist'} }
-          = values %{ $cfg_ref->{'zones'}->{'blacklist'} }
-      ]
-    );
+  # Feed all blacklists from the zones and domains into host's exclude list
+  if ( $input->{'area'} eq 'hosts' ) {
+    for my $area ( qw{domains zones} ) {
+      while ( my ( $key, $value )
+        = each( %{ $cfg_ref->{$area}->{'blacklist'} } ) )
+      {
+        $cfg_ref->{'hosts'}->{'exclude'}->{$key} = $value;
+      }
+    }
   }
 
-  my ( $content_ref, $prefix );
+  my ( @content, $prefix );
   for my $source (@sources) {
-    my @urls = $cfg_ref->{ $input->{'area'} }->{'src'}->{ $input->{'source'} }
-      ->{'url'};
-    my $file = $cfg_ref->{ $input->{'area'} }->{'src'}->{ $input->{'source'} }
-      ->{'file'};
+    my @urls = $cfg_ref->{ $input->{'area'} }->{'src'}->{$source}->{'url'};
+    my $file = $cfg_ref->{ $input->{'area'} }->{'src'}->{$source}->{'file'};
 
     $prefix
-      = $cfg_ref->{ $input->{'area'} }->{'src'}->{ $input->{'source'} }
-      ->{'prefix'} ~~ 'http'
+      = $cfg_ref->{ $input->{'area'} }->{'src'}->{$source}->{'prefix'} ~~ 'http'
       ? qr{(?:(?:http:|https:){1}[/]{1,2})}o
-      : $cfg_ref->{ $input->{'area'} }->{'src'}->{ $input->{'source'} }
-      ->{'prefix'};
+      : $cfg_ref->{ $input->{'area'} }->{'src'}->{$source}->{'prefix'};
 
     if ( scalar(@urls) )
-    {    # create asynchronous threaded web jobs and collect downloaded data
-      $content_ref = get_web_content(
-        { area => $input->{'area'}, prefix => $prefix, urls => @urls } );
+    {    # create asynchronous threaded web data collection jobs
+      push(
+        @content,
+        &get_web_content(
+          { area => $input->{'area'}, prefix => $prefix, urls => \@urls }
+        )
+      );
     }
     elsif ($file) {    # get file data
-      $content_ref = get_file( { file => $file } );
+      push( @content, &get_file( { file => $file } ) );
     }
   }
 
@@ -686,9 +676,9 @@ sub get_data {
     );
     return process_data(
       {
-        data   => \@{$content_ref},
+        area   => $input->{'area'},
         prefix => \$prefix,
-        area   => $input->{'area'}
+        data   => @content,
       }
     );
   }
@@ -708,7 +698,7 @@ sub process_data {
   };
 
 LINE:
-  for my $line ( @{ $input->{'data'} } ) {
+  for my $line ( @{$input->{'data'}} ) {
     next LINE if $line eq q{};
     $line =~ s/$re->{PREFIX}//;
     $line =~ s/$re->{SUFFIX}//;
@@ -824,7 +814,6 @@ sub get_options {
   my @opts = (
     [ q{-f <file>   # load a configuration file},             'f=s'        => \$cfg_file],
     [ q{--debug     # enable verbose debug output},           'debug'      => \$cfg_ref->{'debug'}],
-    [ q{--chkfile   # enable verbose debug output},           'chkfile=s'  => \$chk_file],
     [ q{--default   # use default values for dnsmasq conf},   'default'    => \$default],
     [ q{--disable   # disable dnsmasq blacklists},            'disable'    => \$disable],
     [ q{--enable    # enable dnsmasq blacklists},             'enable'     => \$enable],
@@ -855,16 +844,6 @@ usage( { option => 'cfg_file', exit_code => 1 } )
   if defined($cfg_file)
   and not( -f $cfg_file );
 
-# CLI wants to check if a file exists
-if ($chk_file){
-  if (! -f $chk_file) {
-    say STDERR ("$chk_file does not exist, enter the full path and file name!");
-    exit(1);
-  }
-  else {
-    exit(0);
-  }
-}
 # Start logging
 open( $LH, '>>', $cfg_ref->{'log_file'} )
   or die(q{Cannot open log file - this shouldn't happen!});
