@@ -31,7 +31,6 @@ use strict;
 use Data::Dumper;
 # use Benchmark qw(cmpthese);
 
-use English qw( -no_match_vars );
 use feature qw/switch/;
 use File::Basename;
 use Getopt::Long;
@@ -500,9 +499,12 @@ sub cfg_file {
 sub log_msg {
   my $msg_ref = shift;
   my $date = strftime "%b %e %H:%M:%S %Y", localtime;
-  my $EOL  = "\n" if $cfg_ref->{'debug'};
   return (FALSE)
     unless ( length( $msg_ref->{msg_typ} . $msg_ref->{msg_str} ) > 2 );
+
+  my $EOL = (exists $cfg_ref->{'debug'})
+    ? qq{\n}
+    : q{};
 
   say {$LH} ("$date: $msg_ref->{msg_typ}: $msg_ref->{msg_str}");
   print( "\r", " " x $cols, "\r" ) if $show;
@@ -563,38 +565,70 @@ sub write_file {
   return TRUE;
 }
 
-sub get_web_content {
-  my $input = shift;
+sub get_data {
+  my $input   = shift;
+  my @sources = keys %{ $cfg_ref->{ $input->{'area'} }->{'src'} };
   my @threads;
+  my %content;
+  my $prefix;
+  my $max_thrds = 8;
 
-  for my $url ( @{ $input->{'urls'} } ) {
-    my $max_thrds = 10;
+  $cfg_ref->{ $input->{'area'} }->{'icount'}
+    = scalar( keys %{ $cfg_ref->{ $input->{'area'} }->{'blacklist'} } ) // 0;
+  $cfg_ref->{ $input->{'area'} }->{'records'}
+    = $cfg_ref->{ $input->{'area'} }->{'icount'};
+
+  # Feed all blacklists from the zones and domains into host's exclude list
+  if ( $input->{'area'} eq 'hosts' ) {
+    for my $area (qw{domains zones}) {
+      while ( my ( $key, $value )
+        = each( %{ $cfg_ref->{$area}->{'blacklist'} } ) )
+      {
+        $cfg_ref->{'hosts'}->{'exclude'}->{$key} = $value;
+      }
+    }
+  }
+
+  for my $source (@sources) {
+    my $url       = $cfg_ref->{ $input->{'area'} }->{'src'}->{$source}->{'url' };
+    my $file      = $cfg_ref->{ $input->{'area'} }->{'src'}->{$source}->{'file'};
     my $uri       = new URI($url);
     my $host      = $uri->host;
 
-    log_msg(
-      {
-        msg_typ => 'INFO',
-        msg_str => sprintf(
-          'Downloading %s blacklist from %s', $input->{'area'}, $host
-        )
-      }
-    ) if $show;
+    $prefix
+      = $cfg_ref->{ $input->{'area'} }->{'src'}->{$source}->{'prefix'} ~~ 'http'
+      ? qr{(?:^(?:http:|https:){1}[/]{1,2})}o
+      : $cfg_ref->{ $input->{'area'} }->{'src'}->{$source}->{'prefix'};
 
-    push(
-      @threads,
-      threads->create(
-        { 'context' => 'list', 'exit' => 'thread_only' },
-        \&fetch_url,
+    if ( scalar($url) ) {
+      log_msg(
         {
-          area   => $input->{'area'},
-          host   => $host,
-          prefix => $input->{'prefix'},
-          url    => $url
+          msg_typ => 'INFO',
+          msg_str => sprintf(
+            'Downloading %s blacklist from %s',
+            $input->{'area'}, $host
+          )
         }
-      )
-    );
-    sleep(1) while ( scalar threads->list(threads::running) >= $max_thrds );
+      ) if $show;
+
+      push(
+        @threads,
+        threads->create(
+          { 'context' => 'list', 'exit' => 'thread_only' },
+          \&fetch_url,
+          {
+            area   => $input->{'area'},
+            host   => $host,
+            prefix => $prefix,
+            url    => $url
+          }
+        )
+      );
+      sleep(1) while ( scalar threads->list(threads::running) >= $max_thrds );
+    }
+    elsif ($file) {    # get file data
+      %content = { map { my $key = $_; lc($key) => 1 } &get_file( { file => $file } ) };
+    }
   }
 
   for my $thread (@threads) {
@@ -615,53 +649,9 @@ sub get_web_content {
       }
     ) if exists $data_ref->{'host'};
 
-    push( my @content, keys %{ $data_ref->{'data'} } );
-    return scalar(@content) ? \@content : [];
-  }
-}
-
-sub get_data {
-  my $input   = shift;
-  my @sources = keys %{ $cfg_ref->{ $input->{'area'} }->{'src'} };
-
-  $cfg_ref->{ $input->{'area'} }->{'icount'}
-    = scalar( keys %{ $cfg_ref->{ $input->{'area'} }->{'blacklist'} } ) // 0;
-  $cfg_ref->{ $input->{'area'} }->{'records'}
-    = $cfg_ref->{ $input->{'area'} }->{'icount'};
-
-  # Feed all blacklists from the zones and domains into host's exclude list
-  if ( $input->{'area'} eq 'hosts' ) {
-    for my $area ( qw{domains zones} ) {
-      while ( my ( $key, $value )
-        = each( %{ $cfg_ref->{$area}->{'blacklist'} } ) )
-      {
-        $cfg_ref->{'hosts'}->{'exclude'}->{$key} = $value;
-      }
-    }
-  }
-
-  my ( @content, $prefix );
-  for my $source (@sources) {
-    my @urls = $cfg_ref->{ $input->{'area'} }->{'src'}->{$source}->{'url'};
-    my $file = $cfg_ref->{ $input->{'area'} }->{'src'}->{$source}->{'file'};
-
-    $prefix
-      = $cfg_ref->{ $input->{'area'} }->{'src'}->{$source}->{'prefix'} ~~ 'http'
-      ? qr{(?:(?:http:|https:){1}[/]{1,2})}o
-      : $cfg_ref->{ $input->{'area'} }->{'src'}->{$source}->{'prefix'};
-
-    if ( scalar(@urls) )
-    {    # create asynchronous threaded web data collection jobs
-      push(
-        @content,
-        &get_web_content(
-          { area => $input->{'area'}, prefix => $prefix, urls => \@urls }
-        )
-      );
-    }
-    elsif ($file) {    # get file data
-      push( @content, &get_file( { file => $file } ) );
-    }
+    %content = (keys %content)
+      ? ( %{ $data_ref->{'data'} }, %content )
+      : %{ $data_ref->{'data'} };
   }
 
   if ( $cfg_ref->{ $input->{'area'} }->{'records'} > 0 ) {
@@ -673,12 +663,7 @@ sub get_data {
       }
     );
     return process_data(
-      {
-        area   => $input->{'area'},
-        prefix => \$prefix,
-        data   => @content,
-      }
-    );
+      { area => $input->{'area'}, prefix => $prefix, data => \%content, } );
   }
   else {
     return FALSE;
@@ -691,12 +676,12 @@ sub process_data {
     FQDN => qr{(\b(?:(?![.]|-)[\w-]{1,63}(?<!-)[.]{1})+(?:[a-zA-Z]{2,63})\b)}o,
     LSPACES => qr{^\s+}o,
     RSPACES => qr{\s+$}o,
-    PREFIX  => $input->{'prefix'},
+    PREFIX  => qr{^$input->{'prefix'}},
     SUFFIX  => qr{(?:#.*$|\{.*$|[/[].*$)}o,
   };
 
 LINE:
-  for my $line ( @{$input->{'data'}} ) {
+  for my $line ( keys %{$input->{'data'}} ) {
     next LINE if $line eq q{};
     $line =~ s/$re->{PREFIX}//;
     $line =~ s/$re->{SUFFIX}//;
