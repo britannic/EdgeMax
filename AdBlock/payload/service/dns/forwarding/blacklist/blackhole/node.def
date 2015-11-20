@@ -1,8 +1,0 @@
-type: ipv4, ipv6
-help: Black hole IP for dropping blacklisted hosts
-
-val_help: ipv4net; IP address
-val_help: ipv6net; IPv6 address
-
-default: 0.0.0.0
-
