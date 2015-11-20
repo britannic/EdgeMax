@@ -502,7 +502,7 @@ sub log_msg {
   return (FALSE)
     unless ( length( $msg_ref->{msg_typ} . $msg_ref->{msg_str} ) > 2 );
 
-  my $EOL = (exists $cfg_ref->{'debug'})
+  my $EOL = scalar ($cfg_ref->{'debug'})
     ? qq{\n}
     : q{};
 
@@ -679,6 +679,8 @@ sub process_data {
     PREFIX  => qr{^$input->{'prefix'}},
     SUFFIX  => qr{(?:#.*$|\{.*$|[/[].*$)}o,
   };
+
+  print( "\r", " " x $cols, "\r" ) if $show;
 
 LINE:
   for my $line ( keys %{$input->{'data'}} ) {
@@ -893,6 +895,8 @@ if ( not $cfg_ref->{'disabled'} and not $disable ) {
       );
     }
   }
+  pop(@areas);
+  say(q{}) if (scalar(@areas) == 1); # print a final line feed
 }
 elsif ($enable) {
   log_msg(

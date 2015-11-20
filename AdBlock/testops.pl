@@ -8,7 +8,7 @@ use Data::Dumper;
 use feature qw/switch/;
 no warnings 'experimental::smartmatch';
 
-my $cfg_file = '/Users/Neil/Projects/EdgeMax/AdBlock/config.boot';
+my $cfg_file = '/Users/Neil/EdgeOs/Config.boots/config.boot';
 my $cfg_ref = {
     debug    => 0,
     disabled => 0,
@@ -187,7 +187,7 @@ if ($configured) {
     }
 }
 else {
-    die 'Bugger!'
+    die 'Bugger!';
 }
 print Dumper ( $cfg_ref );
 
@@ -204,4 +204,10 @@ print Dumper ( $cfg_ref );
 # say $domains;
 # say $hosts;
 # say $zones;
+
+my @areas = (qw{neil colin beadle});
+for (@areas) {
+  pop(@areas);
+  if (scalar(@areas) == 1) {say 'It worked';} # print a final line feed
+}
 
