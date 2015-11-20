@@ -500,13 +500,13 @@ sub cfg_file {
 sub log_msg {
   my $msg_ref = shift;
   my $date = strftime "%b %e %H:%M:%S %Y", localtime;
-
+  my $EOL  = "\n" if $cfg_ref->{'debug'};
   return (FALSE)
     unless ( length( $msg_ref->{msg_typ} . $msg_ref->{msg_str} ) > 2 );
 
   say {$LH} ("$date: $msg_ref->{msg_typ}: $msg_ref->{msg_str}");
-  say("$msg_ref->{msg_typ}: $msg_ref->{msg_str}")
-    if $cfg_ref->{'debug'} || $show;
+  print( "\r", " " x $cols, "\r" ) if $show;
+  print ("$msg_ref->{msg_typ}: $msg_ref->{msg_str}$EOL") if $show;
 
   return TRUE;
 }
@@ -663,8 +663,6 @@ sub get_data {
       push( @content, &get_file( { file => $file } ) );
     }
   }
-
-  print( "\r", " " x $cols, "\r" ) if $show;
 
   if ( $cfg_ref->{ $input->{'area'} }->{'records'} > 0 ) {
     log_msg(
