@@ -24,7 +24,7 @@
 #
 # **** End License ****
 
-my $version = '3.23rc1';
+my $version = '3.22rc3';
 
 use threads;
 use strict;
@@ -451,7 +451,7 @@ sub cfg_file {
 
         is_scheduled == TRUE
           ? log_msg(
-          { msg_typ => 'INFO', msg_str => 'Enabled dnsmasq blacklist\n' } )
+          { msg_typ => 'INFO', msg_str => 'Enabled dnsmasq blacklist' } )
           : log_msg(
           {
             msg_typ => 'WARNING',
