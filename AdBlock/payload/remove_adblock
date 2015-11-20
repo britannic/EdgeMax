@@ -1,0 +1,174 @@
+#!/usr/bin/env bash
+# **** License ****
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	See the GNU
+# General Public License for more details.
+#
+# A copy of the GNU General Public License is available as
+# '/usr/share/common-licenses/GPL' in the Debian GNU/Linux distribution
+# or on the World Wide Web at `http://www.gnu.org/copyleft/gpl.html'.
+# You can also obtain it by writing to the Free Software Foundation,
+# Free Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+# MA 02110-1301, USA.
+#
+# Author: Neil Beadle
+# Date: September 2015
+#
+# **** End License ****
+# Remove dnsmasq Blacklist and blacklist blocking from an EdgeMax router
+# Use at your own risk
+#
+set -o errtrace
+
+VERSION="v2.4"
+
+# Uncomment for debugging or syntax checking
+# set -x
+# Syntax check - uncomment for non execution dry run:
+# set -nv
+
+# Make sure script runs as root
+if [[ ${EUID} != 0 ]]
+then
+	echo "This script must be run as root, use: [sudo $(pwd)/ersetup]"
+	exit 1
+fi
+
+# Set up the Vyatta environment
+source /opt/vyatta/etc/functions/script-template
+OPRUN=/opt/vyatta/bin/vyatta-op-cmd-wrapper
+CFGRUN=/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper
+API=/bin/cli-shell-api
+shopt -s expand_aliases
+alias begin="${CFGRUN} begin"
+alias commit="${CFGRUN} commit"
+alias copy="${CFGRUN} copy"
+alias delete="${CFGRUN} delete"
+alias discard="${CFGRUN} discard"
+alias end="${CFGRUN} end"
+alias save="${CFGRUN} save"
+alias set="${CFGRUN} set"
+alias version="${OPRUN} show version"
+
+SHOWVER=$(version | sed 's/$/;/g')
+BUILD=$(echo ${SHOWVER} | awk 'BEGIN {RS=";"} /Build ID:/ {print $3}')
+VER=$(echo ${SHOWVER} | awk 'BEGIN {RS=";"} /Version:/ {print $2}')
+ME="${0##*/} ${VERSION}: "
+ERROR=0
+
+# Make sure we clean up session on deliberate and accidental exits
+atexit ()
+{
+	trap "" ERR
+	end
+	trap - ERR
+}
+trap atexit exit ${?}
+
+# Enable error tracing functionality
+##################################################################
+# Copyright (c): Hilario J. Montoliu <hmontoliu@gmail.com>
+# This program is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the
+# Free Software Foundation; either version 2 of the License, or (at your
+# option) any later version.  See http://www.gnu.org/copyleft/gpl.html for
+# the full text of the license.
+##################################################################
+report_error ()
+{
+	trap "" ERR
+	local ERR=$1 # error status
+	local LINE=$2 # LINENO
+	local FUNCTLINE=$3
+	local CMD="$4"
+	local STACK="$5"
+	echo "==================================================="
+	echo "Error: '${CMD}' exited with status: ${ERR} at line ${LINE}"
+
+	if [ "${STACK}" != "::" ]; then
+		echo -n "	... Error at ${STACK} "
+		[ -z ${FUNCTLINE:=0} ] && echo -n "called at line ${FUNCTLINE}"
+	else
+		echo -n "	... internal debug info from function ${FUNCNAME} (line ${FUNCTLINE})"
+	fi
+	echo
+	echo "==================================================="
+	trap - ERR
+}
+
+trap 'report_error $? ${LINENO} ${BASH_LINENO} "${BASH_COMMAND}" $(printf "::%s" ${FUNCNAME[@]})'  ERR
+# End of error tracing functions
+##################################################################
+
+# Install adblock and bogon support
+delete_adblock_support ()
+{
+	CONFIG="/config/scripts"
+	SCRIPT="update-dnsmasq.pl"
+	OSCRIPT="update-blacklists-dnsmasq.pl"
+	DNSMASQ="/etc/dnsmasq.d"
+	CNFFILE="blacklist.conf"
+	CFGDIR="/opt/vyatta/share/vyatta-cfg/templates/service/dns/forwarding"
+	BLKLIST="blacklist"
+
+	for i in domain host zone
+	do
+		if [[ -f "${DNSMASQ}/${i}.${CNFFILE}" ]]
+		then
+			echo "Removing ${DNSMASQ}/${i}.${CNFFILE}"
+			rm ${DNSMASQ}/${i}.${CNFFILE}
+		fi
+	done
+
+	if [[ -f "${CONFIG}/${SCRIPT}" ]]; then
+		echo "Removing ${SCRIPT} from ${CONFIG}/"
+		rm -f "${CONFIG}/${SCRIPT}"
+	fi
+
+	if [[ -f "${CONFIG}/${OSCRIPT}" ]]; then
+		echo "Removing ${OSCRIPT} from ${CONFIG}/"
+		rm -f "${CONFIG}/${OSCRIPT}"
+	fi
+
+	echo "Opening EdgeMax configuration session..."
+	begin
+
+	echo "Removing Blacklist and task scheduler task for ${SCRIPT}..."
+	delete service dns forwarding blacklist
+	delete system task-scheduler task update_blacklists
+
+	echo "Committing configuration..."
+	commit
+
+	echo "Saving configuration..."
+	save
+
+	echo "Ending configuration session..."
+	end
+
+	echo "Removing blacklist configuration templates for ${SCRIPT}..."
+	[[ -f "${CFGDIR}/${BLKLIST}/" ]] && rm -rf "${CFGDIR}/${BLKLIST}/"
+
+	service dnsmasq restart
+
+	return ${ERROR}
+}
+
+# This is where we run the script using the above functions
+
+if /opt/vyatta/bin/yesno -n 'Do you want to completely remove Blacklist? [y/N]: '
+then
+	if delete_adblock_support
+	then
+		echo 'Blacklist has been completely removed.'
+		exit 0
+	else
+		echo 'There were problems removing Blacklist'
+		exit 1
+	fi
+fi

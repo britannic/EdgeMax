@@ -1,0 +1,241 @@
+#!/usr/bin/env bash
+# **** License ****
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	See the GNU
+# General Public License for more details.
+#
+# A copy of the GNU General Public License is available as
+# '/usr/share/common-licenses/GPL' in the Debian GNU/Linux distribution
+# or on the World Wide Web at `http://www.gnu.org/copyleft/gpl.html'.
+# You can also obtain it by writing to the Free Software Foundation,
+# Free Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+# MA 02110-1301, USA.
+#
+# Author: Neil Beadle
+# Date: September 2015
+#
+# **** End License ****
+# Install dnsmasq BLACKLIST and blacklist blocking onto an EdgeMax router
+# Use at your own risk
+#
+set -o errtrace
+
+VERSION="v2.7"
+
+# Uncomment for debugging or syntax checking
+# set -x
+# Syntax check - uncomment for non execution dry run:
+# set -nv
+
+# Make sure script runs as root
+if [[ ${EUID} != 0 ]]
+then
+	echo "This script must be run as root, use: [sudo $(pwd)/ersetup]"
+	exit 1
+fi
+
+# Set up the Vyatta environment
+source /opt/vyatta/etc/functions/script-template
+OPRUN=/opt/vyatta/bin/vyatta-op-cmd-wrapper
+CFGRUN=/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper
+API=/bin/cli-shell-api
+shopt -s expand_aliases
+alias begin="${CFGRUN} begin"
+alias commit="${CFGRUN} commit"
+alias copy="${CFGRUN} copy"
+alias delete="${CFGRUN} delete"
+alias discard="${CFGRUN} discard"
+alias end="${CFGRUN} end"
+alias save="${CFGRUN} save"
+alias set="${CFGRUN} set"
+alias version="${OPRUN} show version"
+
+SHOWVER=$(version | sed 's/$/;/g')
+BUILD=$(echo ${SHOWVER} | awk 'BEGIN {RS=";"} /Build ID:/ {print $3}')
+VER=$(echo ${SHOWVER} | awk 'BEGIN {RS=";"} /Version:/ {print $2}')
+ME="${0##*/} ${VERSION}: "
+ERROR=0
+
+# Check version and set up environment
+is_version ()
+{
+	# v1.2.0: build 4574253
+	# v1.4.1: build 4648309
+	# v1.5.0: build 4677648
+	# v1.6.0: build 4716006
+	# v1.7.0: build 4783374
+
+	if [[ ${BUILD} > 4716006 ]]	  # Script is only supported on OS v1.6.0 & above
+	then
+		return 0
+	else
+		return 1
+	fi
+}
+
+# Make sure we clean up session on deliberate and accidental exits
+atexit ()
+{
+	trap "" ERR
+	end
+	trap - ERR
+}
+trap atexit exit ${?}
+
+# Enable error tracing functionality
+##########################################################################
+# Copyright (c): Hilario J. Montoliu <hmontoliu@gmail.com>
+# This program is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the
+# Free Software Foundation; either version 2 of the License, or (at your
+# option) any later version.  See http://www.gnu.org/copyleft/gpl.html for
+# the full text of the license.
+##########################################################################
+report_error ()
+{
+	trap "" ERR
+	local ERR=$1 # error status
+	local LINE=$2 # LINENO
+	local FUNCTLINE=$3
+	local CMD="$4"
+	local STACK="$5"
+	echo "==================================================="
+	echo "Error: '${CMD}' exited with status: ${ERR} at line ${LINE}"
+
+	if [ "${STACK}" != "::" ]; then
+		echo -n "	... Error at ${STACK} "
+		[ -z ${FUNCTLINE:=0} ] && echo -n "called at line ${FUNCTLINE}"
+	else
+		echo -n "	... internal debug info from function ${FUNCNAME} (line ${FUNCTLINE})"
+	fi
+	echo
+	echo "==================================================="
+	trap - ERR
+}
+
+trap 'report_error $? ${LINENO} ${BASH_LINENO} "${BASH_COMMAND}" $(printf "::%s" ${FUNCNAME[@]})'  ERR
+# End of error tracing functions
+##################################################################
+
+# Install blacklist support
+install_blacklist_support ()
+{
+	CONFIG='/config/scripts'
+	BLACKLIST='update-dnsmasq.pl'
+	TEMPLATES='/opt/vyatta/share/vyatta-cfg/templates/service/dns'
+	OLDCONF='dnsmasq.blacklist.conf'
+	DNSMASQ='/etc/dnsmasq.d'
+#	WWWDIR="/config/wizard/feature/ADBlock"
+#	GUI="GUI"
+
+	if [[ -f "${DNSMASQ}/${OLDCONF}" ]]
+	then
+		rm -f "${DNSMASQ}/${OLDCONF}"
+	fi
+
+	if [[ ! -d "${CONFIG}" ]]
+	then
+		install -d -o root -g root -m 0755 "${CONFIG}/"
+	fi
+
+	echo "Installing ${BLACKLIST} to ${CONFIG}/"
+	install -o root -g root -m 0755 "${BLACKLIST}" "${CONFIG}/${BLACKLIST}"
+
+#	if [[ ! -d "${WWWDIR}/" ]]
+#	then
+#		install -d -o www-data -g users -m 0755 "${WWWDIR}/"
+#	fi
+
+#	for i in "${GUI}/"*
+#	do
+#		install -o www-data -g users -m 0755 ${i} "${WWWDIR}/"$(basename ${i})
+#	done
+
+	echo "Installing blacklist configuration templates for ${BLACKLIST}..."
+	cp -rf forwarding/ "${TEMPLATES}/"
+
+	echo "Opening EdgeMax configuration session..."
+	begin
+
+	echo "Creating starter blacklists and task scheduler for ${BLACKLIST}..."
+    set service dns forwarding blacklist dns-redirect-ip 192.168.168.1
+    set service dns forwarding blacklist disabled false
+    set service dns forwarding blacklist hosts exclude appleglobal.112.2o7.net
+    set service dns forwarding blacklist hosts exclude freedns.afraid.org
+    set service dns forwarding blacklist hosts exclude cdn.visiblemeasures.com
+    set service dns forwarding blacklist hosts exclude googleadservices.com
+    set service dns forwarding blacklist hosts exclude hb.disney.go.com
+    set service dns forwarding blacklist hosts exclude static.chartbeat.com
+    set service dns forwarding blacklist hosts exclude survey.112.2o7.net
+    set service dns forwarding blacklist hosts include beap.gemini.yahoo.com
+    set service dns forwarding blacklist hosts source hpHosts description 'hpHosts optimized in hosts format'
+    set service dns forwarding blacklist hosts source hpHosts prefix '127.0.0.1'
+    set service dns forwarding blacklist hosts source hpHosts url 'http://hosts-file.net/download/HOSTS-Optimized.txt'
+    set service dns forwarding blacklist hosts source openphish.com description 'OpenPhish automatic phishing detection'
+    set service dns forwarding blacklist hosts source openphish.com prefix 'http'
+    set service dns forwarding blacklist hosts source openphish.com url 'https://openphish.com/feed.txt'
+    set service dns forwarding blacklist hosts source someonewhocares.org description 'Zero based host and domain list'
+    set service dns forwarding blacklist hosts source someonewhocares.org prefix 0.0.0.0
+    set service dns forwarding blacklist hosts source someonewhocares.org url 'http://someonewhocares.org/hosts/zero/'
+    set service dns forwarding blacklist hosts source volkerschatz.com description 'Ad server blacklists'
+    set service dns forwarding blacklist hosts source volkerschatz.com prefix 'http'
+    set service dns forwarding blacklist hosts source volkerschatz.com url 'http://www.volkerschatz.com/net/adpaths'
+    set service dns forwarding blacklist hosts source winhelp2002.mvps.org description 'Zero based host and domain list'
+    set service dns forwarding blacklist hosts source winhelp2002.mvps.org prefix '0.0.0.0 '
+    set service dns forwarding blacklist hosts source winhelp2002.mvps.org url 'http://winhelp2002.mvps.org/hosts.txt'
+    set service dns forwarding blacklist hosts source www.malwaredomainlist.com description '127.0.0.1 based host and domain list'
+    set service dns forwarding blacklist hosts source www.malwaredomainlist.com prefix '127.0.0.1 '
+    set service dns forwarding blacklist hosts source www.malwaredomainlist.com url 'http://www.malwaredomainlist.com/hostslist/hosts.txt'
+    set service dns forwarding blacklist hosts source yoyo.org description 'Fully Qualified Domain Names only - no prefix to strip'
+    set service dns forwarding blacklist hosts source yoyo.org prefix ''
+    set service dns forwarding blacklist hosts source yoyo.org url 'http://pgl.yoyo.org/as/serverlist.php?hostformat=nohtml&showintro=1&mimetype=plaintext'
+    set service dns forwarding blacklist hosts source zeustracker.abuse.ch/compromised description 'abuse.ch ZeuS compromised URL blacklist'
+    set service dns forwarding blacklist hosts source zeustracker.abuse.ch/compromised prefix ''
+    set service dns forwarding blacklist hosts source zeustracker.abuse.ch/compromised url 'https://zeustracker.abuse.ch/blocklist.php?download=compromised'
+    set service dns forwarding blacklist hosts source zeustracker.abuse.ch/hostfile description 'abuse.ch ZeuS blocklist host file'
+    set service dns forwarding blacklist hosts source zeustracker.abuse.ch/hostfile prefix 127.0.0.1
+    set service dns forwarding blacklist hosts source zeustracker.abuse.ch/hostfile url 'https://zeustracker.abuse.ch/blocklist.php?download=hostfile'
+    set service dns forwarding blacklist hosts exclude adobedtm.com
+    set service dns forwarding blacklist hosts exclude coremetrics.com
+    set service dns forwarding blacklist hosts exclude doubleclick.net
+    set service dns forwarding blacklist hosts exclude hulu.com
+    set service dns forwarding blacklist hosts exclude msdn.com
+    set service dns forwarding blacklist domains source malc0de.com description 'List of zones serving malicious executables observed by malc0de.com/database/'
+    set service dns forwarding blacklist domains source malc0de.com prefix 'zone '
+    set service dns forwarding blacklist domains source malc0de.com url 'http://malc0de.com/bl/ZONES'
+    set service dns forwarding blacklist domains include centade.com
+    set system task-scheduler task update_blacklists executable path /config/scripts/update-dnsmasq.pl
+    set system task-scheduler task update_blacklists interval 6h
+
+	echo "Committing configuration..."
+	commit
+
+	echo "Saving configuration..."
+	save
+
+	echo "Ending configuration session..."
+	end
+
+}
+
+# This is where we run the script using the above functions
+
+if is_version
+then
+	echo "${ME}Installing ADBlock and Blacklist blocking dnsmasq support..."
+	if install_blacklist_support
+	then
+		echo "${ME}ADBlock and Blacklist blocking dnsmasq installation succeeded!"
+		echo "Updating dnsmasq configuration..."
+# 		/config/scripts/update-blacklists-dnsmasq.pl -v
+	else
+		echo "${ME}ADBlock and Blacklist blocking dnsmasq installation failed!"
+	fi
+else
+	echo "${ME}Edgemax ${VER} is not supported, upgrade!"
+fi
