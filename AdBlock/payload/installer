@@ -25,7 +25,7 @@
 #
 set -o errtrace
 
-VERSION="v2.7"
+VERSION="v2.8"
 
 # Uncomment for debugging or syntax checking
 # set -x
@@ -165,25 +165,47 @@ install_blacklist_support ()
 	echo "Creating starter blacklists and task scheduler for ${BLACKLIST}..."
     set service dns forwarding blacklist dns-redirect-ip 0.0.0.0
     set service dns forwarding blacklist disabled false
-    set service dns forwarding blacklist hosts exclude apple.com
+    set service dns forwarding blacklist domains exclude adobedtm.com
+    set service dns forwarding blacklist domains exclude apple.com
+    set service dns forwarding blacklist domains exclude coremetrics.com
+    set service dns forwarding blacklist domains exclude doubleclick.net
+    set service dns forwarding blacklist domains exclude google.com
+    set service dns forwarding blacklist domains exclude googleadservices.com
+    set service dns forwarding blacklist domains exclude googleapis.com
+    set service dns forwarding blacklist domains exclude hulu.com
+    set service dns forwarding blacklist domains exclude msdn.com
+    set service dns forwarding blacklist domains exclude paypal.com
+    set service dns forwarding blacklist domains exclude storage.googleapis.com
+    set service dns forwarding blacklist domains include adsrvr.org
+    set service dns forwarding blacklist domains include adtechus.net
+    set service dns forwarding blacklist domains include advertising.com
+    set service dns forwarding blacklist domains include beap.gemini.yahoo.com
+    set service dns forwarding blacklist domains include centade.com
+    set service dns forwarding blacklist domains include doubleclick.net
+    set service dns forwarding blacklist domains include free-counter.co.uk
+    set service dns forwarding blacklist domains include kiosked.com
+    set service dns forwarding blacklist domains source malc0de.com description 'List of zones serving malicious executables observed by malc0de.com/database/'
+    set service dns forwarding blacklist domains source malc0de.com prefix 'zone '
+    set service dns forwarding blacklist domains source malc0de.com url 'http://malc0de.com/bl/ZONES'
     set service dns forwarding blacklist hosts exclude appleglobal.112.2o7.net
     set service dns forwarding blacklist hosts exclude autolinkmaker.itunes.apple.com
     set service dns forwarding blacklist hosts exclude cdn.visiblemeasures.com
     set service dns forwarding blacklist hosts exclude freedns.afraid.org
-    set service dns forwarding blacklist hosts exclude gg.google.com
-    set service dns forwarding blacklist hosts exclude googleadservices.com
     set service dns forwarding blacklist hosts exclude hb.disney.go.com
     set service dns forwarding blacklist hosts exclude static.chartbeat.com
     set service dns forwarding blacklist hosts exclude survey.112.2o7.net
     set service dns forwarding blacklist hosts include beap.gemini.yahoo.com
+#     set service dns forwarding blacklist hosts source hpHosts description 'hpHosts optimized in hosts format'
+#     set service dns forwarding blacklist hosts source hpHosts prefix '127.0.0.1 '
+#     set service dns forwarding blacklist hosts source hpHosts url 'http://hosts-file.net/download/HOSTS-Optimized.txt'
     set service dns forwarding blacklist hosts source openphish.com description 'OpenPhish automatic phishing detection'
-    set service dns forwarding blacklist hosts source openphish.com prefix 'http'
+    set service dns forwarding blacklist hosts source openphish.com prefix http
     set service dns forwarding blacklist hosts source openphish.com url 'https://openphish.com/feed.txt'
     set service dns forwarding blacklist hosts source someonewhocares.org description 'Zero based host and domain list'
     set service dns forwarding blacklist hosts source someonewhocares.org prefix 0.0.0.0
     set service dns forwarding blacklist hosts source someonewhocares.org url 'http://someonewhocares.org/hosts/zero/'
     set service dns forwarding blacklist hosts source volkerschatz.com description 'Ad server blacklists'
-    set service dns forwarding blacklist hosts source volkerschatz.com prefix 'http'
+    set service dns forwarding blacklist hosts source volkerschatz.com prefix http
     set service dns forwarding blacklist hosts source volkerschatz.com url 'http://www.volkerschatz.com/net/adpaths'
     set service dns forwarding blacklist hosts source winhelp2002.mvps.org description 'Zero based host and domain list'
     set service dns forwarding blacklist hosts source winhelp2002.mvps.org prefix '0.0.0.0 '
@@ -194,20 +216,8 @@ install_blacklist_support ()
     set service dns forwarding blacklist hosts source yoyo.org description 'Fully Qualified Domain Names only - no prefix to strip'
     set service dns forwarding blacklist hosts source yoyo.org prefix ''
     set service dns forwarding blacklist hosts source yoyo.org url 'http://pgl.yoyo.org/as/serverlist.php?hostformat=nohtml&showintro=1&mimetype=plaintext'
-    set service dns forwarding blacklist hosts exclude adobedtm.com
-    set service dns forwarding blacklist hosts exclude coremetrics.com
-    set service dns forwarding blacklist hosts exclude doubleclick.net
-    set service dns forwarding blacklist hosts exclude hulu.com
-    set service dns forwarding blacklist hosts exclude msdn.com
-    set service dns forwarding blacklist domains source malc0de.com description 'List of zones serving malicious executables observed by malc0de.com/database/'
-    set service dns forwarding blacklist domains source malc0de.com prefix 'zone '
-    set service dns forwarding blacklist domains source malc0de.com url 'http://malc0de.com/bl/ZONES'
-    set service dns forwarding blacklist domains include centade.com
     set system task-scheduler task update_blacklists executable path /config/scripts/update-dnsmasq.pl
     set system task-scheduler task update_blacklists interval 6h
-#     set service dns forwarding blacklist hosts source hpHosts description 'hpHosts optimized in hosts format'
-#     set service dns forwarding blacklist hosts source hpHosts prefix '127.0.0.1 '
-#     set service dns forwarding blacklist hosts source hpHosts url 'http://hosts-file.net/download/HOSTS-Optimized.txt'
 #     delete service dns forwarding blacklist hosts source zeustracker.abuse.ch/compromised description 'abuse.ch ZeuS compromised URL blacklist'
 #     delete service dns forwarding blacklist hosts source zeustracker.abuse.ch/compromised prefix ''
 #     delete service dns forwarding blacklist hosts source zeustracker.abuse.ch/compromised url 'https://zeustracker.abuse.ch/blocklist.php?download=compromised'

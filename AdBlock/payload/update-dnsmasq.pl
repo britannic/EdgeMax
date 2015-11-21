@@ -24,7 +24,7 @@
 #
 # **** End License ****
 
-my $version = '3.23';
+my $version = '3.24';
 
 use feature qw/switch/;
 use File::Basename;
@@ -52,7 +52,6 @@ my $cfg_ref     = {
   debug    => 0,
   disabled => 0,
   domains  => {
-    blacklist       => {},
     file            => '/etc/dnsmasq.d/domain.blacklist.conf',
     icount          => 0,
     records         => 0,
@@ -61,7 +60,6 @@ my $cfg_ref     = {
     unique          => 0,
   },
   hosts => {
-    blacklist       => {},
     file            => '/etc/dnsmasq.d/host.blacklist.conf',
     icount          => 0,
     records         => 0,
@@ -70,7 +68,6 @@ my $cfg_ref     = {
     unique          => 0,
   },
   zones => {
-    blacklist       => {},
     file            => '/etc/dnsmasq.d/zone.blacklist.conf',
     icount          => 0,
     records         => 0,
@@ -145,7 +142,7 @@ sub cfg_actv {
       $config->setLevel("service dns forwarding blacklist $area");
       $cfg_ref->{$area}->{'dns_redirect_ip'}
         = $config->$returnValue('dns-redirect-ip') // $cfg_ref->{'dns_redirect_ip'};
-      $cfg_ref->{$area}->{'blacklist'} = {
+      $cfg_ref->{$area}->{'blklst'} = {
         map {
           my $element = $_;
           my @domain = split( /[.]/, $element );
@@ -239,7 +236,7 @@ sub cfg_dflt {
   };
 
   # Include our own redirected hosts
-  $cfg_ref->{'hosts'}->{'blacklist'} = {
+  $cfg_ref->{'hosts'}->{'blklst'} = {
     'beap.gemini.yahoo.com' => 'gemini.yahoo.com',
     '.kiosked.com'          => '.kiosked.com'
   };
@@ -252,7 +249,7 @@ sub cfg_dflt {
   $cfg_ref->{'domains'}->{'exclude'} = { 'msdn.com' => 'msdn.com' };
 
   # Include our own redirected domains
-  $cfg_ref->{'domains'}->{'blacklist'} = {
+  $cfg_ref->{'domains'}->{'blklst'} = {
     'coolwebhosts.com' => 'coolwebhosts.com',
     'centade.com'      => 'centade.com',
     'kiosked.com'      => 'kiosked.com'
@@ -362,7 +359,7 @@ sub parse_node {
     }
 
   }
-  return ( $cfg_ref->{'service'}->{'dns'}->{'forwarding'}->{'blacklist'} );
+  return ( $cfg_ref->{'service'}->{'dns'}->{'forwarding'}->{'blklst'} );
 }
 
 sub get_file {
@@ -398,7 +395,7 @@ sub cfg_file {
       $cfg_ref->{$area}->{'dns_redirect_ip'} = $cfg_ref->{'dns_redirect_ip'}
         if !exists( $tmp_ref->{$area}->{'dns-redirect-ip'} );
       $cfg_ref->{$area}->{'exclude'}   = $tmp_ref->{$area}->{'exclude'};
-      $cfg_ref->{$area}->{'blacklist'} = $tmp_ref->{$area}->{'include'};
+      $cfg_ref->{$area}->{'blklst'}    = $tmp_ref->{$area}->{'include'};
       $cfg_ref->{$area}->{'src'}       = $tmp_ref->{$area}->{'source'};
     }
   }
@@ -567,7 +564,7 @@ sub get_data {
   my $max_thrds = 8;
 
   $cfg_ref->{ $input->{'area'} }->{'icount'}
-    = scalar( keys %{ $cfg_ref->{ $input->{'area'} }->{'blacklist'} } ) // 0;
+    = scalar( keys %{ $cfg_ref->{ $input->{'area'} }->{'blklst'} } ) // 0;
   $cfg_ref->{ $input->{'area'} }->{'records'}
     = $cfg_ref->{ $input->{'area'} }->{'icount'};
 
@@ -575,7 +572,12 @@ sub get_data {
   if ( $input->{'area'} eq 'hosts' ) {
     for my $area (qw{domains zones}) {
       while ( my ( $key, $value )
-        = each( %{ $cfg_ref->{$area}->{'blacklist'} } ) )
+        = each( %{ $cfg_ref->{$area}->{'blklst'} } ) )
+      {
+        $cfg_ref->{'hosts'}->{'exclude'}->{$key} = $value;
+      }
+      while ( my ( $key, $value )
+        = each( %{ $cfg_ref->{$area}->{'exclude'} } ) )
       {
         $cfg_ref->{'hosts'}->{'exclude'}->{$key} = $value;
       }
@@ -678,14 +680,14 @@ sub process_data {
 
 LINE:
   for my $line ( keys %{ $input->{'data'} } ) {
-    next LINE if $line eq q{};
+    next LINE if $line eq q{} || ! defined($line);
     $line =~ s/$re->{PREFIX}//;
     $line =~ s/$re->{SUFFIX}//;
     $line =~ s/$re->{LSPACES}//;
     $line =~ s/$re->{RSPACES}//;
 
     my @elements = $line =~ m/$re->{FQDN}/gc;
-    next LINE if scalar(@elements) == 0;
+    next LINE if ! scalar(@elements);
 
     map {
       my $element = $_;
@@ -697,9 +699,10 @@ LINE:
         }
       }
       my $value = join( '.', @domain );
-      $cfg_ref->{ $input->{'area'} }->{'blacklist'}->{$element} = $value
+      $cfg_ref->{ $input->{'area'} }->{'blklst'}->{$element} = $value
         if !exists $cfg_ref->{ $input->{'area'} }->{'exclude'}->{$element}
-        || !exists $cfg_ref->{ $input->{'area'} }->{'exclude'}->{$value};
+        || !exists $cfg_ref->{ $input->{'area'} }->{'exclude'}->{$value}
+        || !exists $cfg_ref->{ $input->{'area'} }->{'blklst'}->{$value};
     } @elements;
     $cfg_ref->{ $input->{'area'} }->{'icount'} += scalar(@elements);
     printf(
@@ -832,7 +835,7 @@ log_msg(
   { msg_typ => 'INFO', msg_str =>, "---+++ blacklist $version +++---" } );
 
 # Make sure localhost is always in the exclusions whitelist
-$cfg_ref->{'hosts'}->{'exclude'}->{'localhost'} = 1;
+$cfg_ref->{'hosts'}->{'exclude'}->{'localhost'} = 'localhost';
 
 # Now choose which data set will define the configuration
 my $cfg_type
@@ -861,14 +864,14 @@ if ( not $cfg_ref->{'disabled'} and not $disable ) {
           target => $cfg_ref->{$area}->{'target'},
           equals => $equals,
           ip     => $cfg_ref->{$area}->{'dns_redirect_ip'},
-          data   => [ sort keys %{ $cfg_ref->{$area}->{'blacklist'} } ],
+          data   => [ sort keys %{ $cfg_ref->{$area}->{'blklst'} } ],
         }
         )
         or die(
         sprintf( "Could not open file: s% $!", $cfg_ref->{$area}->{'file'} ) );
 
       $cfg_ref->{$area}->{'unique'}
-        = scalar( keys %{ $cfg_ref->{$area}->{'blacklist'} } );
+        = scalar( keys %{ $cfg_ref->{$area}->{'blklst'} } );
 
       log_msg(
         {
@@ -908,7 +911,6 @@ elsif ($disable) {
             msg_typ => 'INFO',
             msg_str => sprintf( 'Removing blacklist configuration file %s',
               $cfg_ref->{$area}->{'file'} )
-
           }
         );
 
@@ -918,7 +920,9 @@ elsif ($disable) {
   }
   else {
     log_msg(
-      { msg_typ => 'ERROR', msg_str => 'Unable to disable dnsmasq blacklist!' }
+      {
+        msg_typ => 'ERROR',
+        msg_str => 'Unable to disable dnsmasq blacklist!' }
     );
     exit(1);
   }
@@ -929,10 +933,21 @@ my $cmd
   ? '/opt/vyatta/sbin/vyatta-dns-forwarding.pl --update-dnsforwarding'
   : "$dnsmasq_svc force-reload > /dev/null 2>1&";
 
+log_msg(
+  {
+    msg_typ => 'INFO',
+    msg_str => 'Reloading dnsmasq configuration...'
+  }
+);
+
+# Reload updated dnsmasq conf redirected address files
 qx($cmd);
 
 # Close the log
 close($LH);
+
+# Finish with a linefeed if '-v' is selected
+say(q{});
 
 # Exit normally
 exit(0);
