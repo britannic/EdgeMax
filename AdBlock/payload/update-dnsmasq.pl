@@ -24,20 +24,16 @@
 #
 # **** End License ****
 
-my $version = '3.22rc3';
-
-use threads;
-use strict;
-use Data::Dumper;
-# use Benchmark qw(cmpthese);
+my $version = '3.23';
 
 use feature qw/switch/;
 use File::Basename;
 use Getopt::Long;
-use integer;
 use lib '/opt/vyatta/share/perl5/';
 use LWP::UserAgent;
 use POSIX qw(geteuid strftime);
+use strict;
+use threads;
 use URI;
 use v5.14;
 use Vyatta::Config;
@@ -56,7 +52,6 @@ my $cfg_ref     = {
   debug    => 0,
   disabled => 0,
   domains  => {
-    dns_redirect_ip => '0.0.0.0',
     blacklist       => {},
     file            => '/etc/dnsmasq.d/domain.blacklist.conf',
     icount          => 0,
@@ -66,7 +61,6 @@ my $cfg_ref     = {
     unique          => 0,
   },
   hosts => {
-    dns_redirect_ip => '0.0.0.0',
     blacklist       => {},
     file            => '/etc/dnsmasq.d/host.blacklist.conf',
     icount          => 0,
@@ -76,7 +70,6 @@ my $cfg_ref     = {
     unique          => 0,
   },
   zones => {
-    dns_redirect_ip => '0.0.0.0',
     blacklist       => {},
     file            => '/etc/dnsmasq.d/zone.blacklist.conf',
     icount          => 0,
@@ -151,7 +144,7 @@ sub cfg_actv {
     for my $area (qw/hosts domains zones/) {
       $config->setLevel("service dns forwarding blacklist $area");
       $cfg_ref->{$area}->{'dns_redirect_ip'}
-        = $config->$returnValue('dns-redirect-ip') // '0.0.0.0';
+        = $config->$returnValue('dns-redirect-ip') // $cfg_ref->{'dns_redirect_ip'};
       $cfg_ref->{$area}->{'blacklist'} = {
         map {
           my $element = $_;
@@ -554,12 +547,12 @@ sub write_file {
       msg_str => "Writing dnsmasq configuration data to $input->{'file'}"
     }
   );
-  print {$FH} (
-    map {
-      my $val = $_;
-      $input->{'target'}, $input->{'equals'}, $val, '/', $input->{'ip'}, "\n"
-    } @{ $input->{'data'} }
-  );
+
+  for my $val ( @{ $input->{'data'} } ) {
+    printf {$FH} ("%s%s%s/%s\n"), $input->{'target'}, $input->{'equals'},
+      $val, $input->{'ip'};
+  }
+
   close($FH);
 
   return TRUE;
@@ -634,9 +627,9 @@ sub get_data {
   for my $thread (@threads) {
     my $data_ref = $thread->join();
     my $rec_count
-      = ( exists $data_ref->{'data'} )
-      ? scalar( keys %{ $data_ref->{'data'} } )
-      : 0;
+      = ( !keys( %{ $data_ref->{'data'} } ) )
+      ? 0
+      : scalar( keys %{ $data_ref->{'data'} } );
     $cfg_ref->{ $input->{'area'} }->{'records'} += $rec_count;
 
     log_msg(
@@ -649,7 +642,8 @@ sub get_data {
       }
     ) if exists $data_ref->{'host'};
 
-    %content = (keys %content)
+    %content
+      = ( keys %content )
       ? ( %{ $data_ref->{'data'} }, %content )
       : %{ $data_ref->{'data'} };
   }
@@ -672,7 +666,7 @@ sub get_data {
 
 sub process_data {
   my $input = shift;
-  my $re = {
+  my $re    = {
     FQDN => qr{(\b(?:(?![.]|-)[\w-]{1,63}(?<!-)[.]{1})+(?:[a-zA-Z]{2,63})\b)}o,
     LSPACES => qr{^\s+}o,
     RSPACES => qr{\s+$}o,
@@ -683,7 +677,7 @@ sub process_data {
   print( "\r", " " x $cols, "\r" ) if $show;
 
 LINE:
-  for my $line ( keys %{$input->{'data'}} ) {
+  for my $line ( keys %{ $input->{'data'} } ) {
     next LINE if $line eq q{};
     $line =~ s/$re->{PREFIX}//;
     $line =~ s/$re->{SUFFIX}//;
@@ -691,31 +685,33 @@ LINE:
     $line =~ s/$re->{RSPACES}//;
 
     my @elements = $line =~ m/$re->{FQDN}/gc;
-    my @domain;
+    next LINE if scalar(@elements) == 0;
 
-    if ( scalar(@elements) > 0 ) {
-      map {
-        my $element = $_;
-        @domain = split( /[.]/, $element );
-        if ( $input->{'area'} ne 'domain' ) {
-          given ( scalar(@domain) ) {
-            when ( $_ > 2 ) { shift(@domain); }
-            when ( $_ < 2 ) { unshift( @domain, '.' ); }
-          }
+    map {
+      my $element = $_;
+      my @domain = split( /[.]/, $element );
+      if ( $input->{'area'} ne 'domain' ) {
+        given ( scalar(@domain) ) {
+          when ( $_ > 2 ) { shift(@domain); }
+          when ( $_ < 2 ) { unshift( @domain, '.' ); }
         }
-        my $value = join( '.', @domain );
-        $cfg_ref->{ $input->{'area'} }->{'blacklist'}->{$element} = $value
-          if !exists $cfg_ref->{ $input->{'area'} }->{'exclude'}->{$value};
-      } @elements;
-      printf(
-        "Entries processed: %s %s from: %s lines\r",
-        $cfg_ref->{ $input->{'area'} }->{'icount'} += scalar(@elements),
-        $cfg_ref->{ $input->{'area'} }->{'type'},
-        $cfg_ref->{ $input->{'area'} }->{'records'}
-      ) if $show;
-    }
+      }
+      my $value = join( '.', @domain );
+      $cfg_ref->{ $input->{'area'} }->{'blacklist'}->{$element} = $value
+        if !exists $cfg_ref->{ $input->{'area'} }->{'exclude'}->{$element}
+        || !exists $cfg_ref->{ $input->{'area'} }->{'exclude'}->{$value};
+    } @elements;
+    $cfg_ref->{ $input->{'area'} }->{'icount'} += scalar(@elements);
+    printf(
+      "Entries processed: %s %s from: %s lines\r",
+      $cfg_ref->{ $input->{'area'} }->{'icount'},
+      $cfg_ref->{ $input->{'area'} }->{'type'},
+      $cfg_ref->{ $input->{'area'} }->{'records'}
+    ) if $show;
+
   }
-  if (scalar ($cfg_ref->{ $input->{'area'} }->{'icount'})) {
+
+  if ( scalar( $cfg_ref->{ $input->{'area'} }->{'icount'} ) ) {
     return TRUE;
   }
   else {

@@ -163,9 +163,11 @@ install_blacklist_support ()
 	begin
 
 	echo "Creating starter blacklists and task scheduler for ${BLACKLIST}..."
-    set service dns forwarding blacklist dns-redirect-ip 192.168.168.1
+    set service dns forwarding blacklist dns-redirect-ip 0.0.0.0
     set service dns forwarding blacklist disabled false
+    set service dns forwarding blacklist hosts exclude apple.com
     set service dns forwarding blacklist hosts exclude appleglobal.112.2o7.net
+    set service dns forwarding blacklist hosts exclude autolinkmaker.itunes.apple.com
     set service dns forwarding blacklist hosts exclude cdn.visiblemeasures.com
     set service dns forwarding blacklist hosts exclude freedns.afraid.org
     set service dns forwarding blacklist hosts exclude gg.google.com
@@ -174,9 +176,6 @@ install_blacklist_support ()
     set service dns forwarding blacklist hosts exclude static.chartbeat.com
     set service dns forwarding blacklist hosts exclude survey.112.2o7.net
     set service dns forwarding blacklist hosts include beap.gemini.yahoo.com
-#     set service dns forwarding blacklist hosts source hpHosts description 'hpHosts optimized in hosts format'
-#     set service dns forwarding blacklist hosts source hpHosts prefix '127.0.0.1 '
-#     set service dns forwarding blacklist hosts source hpHosts url 'http://hosts-file.net/download/HOSTS-Optimized.txt'
     set service dns forwarding blacklist hosts source openphish.com description 'OpenPhish automatic phishing detection'
     set service dns forwarding blacklist hosts source openphish.com prefix 'http'
     set service dns forwarding blacklist hosts source openphish.com url 'https://openphish.com/feed.txt'
@@ -195,12 +194,6 @@ install_blacklist_support ()
     set service dns forwarding blacklist hosts source yoyo.org description 'Fully Qualified Domain Names only - no prefix to strip'
     set service dns forwarding blacklist hosts source yoyo.org prefix ''
     set service dns forwarding blacklist hosts source yoyo.org url 'http://pgl.yoyo.org/as/serverlist.php?hostformat=nohtml&showintro=1&mimetype=plaintext'
-    set service dns forwarding blacklist hosts source zeustracker.abuse.ch/compromised description 'abuse.ch ZeuS compromised URL blacklist'
-    set service dns forwarding blacklist hosts source zeustracker.abuse.ch/compromised prefix ''
-    set service dns forwarding blacklist hosts source zeustracker.abuse.ch/compromised url 'https://zeustracker.abuse.ch/blocklist.php?download=compromised'
-    set service dns forwarding blacklist hosts source zeustracker.abuse.ch/hostfile description 'abuse.ch ZeuS blocklist host file'
-    set service dns forwarding blacklist hosts source zeustracker.abuse.ch/hostfile prefix 127.0.0.1
-    set service dns forwarding blacklist hosts source zeustracker.abuse.ch/hostfile url 'https://zeustracker.abuse.ch/blocklist.php?download=hostfile'
     set service dns forwarding blacklist hosts exclude adobedtm.com
     set service dns forwarding blacklist hosts exclude coremetrics.com
     set service dns forwarding blacklist hosts exclude doubleclick.net
@@ -212,6 +205,15 @@ install_blacklist_support ()
     set service dns forwarding blacklist domains include centade.com
     set system task-scheduler task update_blacklists executable path /config/scripts/update-dnsmasq.pl
     set system task-scheduler task update_blacklists interval 6h
+#     set service dns forwarding blacklist hosts source hpHosts description 'hpHosts optimized in hosts format'
+#     set service dns forwarding blacklist hosts source hpHosts prefix '127.0.0.1 '
+#     set service dns forwarding blacklist hosts source hpHosts url 'http://hosts-file.net/download/HOSTS-Optimized.txt'
+#     delete service dns forwarding blacklist hosts source zeustracker.abuse.ch/compromised description 'abuse.ch ZeuS compromised URL blacklist'
+#     delete service dns forwarding blacklist hosts source zeustracker.abuse.ch/compromised prefix ''
+#     delete service dns forwarding blacklist hosts source zeustracker.abuse.ch/compromised url 'https://zeustracker.abuse.ch/blocklist.php?download=compromised'
+#     delete service dns forwarding blacklist hosts source zeustracker.abuse.ch/hostfile description 'abuse.ch ZeuS blocklist host file'
+#     delete service dns forwarding blacklist hosts source zeustracker.abuse.ch/hostfile prefix 127.0.0.1
+#     delete service dns forwarding blacklist hosts source zeustracker.abuse.ch/hostfile url 'https://zeustracker.abuse.ch/blocklist.php?download=hostfile'
 
 	echo "Committing configuration..."
 	commit
