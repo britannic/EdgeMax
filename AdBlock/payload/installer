@@ -189,6 +189,7 @@ install_blacklist_support ()
     set service dns forwarding blacklist domains source malc0de.com prefix 'zone '
     set service dns forwarding blacklist domains source malc0de.com url 'http://malc0de.com/bl/ZONES'
     set service dns forwarding blacklist hosts exclude appleglobal.112.2o7.net
+    set service dns forwarding blacklist hosts exclude c.apple.com
     set service dns forwarding blacklist hosts exclude autolinkmaker.itunes.apple.com
     set service dns forwarding blacklist hosts exclude cdn.visiblemeasures.com
     set service dns forwarding blacklist hosts exclude freedns.afraid.org
