@@ -24,7 +24,7 @@
 #
 # **** End License ****
 
-my $version = '3.24';
+my $version = '3.24a';
 
 use feature qw/switch/;
 use File::Basename;
@@ -701,8 +701,7 @@ LINE:
       my $value = join( '.', @domain );
       $cfg_ref->{ $input->{'area'} }->{'blklst'}->{$element} = $value
         if !exists $cfg_ref->{ $input->{'area'} }->{'exclude'}->{$element}
-        || !exists $cfg_ref->{ $input->{'area'} }->{'exclude'}->{$value}
-        || !exists $cfg_ref->{ $input->{'area'} }->{'blklst'}->{$value};
+        || !exists $cfg_ref->{ $input->{'area'} }->{'exclude'}->{$value};
     } @elements;
     $cfg_ref->{ $input->{'area'} }->{'icount'} += scalar(@elements);
     printf(
