@@ -24,7 +24,7 @@
 #
 # **** End License ****
 
-my $version = '3.24b';
+my $version = '3.24c';
 
 use feature qw/switch/;
 use File::Basename;
@@ -197,8 +197,8 @@ sub cfg_dflt {
   # Default all dns_redirect_ips
   $cfg_ref->{'dns_redirect_ip'} = '0.0.0.0';
   $cfg_ref->{'domains'}->{'dns_redirect_ip'} = '0.0.0.0';
-  $cfg_ref->{'hosts'}->{'dns_redirect_ip'} = '0.0.0.0';
-  $cfg_ref->{'zones'}->{'dns_redirect_ip'} = '0.0.0.0';
+  $cfg_ref->{'hosts'  }->{'dns_redirect_ip'} = '0.0.0.0';
+  $cfg_ref->{'zones'  }->{'dns_redirect_ip'} = '0.0.0.0';
 
   # Sources for blacklisted hosts
   $cfg_ref->{'hosts'}->{'src'} = {
@@ -642,9 +642,9 @@ sub get_data {
   for my $thread (@threads) {
     my $data_ref = $thread->join();
     my $rec_count
-      = ( !keys( %{ $data_ref->{'data'} } ) )
+      = scalar( !keys( %{ $data_ref->{'data'} } ) )
       ? 0
-      : scalar( keys %{ $data_ref->{'data'} } );
+      : scalar(  keys (%{ $data_ref->{'data'} } ) );
     $cfg_ref->{ $input->{'area'} }->{'records'} += $rec_count;
 
     log_msg(
