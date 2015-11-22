@@ -25,8 +25,9 @@
 #
 set -o errtrace
 
-VERSION="v2.4"
-
+VERSION="v2.5"
+ADBLOCKVER=$(cat version)
+ERROR=0
 # Uncomment for debugging or syntax checking
 # set -x
 # Syntax check - uncomment for non execution dry run:
@@ -59,7 +60,6 @@ SHOWVER=$(version | sed 's/$/;/g')
 BUILD=$(echo ${SHOWVER} | awk 'BEGIN {RS=";"} /Build ID:/ {print $3}')
 VER=$(echo ${SHOWVER} | awk 'BEGIN {RS=";"} /Version:/ {print $2}')
 ME="${0##*/} ${VERSION}: "
-ERROR=0
 
 # Make sure we clean up session on deliberate and accidental exits
 atexit ()
@@ -82,6 +82,7 @@ trap atexit exit ${?}
 report_error ()
 {
 	trap "" ERR
+	ERROR=1
 	local ERR=$1 # error status
 	local LINE=$2 # LINENO
 	local FUNCTLINE=$3
@@ -165,10 +166,10 @@ if /opt/vyatta/bin/yesno -n 'Do you want to completely remove Blacklist? [y/N]: 
 then
 	if delete_adblock_support
 	then
-		echo 'Blacklist has been completely removed.'
+		echo 'ADBlock version ${ADBLOCKVER} has been completely removed.'
 		exit 0
 	else
-		echo 'There were problems removing Blacklist'
+		echo "There were problems removing ADBlock version ${ADBLOCKVER}."
 		exit 1
 	fi
 fi

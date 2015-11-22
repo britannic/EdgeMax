@@ -25,8 +25,9 @@
 #
 set -o errtrace
 
-VERSION="v2.8"
-
+VERSION="v2.9"
+ADBLOCKVER=$(cat version)
+ERROR=0
 # Uncomment for debugging or syntax checking
 # set -x
 # Syntax check - uncomment for non execution dry run:
@@ -99,7 +100,8 @@ trap atexit exit ${?}
 report_error ()
 {
 	trap "" ERR
-	local ERR=$1 # error status
+	ERROR=1
+	local ERR=$1  # error status
 	local LINE=$2 # LINENO
 	local FUNCTLINE=$3
 	local CMD="$4"
@@ -188,16 +190,16 @@ install_blacklist_support ()
     set service dns forwarding blacklist domains source malc0de.com url 'http://malc0de.com/bl/ZONES'
     set service dns forwarding blacklist hosts exclude appleglobal.112.2o7.net
     set service dns forwarding blacklist hosts exclude autolinkmaker.itunes.apple.com
-    set service dns forwarding blacklist hosts include beap.gemini.yahoo.com
     set service dns forwarding blacklist hosts exclude cdn.visiblemeasures.com
     set service dns forwarding blacklist hosts exclude freedns.afraid.org
     set service dns forwarding blacklist hosts exclude hb.disney.go.com
+    set service dns forwarding blacklist hosts exclude ads.hulu.com
+    set service dns forwarding blacklist hosts exclude ads-a-darwin.hulu.com
+    set service dns forwarding blacklist hosts exclude ads-v-darwin.hulu.com
+    set service dns forwarding blacklist hosts exclude track.hulu.com
     set service dns forwarding blacklist hosts exclude static.chartbeat.com
     set service dns forwarding blacklist hosts exclude survey.112.2o7.net
     set service dns forwarding blacklist hosts include beap.gemini.yahoo.com
-#     set service dns forwarding blacklist hosts source hpHosts description 'hpHosts optimized in hosts format'
-#     set service dns forwarding blacklist hosts source hpHosts prefix '127.0.0.1 '
-#     set service dns forwarding blacklist hosts source hpHosts url 'http://hosts-file.net/download/HOSTS-Optimized.txt'
     set service dns forwarding blacklist hosts source openphish.com description 'OpenPhish automatic phishing detection'
     set service dns forwarding blacklist hosts source openphish.com prefix http
     set service dns forwarding blacklist hosts source openphish.com url 'https://openphish.com/feed.txt'
@@ -218,6 +220,9 @@ install_blacklist_support ()
     set service dns forwarding blacklist hosts source yoyo.org url 'http://pgl.yoyo.org/as/serverlist.php?hostformat=nohtml&showintro=1&mimetype=plaintext'
     set system task-scheduler task update_blacklists executable path /config/scripts/update-dnsmasq.pl
     set system task-scheduler task update_blacklists interval 6h
+#     set service dns forwarding blacklist hosts source hpHosts description 'hpHosts optimized in hosts format'
+#     set service dns forwarding blacklist hosts source hpHosts prefix '127.0.0.1 '
+#     set service dns forwarding blacklist hosts source hpHosts url 'http://hosts-file.net/download/HOSTS-Optimized.txt'
 #     delete service dns forwarding blacklist hosts source zeustracker.abuse.ch/compromised description 'abuse.ch ZeuS compromised URL blacklist'
 #     delete service dns forwarding blacklist hosts source zeustracker.abuse.ch/compromised prefix ''
 #     delete service dns forwarding blacklist hosts source zeustracker.abuse.ch/compromised url 'https://zeustracker.abuse.ch/blocklist.php?download=compromised'
@@ -234,20 +239,19 @@ install_blacklist_support ()
 	echo "Ending configuration session..."
 	end
 
+	return ${ERROR}
 }
 
 # This is where we run the script using the above functions
-
 if is_version
 then
-	echo "${ME}Installing ADBlock and Blacklist blocking dnsmasq support..."
+	echo "${ME}Installing ADBlock version ${ADBLOCKVER} blocking dnsmasq support..."
 	if install_blacklist_support
 	then
-		echo "${ME}ADBlock and Blacklist blocking dnsmasq installation succeeded!"
+		echo "${ME}ADBlock version ${ADBLOCKVER} installation succeeded!"
 		echo "Updating dnsmasq configuration..."
-# 		/config/scripts/update-blacklists-dnsmasq.pl -v
 	else
-		echo "${ME}ADBlock and Blacklist blocking dnsmasq installation failed!"
+		echo "${ME}ADBlock version ${ADBLOCKVER} installation failed!"
 	fi
 else
 	echo "${ME}Edgemax ${VER} is not supported, upgrade!"

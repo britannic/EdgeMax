@@ -1,0 +1,254 @@
+# UBNT EdgeMax Blacklist and Adware Server Blocking
+https://community.ubnt.com/t5/EdgeMAX/Self-Installer-to-configure-Ad-Server-and-Blacklist-Blocking/td-p/1337892
+
+NOTE: THIS IS NOT OFFICIAL UBIQUITI SOFTWARE AND THEREFORE NOT SUPPORTED OR ENDORSED BY Ubiquiti Networks®
+
+## Overview
+EdgeMax Blacklist and Ad Server Blocking is derived from the received wisdom found at (https://community.ubnt.com/t5/EdgeMAX/bd-p/EdgeMAX)
+
+## Licenses
+* GNU General Public License, version 3
+* GNU Lesser General Public License, version 3
+
+## Features
+* Generates a dnsmasq configuration file that can be used directly by dnsmasq
+* Integrated with the EdgeMax OS CLI
+* Any FQDN in the blacklist will force dnsmasq to return the configured Blackhole IP address
+
+## Compatibility
+* update-dnsmasq.pl has been tested on the EdgeRouter Lite family of routers, version v1.6.0-v1.8.0.
+* Since the EdgeOS is a fork and port of Vyatta 6.3, this script could easily be adapted for work on VyOS and Vyatta derived ports
+
+## Versions
+* v3.24a: Updates include:
+    - 'hosts' exclusions now incorporates 'domains' exclusions and blacklists
+    - Additional 'good hosts' excluded from blacklisting in the supplied install configuration
+    - Fixes excluded FQDNs by using precise matching instead of fuzzy (i.e. 1.domain.tld won't also exclude b1.domain.tld)
+    - Entire blacklist can be disabled using 'set service dns forwarding blacklist disabled true'
+    - Ability to add domain sources, which compile to domain.blacklist.conf allowing for domain wildcards, so that all hosts in a domain will now be blocked
+    - Exclude and include lists have been moved and now apply to their parent area, e.g. 'hosts' or 'domains'
+    - New --disable switch enables ADBlock by setting [set service dns forwarding blacklist enabled false]
+    - New --enable switch enables ADBlock by setting [set service dns forwarding blacklist enabled true]
+    - Now uses multi-threading for simultaneous blacklist downloads
+    - Revamped stream processor, now has ability to extract multiple FQDNs from each line or input
+    - Useragent: HTTP get requests now include browser agent information to prevent website robot rejection
+    - Useragent: HTTP/HTTPS handling uses useragent for improved error/timeout control
+    - Uses own node.def to maintain configuration changes. This also forces the script to run the dnsmasq configuration update after DNS is up during boot time
+
+* 3.22rc1: Updates include:
+    - Fixes excluded FQDNs by using precise matching instead of fuzzy (i.e. 1.domain.tld won't also exclude b1.domain.tld)
+    - New --disable switch enables ADBlock by setting [set service dns forwarding blacklist enabled false]
+    - New --doc switch prints out condensed man page
+    - New --enable switch enables ADBlock by setting [set service dns forwarding blacklist enabled true]
+    - Now uses multi-threading for simultaneous blacklist downloads
+    - Revamped stream processor, now has ability to extract multiple FQDNs from each line or input
+    - Useragent: HTTP get requests now include browser agent information to prevent website robot rejection
+    - Useragent: HTTP/HTTPS handling uses useragent for improved error/timeout control
+    - Uses own node.def to maintain configuration changes. This also forces the script to run the dnsmasq configuration update after DNS is up during boot time
+    - Uses own node.def to maintain configuration changes. This also forces the script to run the dnsmasq configuration update after DNS is up during router boot time
+
+* 3.15: Added features include:
+    - Logging to /var/log/update-blacklists-dnsmasq.log
+    - --debug option: prints status messages
+    - Additional download sources added to the default lists
+    - Added retry logic for download sources that time out (inspired by @mseeEngineer﻿)
+    - Task scheduler update interval is now every 6 hours, as some of the sources change hourly (configure interval using "set system task-scheduler task update_blacklists interval"
+    - Status line retains previous downloads for more detail
+
+* Version 3.12: Fixed bug reported by @soehest﻿ where certain FQDNs were being rejected by the stream processor.
+
+* Version 3.10: Now supports https:// source URLs and improved regex handling in the stream processing engine.
+
+* Version 3.00: No longer requires regex strings, just the line prefix/preamble before the hostname in the download. If a version of ADBlock was installed previously, you will need to select option 2 to remove it and then install this version. This is necessary to ensure the configure paths are correctly set up for the new prefix option which replaces the regex string.
+
+## Installation
+
+To install:
+
+* upload install_adblock.v3.24a.tgz to your router (ensure you modify the command if you want to install an older version)
+    - curl -o /tmp/install_adblock.v3.24a.tgz http://community.ubnt.com/ubnt/attachments/ubnt/EdgeMAX/78132/34/install_adblock.v3.24a.tgz
+    - sudo tar zxvf ./install_adblock.v3.24a.tgz
+    - sudo bash ./install_adblock.v3.24a.tgz
+    - select menu option #1 if installing for the first time
+    - select menu option #2 to completely remove ADBlock if you have a previous version, then run install again using option #1
+
+* Now run configure and make certain your DHCP services don't give out public nameservers, otherwise they will defeat the dnsmasq redirects:
+
+        delete service dhcp-server shared-network-name <YOUR DHCP SERVICE NAME> subnet <YOUR SUBNET> dns-server <PUBLIC NAME SERVER i.e. 8.8.8.8>
+
+* Now make sure EACH of your DHCP services (for the subnets you want to block adverts and malware servers) gives out the router as the only nameserver (LAN1 and the subnet should be replaced with your own system values):
+
+        set service dhcp-server shared-network-name LAN1 subnet 192.168.1.0/24 dns-server 192.168.1.1
+
+* The script has a menu to either add or remove (if previously installed) AdBlock. It will set up the system task scheduler (cron) via the CLI to run "/config/scripts/update-blacklists-dnsmasq.pl" at mindnight local time.
+
+## Post Installation
+Here is the scheduler configuration after running install_adblock:
+
+```python
+    show system task-scheduler
+     task update_blacklists {
+         executable {
+             path /config/scripts/update-blacklists-dnsmasq.pl
+         }
+         interval 6h
+     }
+```
+The script will also install a default blacklist setup, here is the stanza (show service dns forwarding):
+
+```python
+    blacklist {
+        disabled false
+        dns-redirect-ip 0.0.0.0
+        domains {
+            exclude adobedtm.com
+            exclude apple.com
+            exclude coremetrics.com
+            exclude doubleclick.net
+            exclude google.com
+            exclude googleadservices.com
+            exclude googleapis.com
+            exclude hulu.com
+            exclude msdn.com
+            exclude paypal.com
+            exclude storage.googleapis.com
+            include adsrvr.org
+            include adtechus.net
+            include advertising.com
+            include centade.com
+            include doubleclick.net
+            include free-counter.co.uk
+            include kiosked.com
+            source malc0de.com {
+                description "List of zones serving malicious executables observed by malc0de.com/database/"
+                prefix "zone "
+                url http://malc0de.com/bl/ZONES
+            }
+        }
+        hosts {
+            exclude appleglobal.112.2o7.net
+            exclude autolinkmaker.itunes.apple.com
+            exclude cdn.visiblemeasures.com
+            exclude freedns.afraid.org
+            exclude hb.disney.go.com
+            exclude static.chartbeat.com
+            exclude survey.112.2o7.net
+            exclude ads.hulu.com
+            exclude ads-a-darwin.hulu.com
+            exclude ads-v-darwin.hulu.com
+            exclude track.hulu.com
+            include beap.gemini.yahoo.com
+            source openphish.com {
+                description "OpenPhish automatic phishing detection"
+                prefix http
+                url https://openphish.com/feed.txt
+            }
+            source someonewhocares.org {
+                description "Zero based host and domain list"
+                prefix 0.0.0.0
+                url http://someonewhocares.org/hosts/zero/
+            }
+            source volkerschatz.com {
+                description "Ad server blacklists"
+                prefix http
+                url http://www.volkerschatz.com/net/adpaths
+            }
+            source winhelp2002.mvps.org {
+                description "Zero based host and domain list"
+                prefix "0.0.0.0 "
+                url http://winhelp2002.mvps.org/hosts.txt
+            }
+            source www.malwaredomainlist.com {
+                description "127.0.0.1 based host and domain list"
+                prefix "127.0.0.1 "
+                url http://www.malwaredomainlist.com/hostslist/hosts.txt
+            }
+            source yoyo.org {
+                description "Fully Qualified Domain Names only - no prefix to strip"
+                prefix ""
+                url http://pgl.yoyo.org/as/serverlist.php?hostformat=nohtml&showintro=1&mimetype=plaintext
+            }
+        }
+    }
+```
+CLI commands to configure the ADBlock Blacklist:
+
+    set service dns forwarding blacklist dns-redirect-ip 0.0.0.0
+    set service dns forwarding blacklist disabled false
+    set service dns forwarding blacklist domains exclude adobedtm.com
+    set service dns forwarding blacklist domains exclude apple.com
+    set service dns forwarding blacklist domains exclude coremetrics.com
+    set service dns forwarding blacklist domains exclude doubleclick.net
+    set service dns forwarding blacklist domains exclude google.com
+    set service dns forwarding blacklist domains exclude googleadservices.com
+    set service dns forwarding blacklist domains exclude googleapis.com
+    set service dns forwarding blacklist domains exclude hulu.com
+    set service dns forwarding blacklist domains exclude msdn.com
+    set service dns forwarding blacklist domains exclude paypal.com
+    set service dns forwarding blacklist domains exclude storage.googleapis.com
+    set service dns forwarding blacklist domains include adsrvr.org
+    set service dns forwarding blacklist domains include adtechus.net
+    set service dns forwarding blacklist domains include advertising.com
+    set service dns forwarding blacklist domains include centade.com
+    set service dns forwarding blacklist domains include doubleclick.net
+    set service dns forwarding blacklist domains include free-counter.co.uk
+    set service dns forwarding blacklist domains include kiosked.com
+    set service dns forwarding blacklist domains source malc0de.com description 'List of zones serving malicious executables observed by malc0de.com/database/'
+    set service dns forwarding blacklist domains source malc0de.com prefix 'zone '
+    set service dns forwarding blacklist domains source malc0de.com url 'http://malc0de.com/bl/ZONES'
+    set service dns forwarding blacklist hosts exclude appleglobal.112.2o7.net
+    set service dns forwarding blacklist hosts exclude autolinkmaker.itunes.apple.com
+    set service dns forwarding blacklist hosts exclude cdn.visiblemeasures.com
+    set service dns forwarding blacklist hosts exclude freedns.afraid.org
+    set service dns forwarding blacklist hosts exclude hb.disney.go.com
+    set service dns forwarding blacklist hosts exclude ads.hulu.com
+    set service dns forwarding blacklist hosts exclude ads-a-darwin.hulu.com
+    set service dns forwarding blacklist hosts exclude ads-v-darwin.hulu.com
+    set service dns forwarding blacklist hosts exclude track.hulu.com
+    set service dns forwarding blacklist hosts exclude static.chartbeat.com
+    set service dns forwarding blacklist hosts exclude survey.112.2o7.net
+    set service dns forwarding blacklist hosts include beap.gemini.yahoo.com
+    set service dns forwarding blacklist hosts source openphish.com description 'OpenPhish automatic phishing detection'
+    set service dns forwarding blacklist hosts source openphish.com prefix http
+    set service dns forwarding blacklist hosts source openphish.com url 'https://openphish.com/feed.txt'
+    set service dns forwarding blacklist hosts source someonewhocares.org description 'Zero based host and domain list'
+    set service dns forwarding blacklist hosts source someonewhocares.org prefix 0.0.0.0
+    set service dns forwarding blacklist hosts source someonewhocares.org url 'http://someonewhocares.org/hosts/zero/'
+    set service dns forwarding blacklist hosts source volkerschatz.com description 'Ad server blacklists'
+    set service dns forwarding blacklist hosts source volkerschatz.com prefix http
+    set service dns forwarding blacklist hosts source volkerschatz.com url 'http://www.volkerschatz.com/net/adpaths'
+    set service dns forwarding blacklist hosts source winhelp2002.mvps.org description 'Zero based host and domain list'
+    set service dns forwarding blacklist hosts source winhelp2002.mvps.org prefix '0.0.0.0 '
+    set service dns forwarding blacklist hosts source winhelp2002.mvps.org url 'http://winhelp2002.mvps.org/hosts.txt'
+    set service dns forwarding blacklist hosts source www.malwaredomainlist.com description '127.0.0.1 based host and domain list'
+    set service dns forwarding blacklist hosts source www.malwaredomainlist.com prefix '127.0.0.1 '
+    set service dns forwarding blacklist hosts source www.malwaredomainlist.com url 'http://www.malwaredomainlist.com/hostslist/hosts.txt'
+    set service dns forwarding blacklist hosts source yoyo.org description 'Fully Qualified Domain Names only - no prefix to strip'
+    set service dns forwarding blacklist hosts source yoyo.org prefix ''
+    set service dns forwarding blacklist hosts source yoyo.org url 'http://pgl.yoyo.org/as/serverlist.php?hostformat=nohtml&showintro=1&mimetype=plaintext'
+    set system task-scheduler task update_blacklists executable path /config/scripts/update-dnsmasq.pl
+    set system task-scheduler task update_blacklists interval 6h
+
+## Notes:
+In order to make this work properly, you will need to first ensure that your dnsmasq is correctly set up. An example configuration is posted below:
+
+    show service dns forwarding
+     cache-size 2048
+     listen-on eth0
+     listen-on eth2
+     listen-on lo
+     name-server 208.67.220.220
+     name-server 208.67.222.222
+     name-server 2620:0:ccc::2
+     name-server 2620:0:ccd::2
+     options expand-hosts
+     options bogus-priv
+     options localise-queries
+     options domain=ubnt.home
+     options strict-order
+     options listen-address=127.0.0.1
+     system
+
+## Removal
+* sudo bash ./install_adblock.v3.24a
+* select option #2
