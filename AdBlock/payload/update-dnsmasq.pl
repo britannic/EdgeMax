@@ -19,8 +19,8 @@
 #
 # Author: Neil Beadle
 # Date:   November 2015
-# Description: Script for creating dnsmasq configuration files containing zone
-# (domain) and host redirects
+# Description: Script for creating dnsmasq configuration files to redirect dns
+# look ups to alternative IPs (blackholes, pixel servers etc.)
 #
 # **** End License ****
 
@@ -79,47 +79,20 @@ my $cfg_ref     = {
 
 my ( $cfg_file, $default, $LH, $show, );
 
-sub is_cli () {
+############################### script runs here ###############################
+&main();
 
-  qx(/bin/cli-shell-api inSession);
+# Exit normally
+exit(0);
+################################################################################
 
-  return ( $? > 0 ) ? FALSE : TRUE;
-}
-
-sub is_blacklist {
-  my $config = new Vyatta::Config;
-
-  $config->setLevel("service dns forwarding");
-  my $blklst_exists
-    = is_cli()
-    ? $config->exists("blacklist")
-    : $config->existsOrig("blacklist");
-
-  return defined($blklst_exists) ? TRUE : FALSE;
-}
-
-sub is_scheduled {
-  my $schedule_exists;
-
-  if (is_blacklist) {
-    my $config = new Vyatta::Config;
-    $config->setLevel("system task-scheduler task");
-
-    $schedule_exists
-      = is_cli()
-      ? $config->exists("blacklist")
-      : $config->existsOrig("blacklist");
-  }
-
-  return my $bool = defined($schedule_exists) ? TRUE : FALSE;
-}
-
+# Process the active (not committed or saved) configuration
 sub cfg_actv {
   if (is_blacklist) {
     my $config = new Vyatta::Config;
     my ( $listNodes, $returnValue, $returnValues );
 
-    if ( is_cli() ) {
+    if ( is_configure() ) {
       $returnValue  = "returnValue";
       $returnValues = "returnValues";
       $listNodes    = "listNodes";
@@ -193,6 +166,7 @@ sub cfg_actv {
   return (TRUE);
 }
 
+# Load default data for demo and quick testing, not usually called
 sub cfg_dflt {
   # Default all dns_redirect_ips
   $cfg_ref->{'dns_redirect_ip'} = '0.0.0.0';
@@ -271,6 +245,259 @@ sub cfg_dflt {
   return (TRUE);
 }
 
+# Process a configuration file in memory after get_file() loads it
+sub cfg_file {
+  my $tmp_ref
+    = get_nodes( { config_data => get_file( { file => $cfg_file } ) } );
+  my $configured
+    = (  $tmp_ref->{'domains'}->{'source'}
+      || $tmp_ref->{'hosts'  }->{'source'}
+      || $tmp_ref->{'zones'  }->{'source'} ) ? TRUE : FALSE;
+
+  if ($configured) {
+    $cfg_ref->{'dns_redirect_ip'} = $tmp_ref->{'dns-redirect-ip'} // '0.0.0.0';
+    $cfg_ref->{'disabled'}
+      = ( $tmp_ref->{'disabled'} eq 'false' ) ? FALSE : TRUE;
+
+    for my $area (qw/hosts domains zones/) {
+      $cfg_ref->{$area}->{'dns_redirect_ip'} = $cfg_ref->{'dns_redirect_ip'}
+        if !exists( $tmp_ref->{$area}->{'dns-redirect-ip'} );
+      $cfg_ref->{$area}->{'exclude'}   = $tmp_ref->{$area}->{'exclude'};
+      $cfg_ref->{$area}->{'blklst'}    = $tmp_ref->{$area}->{'include'};
+      $cfg_ref->{$area}->{'src'}       = $tmp_ref->{$area}->{'source'};
+    }
+  }
+  else {
+    $cfg_ref->{'debug'} = TRUE;
+    log_msg(
+      {
+        msg_typ => 'ERROR',
+        msg_str =>
+          q{[service dns forwarding blacklist] isn't configured, exiting!}
+      }
+    );
+    return (FALSE);
+  }
+  return (TRUE);
+}
+
+{    # Closure to conserve memory
+# CLI command set
+  my $begin  = '/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper begin';
+  my $commit = '/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper commit';
+  my $delete = '/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper delete';
+  my $end    = '/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper end';
+  my $save   = '/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper save';
+  my $set    = '/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper set';
+
+  # enable blacklist (usually under configure when disabled is set to false)
+  sub enable {
+    my $blacklist_enabled = $cfg_ref->{'disabled'};
+    $cfg_ref->{'debug'} = TRUE;
+
+    if ( not $blacklist_enabled ) {
+      log_msg( { msg_typ => 'INFO', msg_str => 'Enabling blacklist...' } );
+      my @command = (
+        "$begin; ",
+        "$set service dns forwarding blacklist disabled false; ",
+        "$commit; $end"
+      );
+
+      qx(@command 2>&1);
+      if ( $? == 0 ) {
+        $blacklist_enabled = TRUE;
+
+        is_scheduled == TRUE
+          ? log_msg(
+          { msg_typ => 'INFO', msg_str => 'Enabled dnsmasq blacklist' } )
+          : log_msg(
+          {
+            msg_typ => 'WARNING',
+            msg_str =>
+              'blacklist is enabled but has no task-scheduler entry - dnsmasq blacklists will not be dynamically updated!'
+          }
+          );
+      }
+    }
+    return ($blacklist_enabled);
+  }
+
+  # disable blacklist (usually under configure when disabled is set to true)
+  sub disable {
+    my $blacklist_disabled = $cfg_ref->{'disabled'};
+    $cfg_ref->{'debug'} = TRUE;
+
+    if ($blacklist_disabled) {
+
+      log_msg(
+        { msg_typ => 'INFO', msg_str => 'Disabling dnsmasq blacklist' } );
+
+      my @command = (
+        "$begin; ",
+        "$set service dns forwarding blacklist disabled true; ",
+        "$commit; $end"
+      );
+
+      qx(@command 2>&1);
+      if ( $? == 0 ) {
+        $blacklist_disabled = TRUE;
+        log_msg(
+          { msg_typ => 'INFO', msg_str => 'Disabled dnsmasq blacklist' } );
+      }
+    }
+    else {
+      log_msg(
+        { msg_typ => 'INFO', msg_str => 'dnsmasq blacklist already disabled' }
+      );
+      $blacklist_disabled = TRUE;
+    }
+    return ($blacklist_disabled);
+  }
+}    # Closure end
+
+# Determine which type of configuration to get (default, active or saved)
+sub get_config {
+  my $input = shift;
+
+  given ( $input->{'type'} ) {
+    when (/active/)  { return cfg_actv(); }
+    when (/default/) { return cfg_dflt(); }
+    when (/file/)    { return cfg_file(); }
+  }
+
+  return FALSE;
+}
+
+# Get data from files or websites (calls get_file() or get_url())
+sub get_data {
+  my $input   = shift;
+  my @sources = keys %{ $cfg_ref->{ $input->{'area'} }->{'src'} };
+  my @threads;
+  my %content;
+  my $prefix;
+  my $max_thrds = 8;
+
+  $cfg_ref->{ $input->{'area'} }->{'icount'}
+    = scalar( keys %{ $cfg_ref->{ $input->{'area'} }->{'blklst'} } ) // 0;
+  $cfg_ref->{ $input->{'area'} }->{'records'}
+    = $cfg_ref->{ $input->{'area'} }->{'icount'};
+
+  # Feed all blacklists from the zones and domains into host's exclude list
+  if ( $input->{'area'} eq 'hosts' ) {
+    for my $area (qw{domains zones}) {
+      while ( my ( $key, $value )
+        = each( %{ $cfg_ref->{$area}->{'blklst'} } ) )
+      {
+        $cfg_ref->{'hosts'}->{'exclude'}->{$key} = $value;
+      }
+      while ( my ( $key, $value )
+        = each( %{ $cfg_ref->{$area}->{'exclude'} } ) )
+      {
+        $cfg_ref->{'hosts'}->{'exclude'}->{$key} = $value;
+      }
+    }
+  }
+
+  for my $source (@sources) {
+    my $url       = $cfg_ref->{ $input->{'area'} }->{'src'}->{$source}->{'url' };
+    my $file      = $cfg_ref->{ $input->{'area'} }->{'src'}->{$source}->{'file'};
+    my $uri       = new URI($url);
+    my $host      = $uri->host;
+
+    $prefix
+      = $cfg_ref->{ $input->{'area'} }->{'src'}->{$source}->{'prefix'} ~~ 'http'
+      ? qr{(?:^(?:http:|https:){1}[/]{1,2})}o
+      : $cfg_ref->{ $input->{'area'} }->{'src'}->{$source}->{'prefix'};
+
+    if ( scalar($url) ) {
+      log_msg(
+        {
+          msg_typ => 'INFO',
+          msg_str => sprintf(
+            'Downloading %s blacklist from %s',
+            $input->{'area'}, $host
+          )
+        }
+      ) if $show;
+
+      push(
+        @threads,
+        threads->create(
+          { 'context' => 'list', 'exit' => 'thread_only' },
+          \&get_url,
+          {
+            area   => $input->{'area'},
+            host   => $host,
+            prefix => $prefix,
+            url    => $url
+          }
+        )
+      );
+      sleep(1) while ( scalar threads->list(threads::running) >= $max_thrds );
+    }
+    elsif ($file) {    # get file data
+      %content = { map { my $key = $_; lc($key) => 1 } &get_file( { file => $file } ) };
+    }
+  }
+
+  for my $thread (@threads) {
+    my $data_ref = $thread->join();
+    my $rec_count
+      = scalar( !keys( %{ $data_ref->{'data'} } ) )
+      ? 0
+      : scalar(  keys (%{ $data_ref->{'data'} } ) );
+    $cfg_ref->{ $input->{'area'} }->{'records'} += $rec_count;
+
+    log_msg(
+      {
+        msg_typ => 'INFO',
+        msg_str => sprintf(
+          '%s lines downloaded from: %s ',
+          $rec_count, $data_ref->{'host'}
+        )
+      }
+    ) if exists $data_ref->{'host'};
+
+    %content
+      = ( keys %content )
+      ? ( %{ $data_ref->{'data'} }, %content )
+      : %{ $data_ref->{'data'} };
+  }
+
+  if ( $cfg_ref->{ $input->{'area'} }->{'records'} > 0 ) {
+    log_msg(
+      {
+        msg_typ => 'INFO',
+        msg_str => sprintf( 'Received %s total records',
+          $cfg_ref->{ $input->{'area'} }->{'records'} )
+      }
+    );
+    return process_data(
+      { area => $input->{'area'}, prefix => $prefix, data => \%content, } );
+  }
+  else {
+    return FALSE;
+  }
+}
+
+# Read a file into memory and return the data to the calling function
+sub get_file {
+  my $input = shift;
+  my @data;
+
+  if ( exists $input->{'file'} ) {
+    open( my $CF, '<', $input->{'file'} )
+      or die "ERROR: Unable to open $input->{'file'}: $!";
+    chomp( @data = <$CF> );
+    close($CF);
+    return \@data;
+  }
+  else {
+    return FALSE;
+  }
+}
+
+# Build hashes from the configuration file data (called by get_nodes())
 sub get_hash {
   my $input    = shift;
   my $hash     = \$input->{'hash_ref'};
@@ -287,7 +514,8 @@ sub get_hash {
   return $hash_ref;
 }
 
-sub parse_node {
+# Process a configure file and extract the blacklist data set
+sub get_nodes {
   my $input = shift;
   my ( @hasher, @nodes );
   my $cfg_ref = {};
@@ -375,148 +603,28 @@ sub parse_node {
   return ( $cfg_ref->{'service'}->{'dns'}->{'forwarding'}->{'blacklist'} );
 }
 
-sub get_file {
+# Set up command line options
+sub get_options {
   my $input = shift;
-  my @data;
-
-  if ( exists $input->{'file'} ) {
-    open( my $CF, '<', $input->{'file'} )
-      or die "ERROR: Unable to open $input->{'file'}: $!";
-    chomp( @data = <$CF> );
-    close($CF);
-    return \@data;
-  }
-  else {
-    return FALSE;
-  }
-}
-
-sub cfg_file {
-  my $tmp_ref
-    = parse_node( { config_data => get_file( { file => $cfg_file } ) } );
-  my $configured
-    = (  $tmp_ref->{'domains'}->{'source'}
-      || $tmp_ref->{'hosts'  }->{'source'}
-      || $tmp_ref->{'zones'  }->{'source'} ) ? TRUE : FALSE;
-
-  if ($configured) {
-    $cfg_ref->{'dns_redirect_ip'} = $tmp_ref->{'dns-redirect-ip'} // '0.0.0.0';
-    $cfg_ref->{'disabled'}
-      = ( $tmp_ref->{'disabled'} eq 'false' ) ? FALSE : TRUE;
-
-    for my $area (qw/hosts domains zones/) {
-      $cfg_ref->{$area}->{'dns_redirect_ip'} = $cfg_ref->{'dns_redirect_ip'}
-        if !exists( $tmp_ref->{$area}->{'dns-redirect-ip'} );
-      $cfg_ref->{$area}->{'exclude'}   = $tmp_ref->{$area}->{'exclude'};
-      $cfg_ref->{$area}->{'blklst'}    = $tmp_ref->{$area}->{'include'};
-      $cfg_ref->{$area}->{'src'}       = $tmp_ref->{$area}->{'source'};
-    }
-  }
-  else {
-    $cfg_ref->{'debug'} = TRUE;
-    log_msg(
-      {
-        msg_typ => 'ERROR',
-        msg_str =>
-          q{[service dns forwarding blacklist] isn't configured, exiting!}
-      }
+  my @opts = (
+    [ q{-f <file>   # load a configuration file},             'f=s'        => \$cfg_file],
+    [ q{--debug     # enable verbose debug output},           'debug'      => \$cfg_ref->{'debug'}],
+    [ q{--default   # use default values for dnsmasq conf},   'default'    => \$default],
+    [ q{--disable   # disable dnsmasq blacklists},            'disable'    => \$disable],
+    [ q{--enable    # enable dnsmasq blacklists},             'enable'     => \$enable],
+    [ q{--help      # show help and usage text},              'help'       => sub {usage({ option => 'help', exit_code => 0} )}],
+    [ q{-v          # verbose (outside configure session)},   'v'          => \$show],
+    [ q{--version   # show program version number},           'version'    => sub {usage({ option => 'version', exit_code => 0} )}],
     );
-    return (FALSE);
-  }
-  return (TRUE);
+
+  return \@opts if $input->{'option'};
+
+  # Read command line flags and exit with help message if any are unknown
+  return GetOptions( map { (@$_)[ 1 .. $#$_ ] } @opts );
 }
 
-{    # Closure to conserve memory
-
-# CLI command set
-  my $begin  = '/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper begin';
-  my $commit = '/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper commit';
-  my $delete = '/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper delete';
-  my $end    = '/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper end';
-  my $save   = '/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper save';
-  my $set    = '/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper set';
-
-  sub enable {
-    my $blacklist_enabled = $cfg_ref->{'disabled'};
-    $cfg_ref->{'debug'} = TRUE;
-
-    if ( not $blacklist_enabled ) {
-      log_msg( { msg_typ => 'INFO', msg_str => 'Enabling blacklist...' } );
-      my @command = (
-        "$begin; ",
-        "$set service dns forwarding blacklist disabled false; ",
-        "$commit; $end"
-      );
-
-      qx(@command 2>&1);
-      if ( $? == 0 ) {
-        $blacklist_enabled = TRUE;
-
-        is_scheduled == TRUE
-          ? log_msg(
-          { msg_typ => 'INFO', msg_str => 'Enabled dnsmasq blacklist' } )
-          : log_msg(
-          {
-            msg_typ => 'WARNING',
-            msg_str =>
-              'blacklist is enabled but has no task-scheduler entry - dnsmasq blacklists will not be dynamically updated!'
-          }
-          );
-      }
-    }
-    return ($blacklist_enabled);
-  }
-
-  sub disable {
-    my $blacklist_disabled = $cfg_ref->{'disabled'};
-    $cfg_ref->{'debug'} = TRUE;
-
-    if ($blacklist_disabled) {
-
-      log_msg(
-        { msg_typ => 'INFO', msg_str => 'Disabling dnsmasq blacklist' } );
-
-      my @command = (
-        "$begin; ",
-        "$set service dns forwarding blacklist disabled true; ",
-        "$commit; $end"
-      );
-
-      qx(@command 2>&1);
-      if ( $? == 0 ) {
-        $blacklist_disabled = TRUE;
-        log_msg(
-          { msg_typ => 'INFO', msg_str => 'Disabled dnsmasq blacklist' } );
-      }
-    }
-    else {
-      log_msg(
-        { msg_typ => 'INFO', msg_str => 'dnsmasq blacklist already disabled' }
-      );
-      $blacklist_disabled = TRUE;
-    }
-    return ($blacklist_disabled);
-  }
-}    # Closure end
-
-sub log_msg {
-  my $msg_ref = shift;
-  my $date = strftime "%b %e %H:%M:%S %Y", localtime;
-  return (FALSE)
-    unless ( length( $msg_ref->{msg_typ} . $msg_ref->{msg_str} ) > 2 );
-
-  my $EOL = scalar ($cfg_ref->{'debug'})
-    ? qq{\n}
-    : q{};
-
-  say {$LH} ("$date: $msg_ref->{msg_typ}: $msg_ref->{msg_str}");
-  print( "\r", " " x $cols, "\r" ) if $show;
-  print ("$msg_ref->{msg_typ}: $msg_ref->{msg_str}$EOL") if $show;
-
-  return TRUE;
-}
-
-sub fetch_url {
+# Get lists from web servers
+sub get_url {
   my $input = shift;
   my $ua    = LWP::UserAgent->new;
   $ua->agent(
@@ -542,143 +650,208 @@ sub fetch_url {
   return $get->is_success ? $data_ref : FALSE;
 }
 
+# Check to see if blacklist is configured
+sub is_blacklist {
+  my $config = new Vyatta::Config;
+
+  $config->setLevel("service dns forwarding");
+  my $blklst_exists
+    = is_configure()
+    ? $config->exists("blacklist")
+    : $config->existsOrig("blacklist");
+
+  return defined($blklst_exists) ? TRUE : FALSE;
+}
+
+# Check to see if we are being run under configure
+sub is_configure () {
+
+  qx(/bin/cli-shell-api inSession);
+
+  return ( $? > 0 ) ? FALSE : TRUE;
+}
+
+# Check to see if the script is scheduled
+sub is_scheduled {
+  my $schedule_exists;
+
+  if (is_blacklist) {
+    my $config = new Vyatta::Config;
+    $config->setLevel("system task-scheduler task");
+
+    $schedule_exists
+      = is_configure()
+      ? $config->exists("blacklist")
+      : $config->existsOrig("blacklist");
+  }
+
+  return my $bool = defined($schedule_exists) ? TRUE : FALSE;
+}
+
 # Make sure script runs as root
 sub is_sudo {
   return (TRUE) if geteuid() == 0;
   return (FALSE);
 }
 
-sub write_file {
-  my $input = shift;
-  open( my $FH, '>', $input->{'file'} ) or return FALSE;
-  log_msg(
-    {
-      msg_typ => 'INFO',
-      msg_str => "Writing dnsmasq configuration data to $input->{'file'}"
-    }
-  );
+# Log and print (if -v or debug)
+sub log_msg {
+  my $msg_ref = shift;
+  my $date = strftime "%b %e %H:%M:%S %Y", localtime;
+  return (FALSE)
+    unless ( length( $msg_ref->{msg_typ} . $msg_ref->{msg_str} ) > 2 );
 
-  for my $val ( @{ $input->{'data'} } ) {
-    printf {$FH} ("%s%s%s/%s\n"), $input->{'target'}, $input->{'equals'},
-      $val, $input->{'ip'};
-  }
+  my $EOL = scalar ($cfg_ref->{'debug'})
+    ? qq{\n}
+    : q{};
 
-  close($FH);
+  say {$LH} ("$date: $msg_ref->{msg_typ}: $msg_ref->{msg_str}");
+  print( "\r", " " x $cols, "\r" ) if $show;
+  print ("$msg_ref->{msg_typ}: $msg_ref->{msg_str}$EOL") if $show;
 
   return TRUE;
 }
 
-sub get_data {
-  my $input   = shift;
-  my @sources = keys %{ $cfg_ref->{ $input->{'area'} }->{'src'} };
-  my @threads;
-  my %content;
-  my $prefix;
-  my $max_thrds = 8;
+# This is the main function
+sub main() {
+  get_options() || usage( { option => 'help', exit_code => 1 } );
 
-  $cfg_ref->{ $input->{'area'} }->{'icount'}
-    = scalar( keys %{ $cfg_ref->{ $input->{'area'} }->{'blklst'} } ) // 0;
-  $cfg_ref->{ $input->{'area'} }->{'records'}
-    = $cfg_ref->{ $input->{'area'} }->{'icount'};
+  # Find reasons to quit
+  usage( { option => 'sudo', exit_code => 1 } ) if not is_sudo;
+  usage( { option => 'enable', exit_code => 1 } )
+    if defined($enable)
+    and defined($disable);
+  usage( { option => 'default', exit_code => 1 } )
+    if defined($default)
+    and defined($cfg_file);
+  usage( { option => 'cfg_file', exit_code => 1 } )
+    if defined($cfg_file)
+    and not( -f $cfg_file );
 
-  # Feed all blacklists from the zones and domains into host's exclude list
-  if ( $input->{'area'} eq 'hosts' ) {
-    for my $area (qw{domains zones}) {
-      while ( my ( $key, $value )
-        = each( %{ $cfg_ref->{$area}->{'blklst'} } ) )
-      {
-        $cfg_ref->{'hosts'}->{'exclude'}->{$key} = $value;
+  # Start logging
+  open( $LH, '>>', $cfg_ref->{'log_file'} )
+    or die(q{Cannot open log file - this shouldn't happen!});
+  log_msg(
+    { msg_typ => 'INFO', msg_str =>, "---+++ blacklist $version +++---" } );
+
+  # Make sure localhost is always in the exclusions whitelist
+  $cfg_ref->{'hosts'}->{'exclude'}->{'localhost'} = 'localhost';
+
+  # Now choose which data set will define the configuration
+  my $cfg_type
+    = defined($default) ? 'default' : defined($cfg_file) ? 'file' : 'active';
+
+  exit(1) unless get_config( { type => $cfg_type } );
+
+  # Now proceed if blacklist is enabled
+  if ( not $cfg_ref->{'disabled'} and not $disable ) {
+    my @areas;
+
+    # Add areas to process only if they contain sources
+    for my $area (qw/domains zones hosts/) {
+      push( @areas, $area )
+        if ( scalar( keys %{ $cfg_ref->{$area}->{'src'} } ) );
+    }
+
+    for my $area (@areas) {
+
+      get_data( { area => $area } );
+
+      if ( $cfg_ref->{$area}->{'icount'} > 0 ) {
+        my $equals = ( $area ne 'domains' ) ? '=/' : '=/.';
+        write_file(
+          {
+            file   => $cfg_ref->{$area}->{'file'},
+            target => $cfg_ref->{$area}->{'target'},
+            equals => $equals,
+            ip     => $cfg_ref->{$area}->{'dns_redirect_ip'},
+            data   => [ sort keys %{ $cfg_ref->{$area}->{'blklst'} } ],
+          }
+          )
+          or die(
+          sprintf( "Could not open file: s% $!", $cfg_ref->{$area}->{'file'} )
+          );
+
+        $cfg_ref->{$area}->{'unique'}
+          = scalar( keys %{ $cfg_ref->{$area}->{'blklst'} } );
+
+        log_msg(
+          {
+            msg_typ => 'INFO',
+            msg_str => sprintf(
+              'Compiled: %s (unique %s), %s (processed) from %s (source lines)',
+              $cfg_ref->{$area}->{'unique'}, $cfg_ref->{$area}->{'type'},
+              $cfg_ref->{$area}->{'icount'}, $cfg_ref->{$area}->{'records'}
+            )
+          }
+        );
       }
-      while ( my ( $key, $value )
-        = each( %{ $cfg_ref->{$area}->{'exclude'} } ) )
-      {
-        $cfg_ref->{'hosts'}->{'exclude'}->{$key} = $value;
+      else {
+        # Get outta here if no records returned from any area
+        log_msg(
+          {
+            msg_typ => 'ERROR',
+            msg_str => 'Zero source records returned from $area!'
+          }
+        );
       }
     }
+    pop(@areas);
+    say(q{})
+      if ( scalar(@areas) == 1 )
+      && ( $show || $cfg_ref->{'debug'} );    # print a final line feed
   }
+  elsif ($enable) {
+    log_msg(
+      { msg_typ => 'ERROR', msg_str => 'Unable to enable dnsmasq blacklist!' } )
+      unless enable();
+  }
+  elsif ($disable) {
+    if ( disable() or $cfg_ref->{'disabled'} ) {
+      for my $area (qw{domains hosts zones}) {
+        if ( -f "$cfg_ref->{$area}->{file}" ) {
+          log_msg(
+            {
+              msg_typ => 'INFO',
+              msg_str => sprintf( 'Removing blacklist configuration file %s',
+                $cfg_ref->{$area}->{'file'} )
+            }
+          );
 
-  for my $source (@sources) {
-    my $url       = $cfg_ref->{ $input->{'area'} }->{'src'}->{$source}->{'url' };
-    my $file      = $cfg_ref->{ $input->{'area'} }->{'src'}->{$source}->{'file'};
-    my $uri       = new URI($url);
-    my $host      = $uri->host;
-
-    $prefix
-      = $cfg_ref->{ $input->{'area'} }->{'src'}->{$source}->{'prefix'} ~~ 'http'
-      ? qr{(?:^(?:http:|https:){1}[/]{1,2})}o
-      : $cfg_ref->{ $input->{'area'} }->{'src'}->{$source}->{'prefix'};
-
-    if ( scalar($url) ) {
+          unlink("$cfg_ref->{$area}->{file}");
+        }
+      }
+    }
+    else {
       log_msg(
         {
-          msg_typ => 'INFO',
-          msg_str => sprintf(
-            'Downloading %s blacklist from %s',
-            $input->{'area'}, $host
-          )
+          msg_typ => 'ERROR',
+          msg_str => 'Unable to disable dnsmasq blacklist!'
         }
-      ) if $show;
-
-      push(
-        @threads,
-        threads->create(
-          { 'context' => 'list', 'exit' => 'thread_only' },
-          \&fetch_url,
-          {
-            area   => $input->{'area'},
-            host   => $host,
-            prefix => $prefix,
-            url    => $url
-          }
-        )
       );
-      sleep(1) while ( scalar threads->list(threads::running) >= $max_thrds );
-    }
-    elsif ($file) {    # get file data
-      %content = { map { my $key = $_; lc($key) => 1 } &get_file( { file => $file } ) };
+      exit(1);
     }
   }
 
-  for my $thread (@threads) {
-    my $data_ref = $thread->join();
-    my $rec_count
-      = scalar( !keys( %{ $data_ref->{'data'} } ) )
-      ? 0
-      : scalar(  keys (%{ $data_ref->{'data'} } ) );
-    $cfg_ref->{ $input->{'area'} }->{'records'} += $rec_count;
+  my $cmd
+    = is_configure()
+    ? '/opt/vyatta/sbin/vyatta-dns-forwarding.pl --update-dnsforwarding'
+    : "$dnsmasq_svc force-reload > /dev/null 2>1&";
 
-    log_msg(
-      {
-        msg_typ => 'INFO',
-        msg_str => sprintf(
-          '%s lines downloaded from: %s ',
-          $rec_count, $data_ref->{'host'}
-        )
-      }
-    ) if exists $data_ref->{'host'};
+  log_msg(
+    { msg_typ => 'INFO', msg_str => 'Reloading dnsmasq configuration...' } );
 
-    %content
-      = ( keys %content )
-      ? ( %{ $data_ref->{'data'} }, %content )
-      : %{ $data_ref->{'data'} };
-  }
+  # Reload updated dnsmasq conf redirected address files
+  qx($cmd);
 
-  if ( $cfg_ref->{ $input->{'area'} }->{'records'} > 0 ) {
-    log_msg(
-      {
-        msg_typ => 'INFO',
-        msg_str => sprintf( 'Received %s total records',
-          $cfg_ref->{ $input->{'area'} }->{'records'} )
-      }
-    );
-    return process_data(
-      { area => $input->{'area'}, prefix => $prefix, data => \%content, } );
-  }
-  else {
-    return FALSE;
-  }
+  # Close the log
+  close($LH);
+
+  # Finish with a linefeed if '-v' or debug is selected
+  say(q{}) if $show || $cfg_ref->{'debug'};
 }
 
+# Crunch the data and throw anything we don't need
 sub process_data {
   my $input = shift;
   my $re    = {
@@ -734,18 +907,7 @@ LINE:
   }
 }
 
-sub get_config {
-  my $input = shift;
-
-  for ( $input->{'type'} ) {
-    /active/  and return cfg_actv();
-    /default/ and return cfg_dflt();
-    /file/    and return cfg_file();
-  }
-
-  return FALSE;
-}
-
+# Process command line options and print usage
 sub usage {
   my $input = shift;
   my $usage = {
@@ -805,162 +967,23 @@ sub usage {
   $usage->{ $input->{'option'} }->( $input->{'exit_code'} );
 }
 
-sub get_options {
+# Write the data to file
+sub write_file {
   my $input = shift;
-  my @opts = (
-    [ q{-f <file>   # load a configuration file},             'f=s'        => \$cfg_file],
-    [ q{--debug     # enable verbose debug output},           'debug'      => \$cfg_ref->{'debug'}],
-    [ q{--default   # use default values for dnsmasq conf},   'default'    => \$default],
-    [ q{--disable   # disable dnsmasq blacklists},            'disable'    => \$disable],
-    [ q{--enable    # enable dnsmasq blacklists},             'enable'     => \$enable],
-    [ q{--help      # show help and usage text},              'help'       => sub {usage({ option => 'help', exit_code => 0} )}],
-    [ q{-v          # verbose (outside configure session)},   'v'          => \$show],
-    [ q{--version   # show program version number},           'version'    => sub {usage({ option => 'version', exit_code => 0} )}],
-    );
-
-  return \@opts if $input->{'option'};
-
-  # Read command line flags and exit with help message if any are unknown
-  return GetOptions( map { (@$_)[ 1 .. $#$_ ] } @opts );
-
-}
-############################### script runs here ###############################
-
-get_options() || usage( { option => 'help', exit_code => 1 } );
-
-# Find reasons to quit
-usage( { option => 'sudo', exit_code => 1 } ) if not is_sudo;
-usage( { option => 'enable', exit_code => 1 } )
-  if defined($enable)
-  and defined($disable);
-usage( { option => 'default', exit_code => 1 } )
-  if defined($default)
-  and defined($cfg_file);
-usage( { option => 'cfg_file', exit_code => 1 } )
-  if defined($cfg_file)
-  and not( -f $cfg_file );
-
-# Start logging
-open( $LH, '>>', $cfg_ref->{'log_file'} )
-  or die(q{Cannot open log file - this shouldn't happen!});
-log_msg(
-  { msg_typ => 'INFO', msg_str =>, "---+++ blacklist $version +++---" } );
-
-# Make sure localhost is always in the exclusions whitelist
-$cfg_ref->{'hosts'}->{'exclude'}->{'localhost'} = 'localhost';
-
-# Now choose which data set will define the configuration
-my $cfg_type
-  = defined($default) ? 'default' : defined($cfg_file) ? 'file' : 'active';
-
-exit(1) unless get_config( { type => $cfg_type } );
-
-# Now proceed if blacklist is enabled
-if ( not $cfg_ref->{'disabled'} and not $disable ) {
-  my @areas;
-
-  # Add areas to process only if they contain sources
-  for my $area (qw/domains zones hosts/) {
-    push( @areas, $area ) if ( scalar( keys %{ $cfg_ref->{$area}->{'src'} } ) );
-  }
-
-  for my $area (@areas) {
-
-    get_data( { area => $area } );
-
-    if ( $cfg_ref->{$area}->{'icount'} > 0 ) {
-      my $equals = ( $area ne 'domains' ) ? '=/' : '=/.';
-      write_file(
-        {
-          file   => $cfg_ref->{$area}->{'file'},
-          target => $cfg_ref->{$area}->{'target'},
-          equals => $equals,
-          ip     => $cfg_ref->{$area}->{'dns_redirect_ip'},
-          data   => [ sort keys %{ $cfg_ref->{$area}->{'blklst'} } ],
-        }
-        )
-        or die(
-        sprintf( "Could not open file: s% $!", $cfg_ref->{$area}->{'file'} ) );
-
-      $cfg_ref->{$area}->{'unique'}
-        = scalar( keys %{ $cfg_ref->{$area}->{'blklst'} } );
-
-      log_msg(
-        {
-          msg_typ => 'INFO',
-          msg_str => sprintf(
-            'Compiled: %s (unique %s), %s (processed) from %s (source lines)',
-            $cfg_ref->{$area}->{'unique'}, $cfg_ref->{$area}->{'type'},
-            $cfg_ref->{$area}->{'icount'}, $cfg_ref->{$area}->{'records'}
-          )
-        }
-      );
-    }
-    else {
-      # Get outta here if no records returned from any area
-      log_msg(
-        {
-          msg_typ => 'ERROR',
-          msg_str => 'Zero source records returned from $area!'
-        }
-      );
-    }
-  }
-  pop(@areas);
-  say(q{}) if (scalar(@areas) == 1) && ($show || $cfg_ref->{'debug'}); # print a final line feed
-}
-elsif ($enable) {
+  open( my $FH, '>', $input->{'file'} ) or return FALSE;
   log_msg(
-    { msg_typ => 'ERROR', msg_str => 'Unable to enable dnsmasq blacklist!' } )
-    unless enable();
-}
-elsif ($disable) {
-  if ( disable() or $cfg_ref->{'disabled'} ) {
-    for my $area (qw{domains hosts zones}) {
-      if ( -f "$cfg_ref->{$area}->{file}" ) {
-        log_msg(
-          {
-            msg_typ => 'INFO',
-            msg_str => sprintf( 'Removing blacklist configuration file %s',
-              $cfg_ref->{$area}->{'file'} )
-          }
-        );
-
-        unlink("$cfg_ref->{$area}->{file}");
-      }
+    {
+      msg_typ => 'INFO',
+      msg_str => "Writing dnsmasq configuration data to $input->{'file'}"
     }
+  );
+
+  for my $val ( @{ $input->{'data'} } ) {
+    printf {$FH} ("%s%s%s/%s\n"), $input->{'target'}, $input->{'equals'},
+      $val, $input->{'ip'};
   }
-  else {
-    log_msg(
-      {
-        msg_typ => 'ERROR',
-        msg_str => 'Unable to disable dnsmasq blacklist!' }
-    );
-    exit(1);
-  }
+
+  close($FH);
+
+  return TRUE;
 }
-
-my $cmd
-  = is_cli()
-  ? '/opt/vyatta/sbin/vyatta-dns-forwarding.pl --update-dnsforwarding'
-  : "$dnsmasq_svc force-reload > /dev/null 2>1&";
-
-log_msg(
-  {
-    msg_typ => 'INFO',
-    msg_str => 'Reloading dnsmasq configuration...'
-  }
-);
-
-# Reload updated dnsmasq conf redirected address files
-qx($cmd);
-
-# Close the log
-close($LH);
-
-# Finish with a linefeed if '-v' is selected
-say(q{}) if $show || $cfg_ref->{'debug'};
-
-# Exit normally
-exit(0);
-################################################################################
