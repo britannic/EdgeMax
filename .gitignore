@@ -16,3 +16,13 @@ Blacklist Blocking/payload/update-blacklists-dnsmasq.ptkdb
 *.bbprojectsettings
 
 Blacklist Blocking/ersetup
+
+*.boot
+
+*.boot
+
+AdBlock/install_adblock.v3.22rc2
+
+AdBlock/install_adblock.v3.22rc1
+
+AdBlock/install_adblock.v3.15.1

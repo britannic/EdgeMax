@@ -1,48 +1,52 @@
-set service dns forwarding blacklist blackhole 0.0.0.0
-set service dns forwarding blacklist enabled true
-set service dns forwarding blacklist exclude msdn.com
-set service dns forwarding blacklist exclude appleglobal.112.2o7.net
-set service dns forwarding blacklist exclude cdn.visiblemeasures.com
-set service dns forwarding blacklist exclude hb.disney.go.com
-set service dns forwarding blacklist exclude googleadservices.com
-set service dns forwarding blacklist exclude hulu.com
-set service dns forwarding blacklist exclude static.chartbeat.com
-set service dns forwarding blacklist exclude survey.112.2o7.net
-set service dns forwarding blacklist exclude coremetrics.com
-set service dns forwarding blacklist exclude adobedtm.com
-set service dns forwarding blacklist include beap.gemini.yahoo.com
-set service dns forwarding blacklist include .adtechus.net
-set service dns forwarding blacklist include .adsrvr.org
-set service dns forwarding blacklist include .advertising.com
-set service dns forwarding blacklist include .doubleclick.net
-set service dns forwarding blacklist include .free-counter.co.uk
-set service dns forwarding blacklist include .kiosked.com
-set service dns forwarding blacklist source isc.sans.edu description 'High Level Sensitivity website URLs'
-set service dns forwarding blacklist source isc.sans.edu prefix ''
-set service dns forwarding blacklist source isc.sans.edu url 'https://isc.sans.edu/feeds/suspiciousdomains_High.txt'
-set service dns forwarding blacklist source malc0de.com description 'List of domains serving malicious executables observed by malc0de.com/database/'
-set service dns forwarding blacklist source malc0de.com prefix zone
-set service dns forwarding blacklist source malc0de.com url 'http://malc0de.com/bl/ZONES'
-set service dns forwarding blacklist source someonewhocares.org description 'Zero based host and domain list'
-set service dns forwarding blacklist source someonewhocares.org prefix 0.0.0.0
-set service dns forwarding blacklist source someonewhocares.org url 'http://someonewhocares.org/hosts/zero/'
-set service dns forwarding blacklist source volkerschatz.com description 'Ad server blacklists'
-set service dns forwarding blacklist source volkerschatz.com prefix 'htt.*/'
-set service dns forwarding blacklist source volkerschatz.com url 'http://www.volkerschatz.com/net/adpaths'
-set service dns forwarding blacklist source winhelp2002.mvps.org description 'Zero based host and domain list'
-set service dns forwarding blacklist source winhelp2002.mvps.org prefix 0.0.0.0
-set service dns forwarding blacklist source winhelp2002.mvps.org url 'http://winhelp2002.mvps.org/hosts.txt'
-set service dns forwarding blacklist source www.malwaredomainlist.com description '127.0.0.1 based host and domain list'
-set service dns forwarding blacklist source www.malwaredomainlist.com prefix 127.0.0.1
-set service dns forwarding blacklist source www.malwaredomainlist.com url 'http://www.malwaredomainlist.com/hostslist/hosts.txt'
-set service dns forwarding blacklist source yoyo.org description 'Fully Qualified Domain Names only - no prefix to strip'
-set service dns forwarding blacklist source yoyo.org prefix ''
-set service dns forwarding blacklist source yoyo.org url 'http://pgl.yoyo.org/as/serverlist.php?hostformat=nohtml&showintro=1&mimetype=plaintext'
-set service dns forwarding blacklist source zeustracker.abuse.ch/compromised description 'abuse.ch ZeuS compromised URL blacklist'
-set service dns forwarding blacklist source zeustracker.abuse.ch/compromised prefix ''
-set service dns forwarding blacklist source zeustracker.abuse.ch/compromised url 'https://zeustracker.abuse.ch/blocklist.php?download=compromised'
-set service dns forwarding blacklist source zeustracker.abuse.ch/hostfile description 'abuse.ch ZeuS blocklist host file'
-set service dns forwarding blacklist source zeustracker.abuse.ch/hostfile prefix 127.0.0.1
-set service dns forwarding blacklist source zeustracker.abuse.ch/hostfile url 'https://zeustracker.abuse.ch/blocklist.php?download=hostfile'
-set system task-scheduler task update_blacklists executable path /config/scripts/update-blacklists-dnsmasq.pl
+set service dns forwarding blacklist disabled false
+set service dns forwarding blacklist dns-redirect-ip 192.168.168.1
+set service dns forwarding blacklist domains exclude adobedtm.com
+set service dns forwarding blacklist domains exclude coremetrics.com
+set service dns forwarding blacklist domains exclude doubleclick.net
+set service dns forwarding blacklist domains exclude google.com
+set service dns forwarding blacklist domains exclude googleadservices.com
+set service dns forwarding blacklist domains exclude googleapis.com
+set service dns forwarding blacklist domains exclude hulu.com
+set service dns forwarding blacklist domains exclude msdn.com
+set service dns forwarding blacklist domains exclude paypal.com
+set service dns forwarding blacklist domains exclude storage.googleapis.com
+set service dns forwarding blacklist domains include adsrvr.org
+set service dns forwarding blacklist domains include adtechus.net
+set service dns forwarding blacklist domains include advertising.com
+set service dns forwarding blacklist domains include beap.gemini.yahoo.com
+set service dns forwarding blacklist domains include centade.com
+set service dns forwarding blacklist domains include doubleclick.net
+set service dns forwarding blacklist domains include free-counter.co.uk
+set service dns forwarding blacklist domains include kiosked.com
+set service dns forwarding blacklist domains source malc0de.com description 'List of zones serving malicious executables observed by malc0de.com/database/'
+set service dns forwarding blacklist domains source malc0de.com prefix 'zone '
+set service dns forwarding blacklist domains source malc0de.com url 'http://malc0de.com/bl/ZONES'
+set service dns forwarding blacklist hosts exclude apple.com
+set service dns forwarding blacklist hosts exclude appleglobal.112.2o7.net
+set service dns forwarding blacklist hosts exclude autolinkmaker.itunes.apple.com
+set service dns forwarding blacklist hosts exclude cdn.visiblemeasures.com
+set service dns forwarding blacklist hosts exclude freedns.afraid.org
+set service dns forwarding blacklist hosts exclude hb.disney.go.com
+set service dns forwarding blacklist hosts exclude static.chartbeat.com
+set service dns forwarding blacklist hosts exclude survey.112.2o7.net
+set service dns forwarding blacklist hosts include beap.gemini.yahoo.com
+set service dns forwarding blacklist hosts source openphish.com description 'OpenPhish automatic phishing detection'
+set service dns forwarding blacklist hosts source openphish.com prefix http
+set service dns forwarding blacklist hosts source openphish.com url 'https://openphish.com/feed.txt'
+set service dns forwarding blacklist hosts source someonewhocares.org description 'Zero based host and domain list'
+set service dns forwarding blacklist hosts source someonewhocares.org prefix 0.0.0.0
+set service dns forwarding blacklist hosts source someonewhocares.org url 'http://someonewhocares.org/hosts/zero/'
+set service dns forwarding blacklist hosts source volkerschatz.com description 'Ad server blacklists'
+set service dns forwarding blacklist hosts source volkerschatz.com prefix http
+set service dns forwarding blacklist hosts source volkerschatz.com url 'http://www.volkerschatz.com/net/adpaths'
+set service dns forwarding blacklist hosts source winhelp2002.mvps.org description 'Zero based host and domain list'
+set service dns forwarding blacklist hosts source winhelp2002.mvps.org prefix '0.0.0.0 '
+set service dns forwarding blacklist hosts source winhelp2002.mvps.org url 'http://winhelp2002.mvps.org/hosts.txt'
+set service dns forwarding blacklist hosts source www.malwaredomainlist.com description '127.0.0.1 based host and domain list'
+set service dns forwarding blacklist hosts source www.malwaredomainlist.com prefix '127.0.0.1 '
+set service dns forwarding blacklist hosts source www.malwaredomainlist.com url 'http://www.malwaredomainlist.com/hostslist/hosts.txt'
+set service dns forwarding blacklist hosts source yoyo.org description 'Fully Qualified Domain Names only - no prefix to strip'
+set service dns forwarding blacklist hosts source yoyo.org prefix ''
+set service dns forwarding blacklist hosts source yoyo.org url 'http://pgl.yoyo.org/as/serverlist.php?hostformat=nohtml&showintro=1&mimetype=plaintext'
+set system task-scheduler task update_blacklists executable path /config/scripts/update-dnsmasq.pl
 set system task-scheduler task update_blacklists interval 6h

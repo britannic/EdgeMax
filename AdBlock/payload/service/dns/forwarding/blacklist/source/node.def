@@ -1,6 +1,0 @@
-tag:
-type: txt
-help: Blacklist source URL and prefix pairs
-
-commit:expression: $VAR(./url) != ""; "At least one source url must be configured."
-

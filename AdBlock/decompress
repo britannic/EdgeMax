@@ -7,8 +7,10 @@ install_menu () {
 	local IFS=' '
 	local PS3="Enter option number and hit return => "
 	local OPTIONS="INSTALL REMOVE QUIT"
+	shopt -s checkwinsize
+	local COLUMNS=$(tput cols)
 
-	echo "Would you like to install or remove ADBLOCK (if previously installed)?"
+	echo "Would you like to install or remove dnsmasq blacklist functionality (if previously installed)?" | fold -s -w ${COLUMNS}
 
 	while true; do
 		select CHOICE in ${OPTIONS}; do
