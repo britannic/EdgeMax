@@ -206,6 +206,8 @@ sub cfg_dflt {
       { url => 'https://openphish.com/feed.txt', prefix => 'htt.*//', },
     someonewhocares =>
       { url => 'http://someonewhocares.org/hosts/zero/', prefix => '0.0.0.0', },
+    volkerschatz =>
+      { url => 'http://www.volkerschatz.com/net/adpaths', prefix => 'http', },
     winhelp2002 =>
       { url => 'http://winhelp2002.mvps.org/hosts.txt', prefix => '0.0.0.0', },
     yoyo => {
@@ -213,46 +215,53 @@ sub cfg_dflt {
         'http://pgl.yoyo.org/as/serverlist.php?hostformat=nohtml&showintro=1&mimetype=plaintext',
       prefix => '',
     },
-    zeustracker_compromised => {
-      url => 'https://zeustracker.abuse.ch/blocklist.php?download=compromised',
-      prefix => '',
-    },
-    zeustracker_hosts => {
-      url    => 'https://zeustracker.abuse.ch/blocklist.php?download=hostfile',
-      prefix => '127.0.0.1',
-    },
   };
 
   # Exclude our own good hosts
   $cfg_ref->{'hosts'}->{'exclude'} = {
-    'appleglobal.112.2o7.net' => 'appleglobal.112.2o7.net',
-    'cdn.visiblemeasures.com' => 'cdn.visiblemeasures.com',
-    'googleadservices.com'    => 'googleadservices.com',
-    'hb.disney.go.com'        => 'hb.disney.go.com',
-    'hulu.com'                => 'hulu.com',
-    'msdn.com'                => 'msdn.com',
-    'static.chartbeat.com'    => 'static.chartbeat.com',
-    'survey.112.2o7.net'      => 'survey.112.2o7.net'
+    'appleglobal.112.2o7.net'        => '112.2o7.net',
+    'autolinkmaker.itunes.apple.com' => 'itunes.apple.com',
+    'cdn.visiblemeasures.com'        => 'visiblemeasures.com',
+    'freedns.afraid.org'             => 'afraid.org',
+    'hb.disney.go.com'               => 'disney.go.com',
+    'static.chartbeat.com'           => 'chartbeat.com',
+    'survey.112.2o7.net'             => '112.2o7.net',
   };
 
   # Include our own redirected hosts
   $cfg_ref->{'hosts'}->{'blklst'} = {
-    'beap.gemini.yahoo.com' => 'gemini.yahoo.com',
-    '.kiosked.com'          => '.kiosked.com'
+    'beap.gemini.yahoo.com' => 'gemini.yahoo.com'
   };
 
   # Sources for blacklisted domains
   $cfg_ref->{'domains'}->{'src'} = { malwaredomainlist =>
-      { url => 'http://malc0de.com/bl/ZONES', prefix => 'zone' } };
+    { url => 'http://malc0de.com/bl/ZONES', prefix => 'zone' } };
 
   # Exclude our own good domains
-  $cfg_ref->{'domains'}->{'exclude'} = { 'msdn.com' => 'msdn.com' };
+  $cfg_ref->{'domains'}->{'exclude'} = {
+    'adobedtm.com'           => 'adobedtm.com',
+    'apple.com'              => 'apple.com',
+    'coremetrics.com'        => 'coremetrics.com',
+    'doubleclick.net'        => 'doubleclick.net',
+    'githubusercontent.com'  => 'githubusercontent.com',
+    'google.com'             => 'google.com',
+    'googleadservices.com'   => 'googleadservices.com',
+    'googleapis.com'         => 'googleapis.com',
+    'hulu.com'               => 'hulu.com',
+    'msdn.com'               => 'msdn.com',
+    'paypal.com'             => 'paypal.com',
+    'storage.googleapis.com' => 'googleapis.com',
+  };
 
   # Include our own redirected domains
   $cfg_ref->{'domains'}->{'blklst'} = {
-    'coolwebhosts.com' => 'coolwebhosts.com',
-    'centade.com'      => 'centade.com',
-    'kiosked.com'      => 'kiosked.com'
+    'adsrvr.org'         => 'adsrvr.org',
+    'adtechus.net'       => 'adtechus.net',
+    'advertising.com'    => 'advertising.com',
+    'centade.com'        => 'centade.com',
+    'doubleclick.net'    => 'doubleclick.net',
+    'free-counter.co.uk' => 'co.uk',
+    'kiosked.com'        => 'kiosked.com',
   };
 
   return (TRUE);
@@ -263,13 +272,13 @@ sub get_hash {
   my $hash     = \$input->{'hash_ref'};
   my @nodes    = @{ $input->{'nodes'} };
   my $value    = pop(@nodes);
-  my $hash_ref = $$hash;
+  my $hash_ref = ${$hash};
 
   for my $key (@nodes) {
-    $hash = \$$hash->{$key};
+    $hash = \${$hash}->{$key};
   }
 
-  $$hash = $value if $value;
+  ${$hash} = $value if $value;
 
   return $hash_ref;
 }
@@ -359,7 +368,7 @@ sub parse_node {
     }
 
   }
-  return ( $cfg_ref->{'service'}->{'dns'}->{'forwarding'}->{'blklst'} );
+  return ( $cfg_ref->{'service'}->{'dns'}->{'forwarding'}->{'blacklist'} );
 }
 
 sub get_file {
