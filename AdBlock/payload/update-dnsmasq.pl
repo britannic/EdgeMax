@@ -24,7 +24,7 @@
 #
 # **** End License ****
 
-my $version = '3.24a';
+my $version = '3.24b';
 
 use feature qw/switch/;
 use File::Basename;
@@ -47,7 +47,6 @@ my $disable     = undef;
 my $dnsmasq_svc = '/etc/init.d/dnsmasq';
 my $enable      = undef;
 my $progname    = basename($0);
-my $showstats   = undef;
 my $cfg_ref     = {
   debug    => 0,
   disabled => 0,
@@ -195,6 +194,11 @@ sub cfg_actv {
 }
 
 sub cfg_dflt {
+  # Default all dns_redirect_ips
+  $cfg_ref->{'dns_redirect_ip'} = '0.0.0.0';
+  $cfg_ref->{'domains'}->{'dns_redirect_ip'} = '0.0.0.0';
+  $cfg_ref->{'hosts'}->{'dns_redirect_ip'} = '0.0.0.0';
+  $cfg_ref->{'zones'}->{'dns_redirect_ip'} = '0.0.0.0';
 
   # Sources for blacklisted hosts
   $cfg_ref->{'hosts'}->{'src'} = {
@@ -903,7 +907,7 @@ if ( not $cfg_ref->{'disabled'} and not $disable ) {
     }
   }
   pop(@areas);
-  say(q{}) if (scalar(@areas) == 1); # print a final line feed
+  say(q{}) if (scalar(@areas) == 1) && ($show || $cfg_ref->{'debug'}); # print a final line feed
 }
 elsif ($enable) {
   log_msg(
@@ -955,7 +959,7 @@ qx($cmd);
 close($LH);
 
 # Finish with a linefeed if '-v' is selected
-say(q{});
+say(q{}) if $show || $cfg_ref->{'debug'};
 
 # Exit normally
 exit(0);
