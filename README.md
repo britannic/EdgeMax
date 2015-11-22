@@ -15,6 +15,6 @@ Repository contains scripts for managing Ubiquiti EdgeMax based routers
 
 ## Compatibility
 *  They have been tested on the EdgeRouter Lite family of routers, versions v1.5.0-v1.7.0.
-* Since the EdgeOS is a fork and port of Vyatta 6.3, these scrtips could easily be adapted to work on VyOS and Vyatta derived ports
+* Since the EdgeOS is a fork and port of Vyatta 6.3, these scripts could easily be adapted to work on VyOS and Vyatta derived ports
 
-## Usage: Check the scripts comments or run the script with "-h" to see how to use them.
+## Usage: Check the script's comments or run the script with "-h" to see how to use them.
