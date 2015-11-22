@@ -179,7 +179,6 @@ install_blacklist_support ()
     set service dns forwarding blacklist domains include adsrvr.org
     set service dns forwarding blacklist domains include adtechus.net
     set service dns forwarding blacklist domains include advertising.com
-    set service dns forwarding blacklist domains include beap.gemini.yahoo.com
     set service dns forwarding blacklist domains include centade.com
     set service dns forwarding blacklist domains include doubleclick.net
     set service dns forwarding blacklist domains include free-counter.co.uk
@@ -189,6 +188,7 @@ install_blacklist_support ()
     set service dns forwarding blacklist domains source malc0de.com url 'http://malc0de.com/bl/ZONES'
     set service dns forwarding blacklist hosts exclude appleglobal.112.2o7.net
     set service dns forwarding blacklist hosts exclude autolinkmaker.itunes.apple.com
+    set service dns forwarding blacklist hosts include beap.gemini.yahoo.com
     set service dns forwarding blacklist hosts exclude cdn.visiblemeasures.com
     set service dns forwarding blacklist hosts exclude freedns.afraid.org
     set service dns forwarding blacklist hosts exclude hb.disney.go.com
