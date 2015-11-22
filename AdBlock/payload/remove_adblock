@@ -166,7 +166,7 @@ if /opt/vyatta/bin/yesno -n 'Do you want to completely remove Blacklist? [y/N]: 
 then
 	if delete_adblock_support
 	then
-		echo 'ADBlock version ${ADBLOCKVER} has been completely removed.'
+		echo "ADBlock version ${ADBLOCKVER} has been completely removed."
 		exit 0
 	else
 		echo "There were problems removing ADBlock version ${ADBLOCKVER}."
