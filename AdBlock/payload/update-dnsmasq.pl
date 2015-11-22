@@ -18,7 +18,7 @@
 # MA 02110-1301, USA.
 #
 # Author: Neil Beadle
-# Date: September 2015
+# Date:   November 2015
 # Description: Script for creating dnsmasq configuration files containing zone
 # (domain) and host redirects
 #
