@@ -24,8 +24,8 @@
 #
 # **** End License ****
 
-my $version = '3.24c';
-
+my $version = '3.24d';
+use Data::Dumper;
 use feature qw/switch/;
 use File::Basename;
 use Getopt::Long;
@@ -43,9 +43,7 @@ use constant TRUE  => 1;
 use constant FALSE => 0;
 
 my $cols        = qx( tput cols );
-my $disable     = undef;
 my $dnsmasq_svc = '/etc/init.d/dnsmasq';
-my $enable      = undef;
 my $progname    = basename($0);
 my $cfg_ref     = {
   debug    => 0,
@@ -88,7 +86,7 @@ exit(0);
 
 # Process the active (not committed or saved) configuration
 sub cfg_actv {
-  if (is_blacklist) {
+  if (is_blacklist()) {
     my $config = new Vyatta::Config;
     my ( $listNodes, $returnValue, $returnValues );
 
@@ -281,80 +279,6 @@ sub cfg_file {
   return (TRUE);
 }
 
-{    # Closure to conserve memory
-# CLI command set
-  my $begin  = '/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper begin';
-  my $commit = '/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper commit';
-  my $delete = '/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper delete';
-  my $end    = '/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper end';
-  my $save   = '/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper save';
-  my $set    = '/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper set';
-
-  # enable blacklist (usually under configure when disabled is set to false)
-  sub enable {
-    my $blacklist_enabled = $cfg_ref->{'disabled'};
-    $cfg_ref->{'debug'} = TRUE;
-
-    if ( not $blacklist_enabled ) {
-      log_msg( { msg_typ => 'INFO', msg_str => 'Enabling blacklist...' } );
-      my @command = (
-        "$begin; ",
-        "$set service dns forwarding blacklist disabled false; ",
-        "$commit; $end"
-      );
-
-      qx(@command 2>&1);
-      if ( $? == 0 ) {
-        $blacklist_enabled = TRUE;
-
-        is_scheduled == TRUE
-          ? log_msg(
-          { msg_typ => 'INFO', msg_str => 'Enabled dnsmasq blacklist' } )
-          : log_msg(
-          {
-            msg_typ => 'WARNING',
-            msg_str =>
-              'blacklist is enabled but has no task-scheduler entry - dnsmasq blacklists will not be dynamically updated!'
-          }
-          );
-      }
-    }
-    return ($blacklist_enabled);
-  }
-
-  # disable blacklist (usually under configure when disabled is set to true)
-  sub disable {
-    my $blacklist_disabled = $cfg_ref->{'disabled'};
-    $cfg_ref->{'debug'} = TRUE;
-
-    if ($blacklist_disabled) {
-
-      log_msg(
-        { msg_typ => 'INFO', msg_str => 'Disabling dnsmasq blacklist' } );
-
-      my @command = (
-        "$begin; ",
-        "$set service dns forwarding blacklist disabled true; ",
-        "$commit; $end"
-      );
-
-      qx(@command 2>&1);
-      if ( $? == 0 ) {
-        $blacklist_disabled = TRUE;
-        log_msg(
-          { msg_typ => 'INFO', msg_str => 'Disabled dnsmasq blacklist' } );
-      }
-    }
-    else {
-      log_msg(
-        { msg_typ => 'INFO', msg_str => 'dnsmasq blacklist already disabled' }
-      );
-      $blacklist_disabled = TRUE;
-    }
-    return ($blacklist_disabled);
-  }
-}    # Closure end
-
 # Determine which type of configuration to get (default, active or saved)
 sub get_config {
   my $input = shift;
@@ -442,10 +366,7 @@ sub get_data {
 
   for my $thread (@threads) {
     my $data_ref = $thread->join();
-    my $rec_count
-      = scalar( !keys( %{ $data_ref->{'data'} } ) )
-      ? 0
-      : scalar(  keys (%{ $data_ref->{'data'} } ) );
+    my $rec_count = scalar( keys (%{ $data_ref->{'data'} } ) ) // 0;
     $cfg_ref->{ $input->{'area'} }->{'records'} += $rec_count;
 
     log_msg(
@@ -610,8 +531,6 @@ sub get_options {
     [ q{-f <file>   # load a configuration file},             'f=s'        => \$cfg_file],
     [ q{--debug     # enable verbose debug output},           'debug'      => \$cfg_ref->{'debug'}],
     [ q{--default   # use default values for dnsmasq conf},   'default'    => \$default],
-    [ q{--disable   # disable dnsmasq blacklists},            'disable'    => \$disable],
-    [ q{--enable    # enable dnsmasq blacklists},             'enable'     => \$enable],
     [ q{--help      # show help and usage text},              'help'       => sub {usage({ option => 'help', exit_code => 0} )}],
     [ q{-v          # verbose (outside configure session)},   'v'          => \$show],
     [ q{--version   # show program version number},           'version'    => sub {usage({ option => 'version', exit_code => 0} )}],
@@ -647,7 +566,12 @@ sub get_url {
   $data_ref->{'data'} = { map { my $key = $_; lc($key) => 1 }
       grep { $_ =~ /$re->{SELECT}/ } split( /$re->{SPLIT}/, $get->content ) };
 
-  return $get->is_success ? $data_ref : FALSE;
+  if ($get->is_success) {
+    return $data_ref;
+  }
+  else {
+    $data_ref->{'data'} = {};
+  }
 }
 
 # Check to see if blacklist is configured
@@ -675,7 +599,7 @@ sub is_configure () {
 sub is_scheduled {
   my $schedule_exists;
 
-  if (is_blacklist) {
+  if (is_blacklist()) {
     my $config = new Vyatta::Config;
     $config->setLevel("system task-scheduler task");
 
@@ -717,10 +641,7 @@ sub main() {
   get_options() || usage( { option => 'help', exit_code => 1 } );
 
   # Find reasons to quit
-  usage( { option => 'sudo', exit_code => 1 } ) if not is_sudo;
-  usage( { option => 'enable', exit_code => 1 } )
-    if defined($enable)
-    and defined($disable);
+  usage( { option => 'sudo', exit_code => 1 } ) if not is_sudo();
   usage( { option => 'default', exit_code => 1 } )
     if defined($default)
     and defined($cfg_file);
@@ -744,7 +665,7 @@ sub main() {
   exit(1) unless get_config( { type => $cfg_type } );
 
   # Now proceed if blacklist is enabled
-  if ( not $cfg_ref->{'disabled'} and not $disable ) {
+  if ( !$cfg_ref->{'disabled'} ) {
     my @areas;
 
     # Add areas to process only if they contain sources
@@ -801,35 +722,18 @@ sub main() {
       if ( scalar(@areas) == 1 )
       && ( $show || $cfg_ref->{'debug'} );    # print a final line feed
   }
-  elsif ($enable) {
-    log_msg(
-      { msg_typ => 'ERROR', msg_str => 'Unable to enable dnsmasq blacklist!' } )
-      unless enable();
-  }
-  elsif ($disable) {
-    if ( disable() or $cfg_ref->{'disabled'} ) {
-      for my $area (qw{domains hosts zones}) {
-        if ( -f "$cfg_ref->{$area}->{file}" ) {
-          log_msg(
-            {
-              msg_typ => 'INFO',
-              msg_str => sprintf( 'Removing blacklist configuration file %s',
-                $cfg_ref->{$area}->{'file'} )
-            }
-          );
-
-          unlink("$cfg_ref->{$area}->{file}");
-        }
+  elsif ($cfg_ref->{'disabled'}) {
+    for my $area (qw{domains hosts zones}) {
+      if ( -f "$cfg_ref->{$area}->{file}" ) {
+        log_msg(
+          {
+            msg_typ => 'INFO',
+            msg_str => sprintf( 'Removing blacklist configuration file %s',
+              $cfg_ref->{$area}->{'file'} )
+          }
+        );
+        unlink("$cfg_ref->{$area}->{file}");
       }
-    }
-    else {
-      log_msg(
-        {
-          msg_typ => 'ERROR',
-          msg_str => 'Unable to disable dnsmasq blacklist!'
-        }
-      );
-      exit(1);
     }
   }
 
