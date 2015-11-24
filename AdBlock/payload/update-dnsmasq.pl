@@ -46,35 +46,7 @@ use constant FALSE => 0;
 my $cols        = qx( tput cols );
 my $dnsmasq_svc = '/etc/init.d/dnsmasq';
 my $progname    = basename($0);
-my $cfg_ref     = {
-  debug       => 0,
-  disabled    => 0,
-  dnsmasq_dir => '/etc/dnsmasq.d',
-  log_file    => '/var/log/update-dnsmasq.log',
-  domains     => {
-    icount  => 0,
-    records => 0,
-    target  => 'address',
-    type    => 'domains',
-    unique  => 0,
-  },
-  hosts => {
-    icount  => 0,
-    records => 0,
-    target  => 'address',
-    type    => 'hosts',
-    unique  => 0,
-  },
-  zones => {
-    icount  => 0,
-    records => 0,
-    target  => 'server',
-    type    => 'zones',
-    unique  => 0,
-  },
-};
-
-my ( $cfg_file, $LH, $show, );
+my ( $cfg_file, $debug, $LH, $show );
 
 ############################### script runs here ###############################
 &main();
@@ -85,6 +57,7 @@ exit(0);
 
 # Process the active (not committed or saved) configuration
 sub cfg_actv {
+  my $input = shift;
   if ( is_blacklist() ) {
     my $config = new Vyatta::Config;
     my ( $listNodes, $returnValue, $returnValues );
@@ -101,45 +74,42 @@ sub cfg_actv {
     }
 
     $config->setLevel('service dns forwarding blacklist');
-    $cfg_ref->{'disabled'} = $config->$returnValue('disabled') // FALSE;
-    $cfg_ref->{'dns_redirect_ip'} = $config->$returnValue('dns-redirect-ip')
-      // '0.0.0.0';
+    $input->{'config'}->{'disabled'} = $config->$returnValue('disabled')
+      // FALSE;
+    $input->{'config'}->{'dns_redirect_ip'}
+      = $config->$returnValue('dns-redirect-ip') // '0.0.0.0';
 
-    $cfg_ref->{'disabled'} = $cfg_ref->{'disabled'} eq 'false' ? FALSE : TRUE;
+    $input->{'config'}->{'disabled'}
+      = $input->{'config'}->{'disabled'} eq 'false' ? FALSE : TRUE;
 
     for my $area (qw/hosts domains zones/) {
       $config->setLevel("service dns forwarding blacklist $area");
-      $cfg_ref->{$area}->{'dns_redirect_ip'}
+      $input->{'config'}->{$area}->{'dns_redirect_ip'}
         = $config->$returnValue('dns-redirect-ip')
-        // $cfg_ref->{'dns_redirect_ip'};
-      $cfg_ref->{$area}->{'blklst'} = {
+        // $input->{'config'}->{'dns_redirect_ip'};
+      $input->{'config'}->{$area}->{'blklst'} = {
         map {
-          my $element = $_;
-          my @domain = split( /[.]/, $element );
-          shift(@domain) if scalar(@domain) > 2;
-          my $value = join( '.', @domain );
-          $element => $value
+          my $key = $_;
+          $key => 1;
         } $config->$returnValues('include')
       };
-      $cfg_ref->{$area}->{'exclude'} = {
+      $input->{'config'}->{$area}->{'exclude'} = {
         map {
-          my $element = $_;
-          my @domain = split( /[.]/, $element );
-          shift(@domain) if scalar(@domain) > 2;
-          my $value = join( '.', @domain );
-          $element => $value
+          my $key = $_;
+          $key => 1;
         } $config->$returnValues('exclude')
       };
 
       for my $source ( $config->$listNodes('source') ) {
         $config->setLevel(
           "service dns forwarding blacklist $area source $source");
-        $cfg_ref->{$area}->{'src'}->{$source}->{'url'}
+        $input->{'config'}->{$area}->{'src'}->{$source}->{'url'}
           = $config->$returnValue('url');
-        $cfg_ref->{$area}->{'src'}->{$source}->{'prefix'}
+        $input->{'config'}->{$area}->{'src'}->{$source}->{'prefix'}
           = $config->$returnValue('prefix');
-        $cfg_ref->{$area}->{'src'}->{$source}->{'compress'}
-          = $config->$returnValue('compress') if $area eq 'domains';
+        $input->{'config'}->{$area}->{'src'}->{$source}->{'compress'}
+          = $config->$returnValue('compress')
+          if $area eq 'domains';
       }
     }
   }
@@ -155,9 +125,9 @@ sub cfg_actv {
 
     return (FALSE);
   }
-  if ( ( !scalar( keys %{ $cfg_ref->{'domains'}->{'src'} } ) )
-    && ( !scalar( keys %{ $cfg_ref->{'hosts'}->{'src'} } ) )
-    && ( !scalar( keys %{ $cfg_ref->{'zones'}->{'src'} } ) ) )
+  if ( ( !scalar( keys %{ $input->{'config'}->{'domains'}->{'src'} } ) )
+    && ( !scalar( keys %{ $input->{'config'}->{'hosts'}->{'src'} } ) )
+    && ( !scalar( keys %{ $input->{'config'}->{'zones'}->{'src'} } ) ) )
   {
     say STDERR ('At least one domain or host source must be configured');
     return (FALSE);
@@ -168,6 +138,7 @@ sub cfg_actv {
 
 # Process a configuration file in memory after get_file() loads it
 sub cfg_file {
+  my $input = shift;
   my $tmp_ref
     = get_nodes( { config_data => get_file( { file => $cfg_file } ) } );
   my $configured
@@ -176,20 +147,22 @@ sub cfg_file {
       || $tmp_ref->{'zones'}->{'source'} ) ? TRUE : FALSE;
 
   if ($configured) {
-    $cfg_ref->{'dns_redirect_ip'} = $tmp_ref->{'dns-redirect-ip'} // '0.0.0.0';
-    $cfg_ref->{'disabled'}
+    $input->{'config'}->{'dns_redirect_ip'} = $tmp_ref->{'dns-redirect-ip'}
+      // '0.0.0.0';
+    $input->{'config'}->{'disabled'}
       = ( $tmp_ref->{'disabled'} eq 'false' ) ? FALSE : TRUE;
 
     for my $area (qw/hosts domains zones/) {
-      $cfg_ref->{$area}->{'dns_redirect_ip'} = $cfg_ref->{'dns_redirect_ip'}
+      $input->{'config'}->{$area}->{'dns_redirect_ip'}
+        = $input->{'config'}->{'dns_redirect_ip'}
         if !exists( $tmp_ref->{$area}->{'dns-redirect-ip'} );
-      $cfg_ref->{$area}->{'exclude'} = $tmp_ref->{$area}->{'exclude'};
-      $cfg_ref->{$area}->{'blklst'}  = $tmp_ref->{$area}->{'include'};
-      $cfg_ref->{$area}->{'src'}     = $tmp_ref->{$area}->{'source'};
+      $input->{'config'}->{$area}->{'exclude'} = $tmp_ref->{$area}->{'exclude'};
+      $input->{'config'}->{$area}->{'blklst'}  = $tmp_ref->{$area}->{'include'};
+      $input->{'config'}->{$area}->{'src'}     = $tmp_ref->{$area}->{'source'};
     }
   }
   else {
-    $cfg_ref->{'debug'} = TRUE;
+    $input->{'config'}->{'debug'} = TRUE;
     log_msg(
       {
         msg_typ => 'ERROR',
@@ -207,9 +180,8 @@ sub get_config {
   my $input = shift;
 
   given ( $input->{'type'} ) {
-    when (/active/)  { return cfg_actv(); }
-    when (/default/) { return cfg_dflt(); }
-    when (/file/)    { return cfg_file(); }
+    when (/active/) { return cfg_actv( { config => $input->{'config'} } ); }
+    when (/file/) { return cfg_file( { config => $input->{'config'} } ); }
   }
 
   return FALSE;
@@ -277,10 +249,7 @@ sub get_nodes {
       when (/$re->{MULT}/) {
         push( @nodes, $+{MULT} );
         push( @nodes, $+{VALU} );
-        my @domain = split( /[.]/, $+{VALU} );
-        shift(@domain) if scalar(@domain) > 2;
-        my $value = join( '.', @domain );
-        push( @nodes, $value );
+        push( @nodes, 1 );
         get_hash( { nodes => \@nodes, hash_ref => $cfg_ref } );
         pop(@nodes);
         pop(@nodes);
@@ -340,11 +309,8 @@ sub get_nodes {
 sub get_options {
   my $input = shift;
   my @opts  = (
-    [ q{-f <file>   # load a configuration file}, 'f=s' => \$cfg_file ],
-    [
-      q{--debug     # enable verbose debug output},
-      'debug' => \$cfg_ref->{'debug'}
-    ],
+    [ q{-f <file>   # load a configuration file},   'f=s'   => \$cfg_file ],
+    [ q{--debug     # enable verbose debug output}, 'debug' => \$debug ],
     [
       q{--help      # show help and usage text},
       'help' => sub { usage( { option => 'help', exit_code => 0 } ) }
@@ -444,7 +410,7 @@ sub log_msg {
   return (FALSE)
     unless ( length( $msg_ref->{msg_typ} . $msg_ref->{msg_str} ) > 2 );
 
-  my $EOL = scalar( $cfg_ref->{'debug'} ) ? qq{\n} : q{};
+  my $EOL = scalar($debug) ? qq{\n} : q{};
 
   say {$LH} ("$date: $msg_ref->{msg_typ}: $msg_ref->{msg_str}");
   print( "\r", " " x $cols, "\r" ) if $show;
@@ -455,6 +421,33 @@ sub log_msg {
 
 # This is the main function
 sub main() {
+  my $cfg_ref = {
+    debug       => 0,
+    disabled    => 0,
+    dnsmasq_dir => '/etc/dnsmasq.d',
+    log_file    => '/var/log/update-dnsmasq.log',
+    domains     => {
+      icount  => 0,
+      records => 0,
+      target  => 'address',
+      type    => 'domains',
+      unique  => 0,
+    },
+    hosts => {
+      icount  => 0,
+      records => 0,
+      target  => 'address',
+      type    => 'hosts',
+      unique  => 0,
+    },
+    zones => {
+      icount  => 0,
+      records => 0,
+      target  => 'server',
+      type    => 'zones',
+      unique  => 0,
+    },
+  };
 
   # Get command line options or print help if no valid options
   get_options() || usage( { option => 'help', exit_code => 1 } );
@@ -472,12 +465,12 @@ sub main() {
     { msg_typ => 'INFO', msg_str =>, "---+++ blacklist $version +++---" } );
 
   # Make sure localhost is always in the exclusions whitelist
-  $cfg_ref->{'hosts'}->{'exclude'}->{'localhost'} = 'localhost';
+  $cfg_ref->{'hosts'}->{'exclude'}->{'localhost'} = 1;
 
   # Now choose which data set will define the configuration
   my $cfg_type = defined($cfg_file) ? 'file' : 'active';
 
-  exit(1) unless get_config( { type => $cfg_type } );
+  exit(1) unless get_config( { type => $cfg_type, config => $cfg_ref } );
 
   # Now proceed if blacklist is enabled
   if ( !$cfg_ref->{'disabled'} ) {
@@ -580,9 +573,23 @@ sub main() {
       }
 
       for my $thread (@threads) {
+        my $compress;
         my $data_ref = $thread->join();
         my $rec_count = scalar( keys( %{ $data_ref->{'data'} } ) ) // 0;
+
         $cfg_ref->{$area}->{ $data_ref->{'src'} }->{'records'} += $rec_count;
+
+        if (
+          exists $cfg_ref->{$area}->{'src'}->{ $data_ref->{'src'} }
+          ->{'compress'} )
+        {
+          $compress
+            = ( $cfg_ref->{$area}->{'src'}->{ $data_ref->{'src'} }
+              ->{'compress'} eq 'true' ) ? TRUE : FALSE;
+        }
+        else {
+          $compress = FALSE;
+        }
 
         log_msg(
           {
@@ -597,10 +604,12 @@ sub main() {
         if (
           process_data(
             {
-              area   => $area,
-              data   => \%{ $data_ref->{'data'} },
-              prefix => $prefix,
-              src    => $data_ref->{'src'}
+              area     => $area,
+              data     => \%{ $data_ref->{'data'} },
+              compress => $compress,
+              config   => $cfg_ref,
+              prefix   => $prefix,
+              src      => $data_ref->{'src'}
             }
           )
           )
@@ -628,6 +637,9 @@ sub main() {
               += $cfg_ref->{$area}->{ $data_ref->{'src'} }->{'icount'};
             $cfg_ref->{$area}->{'records'}
               += $cfg_ref->{$area}->{ $data_ref->{'src'} }->{'records'};
+
+            # Discard the data now its written to file
+            $cfg_ref->{$area}->{ $data_ref->{'src'} }->{'blklst'} = ();
           }
         }
         else {
@@ -654,8 +666,7 @@ sub main() {
 
       $area_ctr--;
       say(q{})
-        if ( $area_ctr == 1 )
-        && ( $show || $cfg_ref->{'debug'} );    # print a final line feed
+        if ( $area_ctr == 1 ) && ( $show || $debug );  # print a final line feed
     }
   }
   elsif ( $cfg_ref->{'disabled'} ) {
@@ -695,7 +706,7 @@ sub main() {
   close($LH);
 
   # Finish with a linefeed if '-v' or debug is selected
-  say(q{}) if $show || $cfg_ref->{'debug'};
+  say(q{}) if $show || $debug;
 }
 
 # Crunch the data and throw anything we don't need
@@ -733,30 +744,42 @@ LINE:
         }
       }
       my $value = join( '.', @domain );
-      $cfg_ref->{ $input->{'area'} }->{ $input->{'src'} }->{'blklst'}
-        ->{$element} = $value
-        if !exists $cfg_ref->{ $input->{'area'} }->{'exclude'}->{$element}
-        || !exists $cfg_ref->{ $input->{'area'} }->{'exclude'}->{$value};
+
+      if ( !exists $input->{'config'}->{ $input->{'area'} }->{'exclude'}
+        ->{$element}
+        || !
+        exists $input->{'config'}->{ $input->{'area'} }->{'exclude'}->{$value} )
+      {
+        ( $input->{'compress'} == TRUE )
+          ? $input->{'config'}->{ $input->{'area'} }->{ $input->{'src'} }
+          ->{'blklst'}->{$value} = 1
+          : $input->{'config'}->{ $input->{'area'} }->{ $input->{'src'} }
+          ->{'blklst'}->{$element} = 1;
+      }
 
       # Add to the exclude list, so the next source doesn't duplicate values
-      $cfg_ref->{ $input->{'area'} }->{'exclude'}->{$element} = $value;
+      $input->{'config'}->{ $input->{'area'} }->{'exclude'}->{$element}
+        = $value;
     } @elements;
 
-    $cfg_ref->{ $input->{'area'} }->{ $input->{'src'} }->{'icount'}
+    $input->{'config'}->{ $input->{'area'} }->{ $input->{'src'} }->{'icount'}
       += scalar(@elements);
 
     printf(
       "Entries processed from %s: %s %s from: %s lines\r",
       $input->{'src'},
-      $cfg_ref->{ $input->{'area'} }->{ $input->{'src'} }->{'icount'},
-      $cfg_ref->{ $input->{'area'} }->{'type'},
-      $cfg_ref->{ $input->{'area'} }->{ $input->{'src'} }->{'records'}
+      $input->{'config'}->{ $input->{'area'} }->{ $input->{'src'} }->{'icount'},
+      $input->{'config'}->{ $input->{'area'} }->{'type'},
+      $input->{'config'}->{ $input->{'area'} }->{ $input->{'src'} }->{'records'}
     ) if $show;
 
   }
 
   if (
-    scalar( $cfg_ref->{ $input->{'area'} }->{ $input->{'src'} }->{'icount'} ) )
+    scalar(
+      $input->{'config'}->{ $input->{'area'} }->{ $input->{'src'} }->{'icount'}
+    )
+    )
   {
     return $input;
   }
