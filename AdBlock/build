@@ -26,10 +26,9 @@ if [[ -e "${0##*/}" ]]; then
 	tar zcf ${INSTALL}.tgz ${INSTALL}
 	echo "${INSTALL} created"
 	[[ -d "${DROPBOX}/" ]] && install -m 0755 ${INSTALL}.tgz "${DROPBOX}/"
-	cd ..
-	tar -zcf ${ADBLOCK}setup.tgz --exclude='._*' --exclude='.svn' --exclude='.DS_Store' --exclude='*.bak' --exclude='*~' "${BASEDIR}"/*
-	mv ${ADBLOCK}setup.tgz "${BASEDIR}"/
-	cd "${BASEDIR}"
+	tar -zcf ../${ADBLOCK}setup.tgz --exclude='._*' --exclude='.svn' --exclude='.DS_Store' --exclude='*.bak' --exclude='*~' "${BASEDIR}"/*
+	mv ../${ADBLOCK}setup.tgz "${BASEDIR}"/
+
 # 	[[ ${1} ]] && /usr/bin/scp "${BASEDIR}"/${INSTALL} ${1}@scratch:/tmp/ersetup
 else
 	echo "$(basename $0) must be run in the directory where it is located."

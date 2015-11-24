@@ -185,9 +185,14 @@ install_blacklist_support ()
     set service dns forwarding blacklist domains include doubleclick.net
     set service dns forwarding blacklist domains include free-counter.co.uk
     set service dns forwarding blacklist domains include kiosked.com
+    set service dns forwarding blacklist domains source hpHosts description 'hpHosts optimized in hosts format'
+    set service dns forwarding blacklist domains source hpHosts prefix '127.0.0.1 '
+    set service dns forwarding blacklist domains source hpHosts url 'http://hosts-file.net/download/HOSTS-Optimized.txt'
+    set service dns forwarding blacklist domains source hpHosts compress true
     set service dns forwarding blacklist domains source malc0de.com description 'List of zones serving malicious executables observed by malc0de.com/database/'
     set service dns forwarding blacklist domains source malc0de.com prefix 'zone '
     set service dns forwarding blacklist domains source malc0de.com url 'http://malc0de.com/bl/ZONES'
+    set service dns forwarding blacklist domains source malc0de.com compress false
     set service dns forwarding blacklist hosts exclude appleglobal.112.2o7.net
     set service dns forwarding blacklist hosts exclude c.apple.com
     set service dns forwarding blacklist hosts exclude autolinkmaker.itunes.apple.com
