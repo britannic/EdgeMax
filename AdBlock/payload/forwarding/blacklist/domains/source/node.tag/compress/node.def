@@ -1,0 +1,4 @@
+type: bool
+help: Set to true to compress FQDNs in a list, leaving only the domains
+comp_help: Example: a large list containing FQDNs will be compressed, leaving only the domain names
+default: false
