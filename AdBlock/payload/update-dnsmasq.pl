@@ -24,7 +24,7 @@
 #
 # **** End License ****
 
-my $version = '3.25';
+my $version = '3.25beta1';
 
 # use Data::Dumper;
 use feature qw/switch/;
@@ -32,7 +32,7 @@ use File::Basename;
 use Getopt::Long;
 use lib '/opt/vyatta/share/perl5/';
 use LWP::UserAgent;
-use POSIX qw(geteuid strftime);
+use POSIX qw{geteuid strftime};
 use strict;
 use threads;
 use URI;
@@ -43,10 +43,8 @@ use warnings;
 use constant TRUE  => 1;
 use constant FALSE => 0;
 
-my $cols        = qx( tput cols );
-my $dnsmasq_svc = '/etc/init.d/dnsmasq';
-my $progname    = basename($0);
-my ( $cfg_file, $debug, $LH, $show );
+my $cols = qx( tput cols );
+my ( $cfg_file, $LH, $debug, $show );
 
 ############################### script runs here ###############################
 &main();
@@ -175,6 +173,28 @@ sub cfg_file {
   return (TRUE);
 }
 
+# Remove previous configuration files
+sub delete_file {
+  my $input = shift;
+
+  if ( -f $input->{'file'} ) {
+    log_msg(
+      {
+        msg_typ => 'INFO',
+        msg_str => sprintf( 'Deleting file %s', $input->{'file'} )
+      }
+    );
+    return unlink( $input->{'file'} )
+      or log_msg(
+      {
+        msg_typ => 'WARNING',
+        msg_str => sprintf( 'Unable to delete %s', $input->{'file'} )
+      }
+      );
+  }
+  return FALSE;
+}
+
 # Determine which type of configuration to get (default, active or saved)
 sub get_config {
   my $input = shift;
@@ -185,6 +205,14 @@ sub get_config {
   }
 
   return FALSE;
+}
+
+# Get directory filtered file lists
+sub get_directory {
+  my $input = shift;
+  my @files = qx{ls $input->{'directory'}/$input->{pattern} 2> /dev/null };
+  chomp(@files);
+  return @files;
 }
 
 # Read a file into memory and return the data to the calling function
@@ -421,7 +449,8 @@ sub log_msg {
 
 # This is the main function
 sub main() {
-  my $cfg_ref = {
+  my $dnsmasq_svc = '/etc/init.d/dnsmasq';
+  my $cfg_ref     = {
     debug       => 0,
     disabled    => 0,
     dnsmasq_dir => '/etc/dnsmasq.d',
@@ -482,8 +511,17 @@ sub main() {
         if ( scalar( keys %{ $cfg_ref->{$area}->{'src'} } ) );
     }
 
+    # Feed all blacklists from the zones and domains into host's exclude list
+    for my $list (qw{domains zones}) {
+      while ( my ( $key, $value )
+        = each( %{ $cfg_ref->{$list}->{'exclude'} } ) )
+      {
+        $cfg_ref->{'hosts'}->{'exclude'}->{$key} = $value;
+      }
+    }
+
     # Process each area
-    my $area_ctr = (@areas);
+    my $area_count = (@areas);
     for my $area (@areas) {
       my ( $prefix, @threads );
       my $max_thrds = 8;
@@ -493,26 +531,31 @@ sub main() {
       $cfg_ref->{$area}->{'records'} = $cfg_ref->{$area}->{'icount'};
       $cfg_ref->{$area}->{'unique'}  = $cfg_ref->{$area}->{'icount'};
 
-      # Feed all blacklists from the zones and domains into host's exclude list
-      if ( $area eq 'hosts' ) {
-        for my $area (qw{domains zones}) {
-          while ( my ( $key, $value )
-            = each( %{ $cfg_ref->{$area}->{'blklst'} } ) )
+      # Remove any files that no longer have configured sources
+      my $sources_ref = {
+        map {
+          my $key = $_;
+          "$cfg_ref->{'dnsmasq_dir'}/$area.$key.blacklist.conf" => 1;
+        } @sources
+      };
+      my $files_ref = {
+        map { my $key = $_; $key => 1; } &get_directory(
           {
-            $cfg_ref->{'hosts'}->{'exclude'}->{$key} = $value;
+            directory => $cfg_ref->{'dnsmasq_dir'},
+            pattern   => "$area.*blacklist.conf"
           }
-          while ( my ( $key, $value )
-            = each( %{ $cfg_ref->{$area}->{'exclude'} } ) )
-          {
-            $cfg_ref->{'hosts'}->{'exclude'}->{$key} = $value;
-          }
-        }
+        )
+      };
+
+      for my $file ( keys $files_ref ) {
+        delete_file( { file => $file } ) if !exists $sources_ref->{$file};
       }
 
       # write each configured area's includes into individual dnsmasq files
       if ( $cfg_ref->{$area}->{'icount'} > 0 ) {
         my $equals = ( $area ne 'domains' ) ? '=/' : '=/.';
-        my $file = "$cfg_ref->{'dnsmasq_dir'}/$area.pre-configured.conf";
+        my $file
+          = "$cfg_ref->{'dnsmasq_dir'}/$area.pre-configured.blacklist.conf";
         write_file(
           {
             file   => $file,
@@ -584,8 +627,9 @@ sub main() {
           ->{'compress'} )
         {
           $compress
-            = ( $cfg_ref->{$area}->{'src'}->{ $data_ref->{'src'} }
-              ->{'compress'} eq 'true' ) ? TRUE : FALSE;
+            = (
+            $cfg_ref->{$area}->{'src'}->{ $data_ref->{'src'} }->{'compress'} eq
+              'true' ) ? TRUE : FALSE;
         }
         else {
           $compress = FALSE;
@@ -617,7 +661,7 @@ sub main() {
           if ( $cfg_ref->{$area}->{ $data_ref->{'src'} }->{'icount'} > 0 ) {
             my $equals = ( $area ne 'domains' ) ? '=/' : '=/.';
             my $file
-              = "$cfg_ref->{'dnsmasq_dir'}/$area.$data_ref->{'src'}.conf";
+              = "$cfg_ref->{'dnsmasq_dir'}/$area.$data_ref->{'src'}.blacklist.conf";
             write_file(
               {
                 file   => $file,
@@ -657,49 +701,49 @@ sub main() {
         {
           msg_typ => 'INFO',
           msg_str => sprintf(
-            'Compiled: %s (unique %s), %s (processed) from %s (source lines)',
+            'Processed %s unique %s from %s records (%s orig. lines)%s',
             $cfg_ref->{$area}->{'unique'}, $cfg_ref->{$area}->{'type'},
-            $cfg_ref->{$area}->{'icount'}, $cfg_ref->{$area}->{'records'}
+            $cfg_ref->{$area}->{'icount'}, $cfg_ref->{$area}->{'records'},
+            qq{\n},
           )
         }
       );
 
-      $area_ctr--;
+      $area_count--;
       say(q{})
-        if ( $area_ctr == 1 ) && ( $show || $debug );  # print a final line feed
+        if ( $area_count == 1 )
+        && ( $show || $debug );    # print a final line feed
     }
   }
   elsif ( $cfg_ref->{'disabled'} ) {
     for my $area (qw{domains hosts zones}) {
-      my @files = qx{ls $cfg_ref->{'dnsmasq_dir'}/$area.*.conf 2> /dev/null };
-      if (@files) {
-        chomp(@files);
-        for my $file (@files) {
-          if ( -f $file ) {
-            log_msg(
-              {
-                msg_typ => 'INFO',
-                msg_str =>
-                  sprintf( 'Removing dnsmasq blacklist configuration file %s',
-                  $file )
-              }
-            );
-            unlink($file);
+      for my $file (
+        &get_directory(
+          {
+            directory => $cfg_ref->{'dnsmasq_dir'},
+            pattern   => "$area.*.blacklist.conf"
           }
-        }
+        )
+        )
+      {
+        delete_file( { file => $file } );
       }
     }
   }
 
+  # Select the appropriate dnsmasq restart for CLI configure or bash shell
   my $cmd
     = is_configure()
     ? '/opt/vyatta/sbin/vyatta-dns-forwarding.pl --update-dnsforwarding'
     : "$dnsmasq_svc force-reload > /dev/null 2>1&";
 
+  # Clean up the status line
+  print( "\r", " " x $cols, "\r" ) if $show;
+
   log_msg(
     { msg_typ => 'INFO', msg_str => 'Reloading dnsmasq configuration...' } );
 
-  # Reload updated dnsmasq conf redirected address files
+  # Reload updated dnsmasq conf address redirection files
   qx($cmd);
 
   # Close the log
@@ -737,29 +781,36 @@ LINE:
     map {
       my $element = $_;
       my @domain = split( /[.]/, $element );
-      if ( $input->{'area'} ne 'domain' ) {
-        given ( scalar(@domain) ) {
-          when ( $_ > 2 ) { shift(@domain); }
-          when ( $_ < 2 ) { unshift( @domain, '.' ); }
-        }
-      }
-      my $value = join( '.', @domain );
 
-      if ( !exists $input->{'config'}->{ $input->{'area'} }->{'exclude'}
-        ->{$element}
-        || !
-        exists $input->{'config'}->{ $input->{'area'} }->{'exclude'}->{$value} )
+      shift(@domain) if ( scalar(@domain) > 2 );
+      my $elem_count = scalar(@domain);
+      my $domain_name = join( '.', @domain );
+
+      my @keys;
+      for my $i ( 2 .. $elem_count ) {
+        push(@keys, join( '.', @domain ));
+        shift(@domain);
+      }
+
+      my $key_exists = FALSE;
+      for my $key (@keys) {
+        $key_exists = TRUE if exists $input->{'config'}->{'hosts'}->{'exclude'}->{$key}
+      }
+
+      if ( !$key_exists )
       {
         ( $input->{'compress'} == TRUE )
           ? $input->{'config'}->{ $input->{'area'} }->{ $input->{'src'} }
-          ->{'blklst'}->{$value} = 1
+          ->{'blklst'}->{$domain_name} = 1
           : $input->{'config'}->{ $input->{'area'} }->{ $input->{'src'} }
           ->{'blklst'}->{$element} = 1;
       }
 
       # Add to the exclude list, so the next source doesn't duplicate values
       $input->{'config'}->{ $input->{'area'} }->{'exclude'}->{$element}
-        = $value;
+        = 1;
+      $input->{'config'}->{ $input->{'area'} }->{'exclude'}->{$domain_name}
+        = 1;
     } @elements;
 
     $input->{'config'}->{ $input->{'area'} }->{ $input->{'src'} }->{'icount'}
@@ -787,8 +838,9 @@ LINE:
 
 # Process command line options and print usage
 sub usage {
-  my $input = shift;
-  my $usage = {
+  my $input    = shift;
+  my $progname = basename($0);
+  my $usage    = {
     cfg_file => sub {
       my $exitcode = shift;
       print STDERR (

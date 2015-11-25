@@ -1,48 +1,71 @@
 #!/usr/bin/env perl
 #
 use strict;
+use diagnostics;
 use warnings;
 use v5.14;
 use Text::Balanced qw(extract_bracketed);
 use Data::Dumper;
 use feature qw/switch/;
 no warnings 'experimental::smartmatch';
+use List::Util qw(first max maxstr min minstr reduce shuffle sum);
 
 my $cfg_file = '/Users/Neil/EdgeOs/Config.boots/config.boot';
 my $cfg_ref = {
-    debug    => 0,
-    disabled => 0,
-    domains  => {
-        dns_redirect_ip => '0.0.0.0',
-        blacklist    => {},
-        file         => '/etc/dnsmasq.d/domain.blacklist.conf',
-        icount       => 0,
-        records      => 0,
-        target       => 'address',
-        type         => 'domains',
-        unique       => 0,
+  debug    => 0,
+  disabled => 0,
+  domains  => {
+    dns_redirect_ip => '0.0.0.0',
+    blacklist       => {},
+    file            => '/etc/dnsmasq.d/domain.blacklist.conf',
+    icount          => 0,
+    records         => 0,
+    target          => 'address',
+    type            => 'domains',
+    unique          => 0,
+  },
+  hosts => {
+    dns_redirect_ip => '0.0.0.0',
+    blacklist       => {
+      'adsrvr.org'         => 1,
+      'adtechus.net'       => 1,
+      'advertising.com'    => 1,
+      'centade.com'        => 1,
+      'doubleclick.net'    => 1,
+      'free-counter.co.uk' => 1,
+      'kiosked.com'        => 1,
     },
-    hosts => {
-        dns_redirect_ip => '0.0.0.0',
-        blacklist    => {},
-        file         => '/etc/dnsmasq.d/host.blacklist.conf',
-        icount       => 0,
-        records      => 0,
-        target       => 'address',
-        type         => 'hosts',
-        unique       => 0,
+    include => {
+      'adobedtm.com'           => 1,
+      'coremetrics.com'        => 1,
+      'doubleclick.net'        => 1,
+      'google.com'             => 1,
+      'googleadservices.com'   => 1,
+      'googleapis.com'         => 1,
+      'hulu.com'               => 1,
+      'msdn.com'               => 1,
+      'paypal.com'             => 1,
+      'storage.googleapis.com' => 1,
+      'apple.com'              => 1,
     },
-    zones => {
-        dns_redirect_ip => '0.0.0.0',
-        blacklist    => {},
-        file         => '/etc/dnsmasq.d/zone.blacklist.conf',
-        icount       => 0,
-        records      => 0,
-        target       => 'server',
-        type         => 'zone',
-        unique       => 0,
-    },
-    log_file => '/var/log/update-blacklists-dnsmasq.log',
+    file    => '/etc/dnsmasq.d/host.blacklist.conf',
+    icount  => 0,
+    records => 0,
+    target  => 'address',
+    type    => 'hosts',
+    unique  => 0,
+  },
+  zones => {
+    dns_redirect_ip => '0.0.0.0',
+    blacklist       => {},
+    file            => '/etc/dnsmasq.d/zone.blacklist.conf',
+    icount          => 0,
+    records         => 0,
+    target          => 'server',
+    type            => 'zone',
+    unique          => 0,
+  },
+  log_file => '/var/log/update-blacklists-dnsmasq.log',
 };
 
 sub get_hash {
@@ -210,4 +233,75 @@ for (@areas) {
   pop(@areas);
   if (scalar(@areas) == 1) {say 'It worked';} # print a final line feed
 }
+$cfg_ref = {
+  debug    => 0,
+  disabled => 0,
+  domains  => {
+    dns_redirect_ip => '0.0.0.0',
+    blacklist       => {},
+    file            => '/etc/dnsmasq.d/domain.blacklist.conf',
+    icount          => 0,
+    records         => 0,
+    target          => 'address',
+    type            => 'domains',
+    unique          => 0,
+  },
+  hosts => {
+    dns_redirect_ip => '0.0.0.0',
+    blacklist       => {
+      'adsrvr.org'         => 1,
+      'adtechus.net'       => 1,
+      'advertising.com'    => 1,
+      'centade.com'        => 1,
+      'doubleclick.net'    => 1,
+      'free-counter.co.uk' => 1,
+      'kiosked.com'        => 1,
+    },
+    include => {
+      'adobedtm.com'           => 1,
+      'coremetrics.com'        => 1,
+      'doubleclick.net'        => 1,
+      'google.com'             => 1,
+      'googleadservices.com'   => 1,
+      'googleapis.com'         => 1,
+      'hulu.com'               => 1,
+      'msdn.com'               => 1,
+      'paypal.com'             => 1,
+      'storage.googleapis.com' => 1,
+      'apple.com'              => 1,
+    },
+    file    => '/etc/dnsmasq.d/host.blacklist.conf',
+    icount  => 0,
+    records => 0,
+    target  => 'address',
+    type    => 'hosts',
+    unique  => 0,
+  },
+  zones => {
+    dns_redirect_ip => '0.0.0.0',
+    blacklist       => {},
+    file            => '/etc/dnsmasq.d/zone.blacklist.conf',
+    icount          => 0,
+    records         => 0,
+    target          => 'server',
+    type            => 'zone',
+    unique          => 0,
+  },
+  log_file => '/var/log/update-blacklists-dnsmasq.log',
+};
+
+my $element = 'www.60neil.piffle.waffle.dog.doubleclick.net';
+my @domain = split( /[.]/, $element );
+
+shift(@domain) if ( scalar(@domain) > 2 );
+my $elem_count = scalar(@domain);
+my @value;
+
+for my $i ( 2 .. $elem_count ) {
+  push(@value, join( '.', @domain ));
+  shift(@domain);
+}
+say Dumper(@value) if none {$cfg_ref->{hosts}->{blacklist}->{$_}} @value;
+
+$cfg_ref->{hosts}->{blacklist}->{'beap.gemini.yahoo.com'}
 
