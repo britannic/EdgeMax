@@ -127,6 +127,7 @@ trap 'report_error $? ${LINENO} ${BASH_LINENO} "${BASH_COMMAND}" $(printf "::%s"
 # Install blacklist support
 install_blacklist_support ()
 {
+	trap - ERR
 	CONFIG='/config/scripts'
 	BLACKLIST='update-dnsmasq.pl'
 	TEMPLATES='/opt/vyatta/share/vyatta-cfg/templates/service/dns'
@@ -167,10 +168,13 @@ install_blacklist_support ()
 	echo "Creating starter blacklists and task scheduler for ${BLACKLIST}..."
     set service dns forwarding blacklist dns-redirect-ip 0.0.0.0
     set service dns forwarding blacklist disabled false
+    set service dns forwarding blacklist domains exclude 122.2o7.net
     set service dns forwarding blacklist domains exclude adobedtm.com
     set service dns forwarding blacklist domains exclude apple.com
     set service dns forwarding blacklist domains exclude coremetrics.com
     set service dns forwarding blacklist domains exclude doubleclick.net
+    set service dns forwarding blacklist domains exclude github.com
+    set service dns forwarding blacklist domains exclude githubusercontent.com
     set service dns forwarding blacklist domains exclude google.com
     set service dns forwarding blacklist domains exclude googleadservices.com
     set service dns forwarding blacklist domains exclude googleapis.com
@@ -178,6 +182,7 @@ install_blacklist_support ()
     set service dns forwarding blacklist domains exclude msdn.com
     set service dns forwarding blacklist domains exclude paypal.com
     set service dns forwarding blacklist domains exclude storage.googleapis.com
+    set service dns forwarding blacklist domains exclude cloudfront.net
     set service dns forwarding blacklist domains include adsrvr.org
     set service dns forwarding blacklist domains include adtechus.net
     set service dns forwarding blacklist domains include advertising.com
@@ -194,15 +199,9 @@ install_blacklist_support ()
     set service dns forwarding blacklist domains source malc0de.com url 'http://malc0de.com/bl/ZONES'
     set service dns forwarding blacklist domains source malc0de.com compress false
     set service dns forwarding blacklist hosts exclude appleglobal.112.2o7.net
-    set service dns forwarding blacklist hosts exclude c.apple.com
-    set service dns forwarding blacklist hosts exclude autolinkmaker.itunes.apple.com
     set service dns forwarding blacklist hosts exclude cdn.visiblemeasures.com
     set service dns forwarding blacklist hosts exclude freedns.afraid.org
     set service dns forwarding blacklist hosts exclude hb.disney.go.com
-    set service dns forwarding blacklist hosts exclude ads.hulu.com
-    set service dns forwarding blacklist hosts exclude ads-a-darwin.hulu.com
-    set service dns forwarding blacklist hosts exclude ads-v-darwin.hulu.com
-    set service dns forwarding blacklist hosts exclude track.hulu.com
     set service dns forwarding blacklist hosts exclude static.chartbeat.com
     set service dns forwarding blacklist hosts exclude survey.112.2o7.net
     set service dns forwarding blacklist hosts include beap.gemini.yahoo.com
@@ -225,10 +224,7 @@ install_blacklist_support ()
     set service dns forwarding blacklist hosts source yoyo.org prefix ''
     set service dns forwarding blacklist hosts source yoyo.org url 'http://pgl.yoyo.org/as/serverlist.php?hostformat=nohtml&showintro=1&mimetype=plaintext'
     set system task-scheduler task update_blacklists executable path /config/scripts/update-dnsmasq.pl
-    set system task-scheduler task update_blacklists interval 6h
-#     set service dns forwarding blacklist hosts source hpHosts description 'hpHosts optimized in hosts format'
-#     set service dns forwarding blacklist hosts source hpHosts prefix '127.0.0.1 '
-#     set service dns forwarding blacklist hosts source hpHosts url 'http://hosts-file.net/download/HOSTS-Optimized.txt'
+    set system task-scheduler task update_blacklists interval 1d
 #     delete service dns forwarding blacklist hosts source zeustracker.abuse.ch/compromised description 'abuse.ch ZeuS compromised URL blacklist'
 #     delete service dns forwarding blacklist hosts source zeustracker.abuse.ch/compromised prefix ''
 #     delete service dns forwarding blacklist hosts source zeustracker.abuse.ch/compromised url 'https://zeustracker.abuse.ch/blocklist.php?download=compromised'
@@ -247,7 +243,7 @@ install_blacklist_support ()
 
 	return ${ERROR}
 }
-
+	trap - ERR
 # This is where we run the script using the above functions
 if is_version
 then

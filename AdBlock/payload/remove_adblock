@@ -25,7 +25,7 @@
 #
 set -o errtrace
 
-VERSION="v2.5"
+VERSION="v2.6"
 ADBLOCKVER=$(cat version)
 ERROR=0
 # Uncomment for debugging or syntax checking
@@ -109,21 +109,25 @@ trap 'report_error $? ${LINENO} ${BASH_LINENO} "${BASH_COMMAND}" $(printf "::%s"
 # Install adblock and bogon support
 delete_adblock_support ()
 {
+	trap - ERR
 	CONFIG="/config/scripts"
 	SCRIPT="update-dnsmasq.pl"
 	OSCRIPT="update-blacklists-dnsmasq.pl"
 	DNSMASQ="/etc/dnsmasq.d"
-	CNFFILE="blacklist.conf"
+	CNFFILE=".conf"
 	CFGDIR="/opt/vyatta/share/vyatta-cfg/templates/service/dns/forwarding"
 	BLKLIST="blacklist"
 
 	for i in domain host zone
 	do
-		if [[ -f "${DNSMASQ}/${i}.${CNFFILE}" ]]
-		then
-			echo "Removing ${DNSMASQ}/${i}.${CNFFILE}"
-			rm ${DNSMASQ}/${i}.${CNFFILE}
-		fi
+		for FILE in "${DNSMASQ}/${i}"*"${CNFFILE}"
+		do
+			if [[ -f "${FILE}" ]]
+			then
+				echo "Removing ${FILE}"
+				rm "${FILE}"
+			fi
+		done
 	done
 
 	if [[ -f "${CONFIG}/${SCRIPT}" ]]; then
@@ -153,7 +157,7 @@ delete_adblock_support ()
 	end
 
 	echo "Removing blacklist configuration templates for ${SCRIPT}..."
-	[[ -f "${CFGDIR}/${BLKLIST}/" ]] && rm -rf "${CFGDIR}/${BLKLIST}/"
+	[[ -d "${CFGDIR}/${BLKLIST}/" ]] && rm -rf "${CFGDIR}/${BLKLIST}/"
 
 	service dnsmasq restart
 
@@ -161,7 +165,7 @@ delete_adblock_support ()
 }
 
 # This is where we run the script using the above functions
-
+trap - ERR
 if /opt/vyatta/bin/yesno -n 'Do you want to completely remove Blacklist? [y/N]: '
 then
 	if delete_adblock_support
