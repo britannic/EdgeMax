@@ -24,7 +24,7 @@
 #
 # **** End License ****
 
-my $version = '3.25beta1';
+my $version = '3.3beta1';
 
 # use Data::Dumper;
 use feature qw/switch/;
@@ -774,14 +774,17 @@ LINE:
     $line =~ s/$re->{SUFFIX}//;
     $line =~ s/$re->{LSPACE}//;
     $line =~ s/$re->{RSPACE}//;
-
+    # Get all of the FQDNs or domains in the line
     my @elements = $line =~ m/$re->{FQDOMN}/gc;
     next LINE if !scalar(@elements);
-
+    # We use map to individually pull 1 to N FQDNs or domains from @elements
     map {
+      # Capture the FQDN or domain
       my $element = $_;
+      # Break it down into it components
       my @domain = split( /[.]/, $element );
 
+      # Convert it to a domain if it is more than two elements
       shift(@domain) if ( scalar(@domain) > 2 );
       my $elem_count = scalar(@domain);
       my $domain_name = join( '.', @domain );

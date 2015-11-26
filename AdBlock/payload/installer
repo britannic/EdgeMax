@@ -170,9 +170,13 @@ install_blacklist_support ()
     set service dns forwarding blacklist disabled false
     set service dns forwarding blacklist domains exclude 122.2o7.net
     set service dns forwarding blacklist domains exclude adobedtm.com
+    set service dns forwarding blacklist domains exclude amazonaws.com
     set service dns forwarding blacklist domains exclude apple.com
+    set service dns forwarding blacklist domains exclude ask.com
+    set service dns forwarding blacklist domains exclude cloudfront.net
     set service dns forwarding blacklist domains exclude coremetrics.com
     set service dns forwarding blacklist domains exclude doubleclick.net
+    set service dns forwarding blacklist domains exclude edgesuite.net
     set service dns forwarding blacklist domains exclude github.com
     set service dns forwarding blacklist domains exclude githubusercontent.com
     set service dns forwarding blacklist domains exclude google.com
@@ -182,7 +186,6 @@ install_blacklist_support ()
     set service dns forwarding blacklist domains exclude msdn.com
     set service dns forwarding blacklist domains exclude paypal.com
     set service dns forwarding blacklist domains exclude storage.googleapis.com
-    set service dns forwarding blacklist domains exclude cloudfront.net
     set service dns forwarding blacklist domains include adsrvr.org
     set service dns forwarding blacklist domains include adtechus.net
     set service dns forwarding blacklist domains include advertising.com
@@ -190,11 +193,11 @@ install_blacklist_support ()
     set service dns forwarding blacklist domains include doubleclick.net
     set service dns forwarding blacklist domains include free-counter.co.uk
     set service dns forwarding blacklist domains include kiosked.com
-    set service dns forwarding blacklist domains source hpHosts description 'hpHosts optimized in hosts format'
-    set service dns forwarding blacklist domains source hpHosts prefix '127.0.0.1 '
-    set service dns forwarding blacklist domains source hpHosts url 'http://hosts-file.net/download/HOSTS-Optimized.txt'
-    set service dns forwarding blacklist domains source hpHosts compress true
-    set service dns forwarding blacklist domains source malc0de.com description 'List of zones serving malicious executables observed by malc0de.com/database/'
+#     set service dns forwarding blacklist domains source hpHosts description 'hpHosts optimized in hosts format'
+#     set service dns forwarding blacklist domains source hpHosts prefix '127.0.0.1 '
+#     set service dns forwarding blacklist domains source hpHosts url 'http://hosts-file.net/download/HOSTS-Optimized.txt'
+#     set service dns forwarding blacklist domains source hpHosts compress true
+#     set service dns forwarding blacklist domains source malc0de.com description 'List of zones serving malicious executables observed by malc0de.com/database/'
     set service dns forwarding blacklist domains source malc0de.com prefix 'zone '
     set service dns forwarding blacklist domains source malc0de.com url 'http://malc0de.com/bl/ZONES'
     set service dns forwarding blacklist domains source malc0de.com compress false
@@ -205,6 +208,9 @@ install_blacklist_support ()
     set service dns forwarding blacklist hosts exclude static.chartbeat.com
     set service dns forwarding blacklist hosts exclude survey.112.2o7.net
     set service dns forwarding blacklist hosts include beap.gemini.yahoo.com
+    set service dns forwarding blacklist hosts source adaway description 'Blocking mobile ad providers and some analytics providers'
+    set service dns forwarding blacklist hosts source adaway prefix '127.0.0.1 '
+    set service dns forwarding blacklist hosts source adaway url 'http://adaway.org/hosts.txt'
     set service dns forwarding blacklist hosts source openphish.com description 'OpenPhish automatic phishing detection'
     set service dns forwarding blacklist hosts source openphish.com prefix http
     set service dns forwarding blacklist hosts source openphish.com url 'https://openphish.com/feed.txt'
