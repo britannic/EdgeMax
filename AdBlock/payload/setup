@@ -1,0 +1,526 @@
+#!/usr/bin/env perl
+# **** License ****
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	See the GNU
+# General Public License for more details.
+#
+# A copy of the GNU General Public License is available as
+# '/usr/share/common-licenses/GPL' in the Debian GNU/Linux distribution
+# or on the World Wide Web at `http://www.gnu.org/copyleft/gpl.html'.
+# You can also obtain it by writing to the Free Software Foundation,
+# Free Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+# MA 02110-1301, USA.
+#
+# Author: Neil Beadle
+# Date: Novemeber 2015
+#
+# **** End License ****
+# Install dnsmasq BLACKLIST and blacklist blocking onto an EdgeMax router
+# Use at your own risk
+#
+
+use feature qw{switch};
+use File::Basename;
+use POSIX qw{geteuid strftime};
+use strict;
+use v5.14;
+use warnings;
+
+use constant TRUE  => 1;
+use constant FALSE => 0;
+
+chomp( my $version = qx{cat version} );
+my $program = basename($0);
+my $edgeOS  = &is_version();
+my $name    = q{ADBlock};
+my $logfile = qq{/var/log/$name-$version-$program.log};
+my $begin   = q{/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper begin};
+my $commit  = q{/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper commit};
+my $delete  = q{/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper delete};
+my $end     = q{/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper end};
+my $save    = q{/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper save};
+my $set     = q{/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper set};
+my $env_ref = {
+  cnf_ext    => q{.conf},
+  dnsmasq    => q{/etc/dnsmasq.d},
+  oldconf    => q{dnsmasq.blacklist.conf},
+  oldscript  => q{update-blacklists-dnsmasq.pl},
+  script     => q{update-dnsmasq.pl},
+  script_dir => q{/config/scripts},
+  templates => q{/opt/vyatta/share/vyatta-cfg/templates/service/dns/forwarding},
+};
+my ( $LH, $success );
+
+############################### script runs here ###############################
+&main();
+
+# Exit normally
+exit(0);
+################################################################################
+
+sub error_handler {
+  $success = ( shift >> 8 != 0 ) ? FALSE : TRUE;
+  return $success;
+}
+
+# check version and set up environment
+sub is_build {
+
+  # v1.2.0: build 4574253
+  # v1.4.1: build 4648309
+  # v1.5.0: build 4677648
+  # v1.6.0: build 4716006
+  # v1.7.0: build 4783374
+
+  if ( $edgeOS->{'build'} >= 4783374 )    # script tested on os v1.7.0 & above
+  {
+    return TRUE;
+  }
+  elsif ( $edgeOS->{'build'} < 4783374 )    # os must be upgraded
+  {
+    return FALSE;
+  }
+}
+
+# Make sure script runs as root
+sub is_sudo {
+  return (TRUE) if geteuid() == 0;
+  return (FALSE);
+}
+
+# get EdgeOS version
+sub is_version {
+  my ( $build, $version ) = ( q{UNKNOWN BUILD}, q{UNKNOWN VERSION} );
+  chomp( my $edgeOS = qx{cat /opt/vyatta/etc/version} );
+  if ( $? >> 8 == 0 ) {
+    if ( $edgeOS =~ s{^Version:\s*(?<VERSION>.*)$}{$+{VERSION}}xms ) {
+      my @ver = split /\./, $edgeOS;
+      $version = join( ".", @ver[ 0, 1, 2 ] );
+      $build = $ver[3];
+    }
+  }
+  return ( { version => $version, build => $build } );
+}
+
+sub log_msg {
+  my $msg_ref = shift;
+  my $date = strftime "%b %e %H:%M:%S %Y", localtime;
+  return (FALSE)
+    unless ( length( $msg_ref->{msg_typ} . $msg_ref->{msg_str} ) > 2 );
+
+  say {$LH} ("$date: $msg_ref->{msg_typ}: $msg_ref->{msg_str}");
+  say("$msg_ref->{msg_typ}: $msg_ref->{msg_str}");
+
+  return TRUE;
+}
+
+sub main {
+
+  # Exit if we're not root/sudo
+  if ( !is_sudo ) {
+    say( qq{$name $program must be executed as sudo/root} . q{!} );
+    exit(1);
+  }
+
+  # Start logging
+  open( $LH, '>>', $logfile )
+    or die(qq{$name $program Cannot open $logfile - this shouldn't happen!});
+
+  log_msg(
+    {
+      msg_typ => q{INFO},
+      msg_str => qq{---+++ $name $program $version +++--- }
+    }
+  );
+
+  given ($program) {
+    when (m/setup/) {
+      if ( is_build() ) {
+        log_msg(
+          {
+            msg_typ => q{INFO},
+            msg_str =>
+              qq{Installing $name version $version blocking dnsmasq support...}
+          }
+        );
+        if ( setup() ) {
+          log_msg(
+            {
+              msg_typ => q{INFO},
+              msg_str => qq{$name version $version installation successful...}
+            }
+          );
+        }
+        else {
+          log_msg(
+            {
+              msg_typ => q{ERROR},
+              msg_str => qq{$name version $version installation failed} . q{!}
+                . qq{\nReview the log file: $logfile...}
+            }
+          );
+          exit(1);
+        }
+      }
+      else {
+        log_msg(
+          {
+            msg_typ => q{ERROR},
+            msg_str =>
+              qq{Edgemax $edgeOS->{'version'} is not supported, upgrade!} . q{!}
+          }
+        );
+        exit(1);
+      }
+    }
+    when (m/remove/) {
+      if ( remove() ) {
+        log_msg(
+          {
+            msg_typ => q{INFO},
+            msg_str => qq{$name version $version removal successful...}
+          }
+        );
+      }
+      else {
+        log_msg(
+          {
+            msg_typ => q{ERROR},
+            msg_str => qq{$name version $version removal failed} . q{!}
+              . qq{\nReview the log file: $logfile...}
+          }
+        );
+        exit(1);
+      }
+    }
+  }
+
+  close($LH);
+  exit 0;
+}
+
+# Remove blacklist support
+sub remove {
+  $success = TRUE;
+
+  my $found = qx{ls $env_ref->{'dnsmasq'}/*$env_ref->{'cnf_ext'} 2> /dev/null};
+  chomp( my @directory
+      = $found =~ m{((?:domains|hosts|zones)[.].*$env_ref->{'cnf_ext'})}gc );
+
+  if (@directory) {
+    log_msg(
+      {
+        msg_typ => q{INFO},
+        msg_str =>
+          qq{Removing dnsmasq blacklist files from directory: $env_ref->{'dnsmasq'}/}
+      }
+    );
+
+    for my $file (@directory) {
+      if ( -f qq{$env_ref->{'dnsmasq'}/$file} ) {
+        log_msg(
+          { msg_typ => q{INFO}, msg_str => qq{Removing $file} } );
+        unlink(qq{$env_ref->{'dnsmasq'}/$file});
+        if ( -f $file ) {
+          $success = FALSE;
+          log_msg(
+            {
+              msg_typ => q{ERROR},
+              msg_str =>
+                qq{unable to remove $env_ref->{'dnsmasq'}/$env_ref->{'script'}}
+            }
+          );
+        }
+      }
+    }
+  }
+
+  if ( -f qq{$env_ref->{script_dir}/$env_ref->{'script'}} ) {
+    log_msg(
+      {
+        msg_typ => q{INFO},
+        msg_str =>
+          qq{Removing $name dnsmasq blacklist script $env_ref->{script_dir}/$env_ref->{'script'}}
+      }
+    );
+    unlink(qq{$env_ref->{script_dir}/$env_ref->{'script'}});
+    if ( -f qq{$env_ref->{script_dir}/$env_ref->{'script'}} ) {
+      $success = FALSE;
+      log_msg(
+        {
+          msg_typ => q{ERROR},
+          msg_str =>
+            qq{unable to remove $env_ref->{script_dir}/$env_ref->{'script'}}
+        }
+      );
+    }
+  }
+
+  if ( -f qq{$env_ref->{script_dir}/$env_ref->{'oldscript'}} ) {
+    log_msg(
+      {
+        msg_typ => q{INFO},
+        msg_str =>
+          qq{Removing $name $env_ref->{'oldscript'} from $env_ref->{script_dir}/}
+      }
+    );
+    unlink(qq{$env_ref->{script_dir}/$env_ref->{'oldscript'}});
+    if ( -f qq{$env_ref->{script_dir}/$env_ref->{'oldscript'}} ) {
+      $success = FALSE;
+      log_msg(
+        {
+          msg_typ => q{ERROR},
+          msg_str =>
+            qq{Unable to remove $name $env_ref->{'oldscript'} from $env_ref->{script_dir}/}
+        }
+      );
+    }
+  }
+
+  log_msg(
+    {
+      msg_typ => q{INFO},
+      msg_str =>
+        qq{Removing $name dnsmasq blacklist sources and task scheduler entries...}
+    }
+  );
+
+  my @command = (
+    qq{$begin;},
+    qq{$delete service dns forwarding blacklist;},
+    qq{$delete system task-scheduler task update_blacklists;},
+    qq{$commit;},
+    qq{$save;},
+    qq{$end;},
+  );
+
+  chomp( my @output = qx{@command} );
+
+  if ( ( q{Nothing to delete (the specified node does not exist)} ~~ @output ) )
+  {
+    log_msg(
+      {
+        msg_typ => q{INFO},
+        msg_str =>
+          qq{$name dnsmasq blacklist wasn't configured, nothing to delete.}
+      }
+    );
+  }
+  else {
+    for my $message (@output) {
+      log_msg( { msg_typ => q{INFO}, msg_str => $message } );
+    }
+  }
+
+  if ( -d qq{$env_ref->{'templates'}/blacklist/} ) {
+    log_msg(
+      {
+        msg_typ => q{INFO},
+        msg_str =>
+          qq{Removing $name dnsmasq blacklist configuration templates...}
+      }
+    );
+    qx{rm -rf "$env_ref->{'templates'}/blacklist/"};
+    if ( -d qq{$env_ref->{'templates'}/blacklist/} ) {
+      $success = FALSE;
+      log_msg(
+        {
+          msg_typ => q{ERROR},
+          msg_str =>
+            qq{Unable to remove $name dnsmasq blacklist configuration templates...}
+        }
+      );
+    }
+  }
+
+  qx{service dnsmasq restart};
+  log_msg(
+    {
+      msg_typ => q{ERROR},
+      msg_str =>
+        q{dnsmasq service did not successfully restart, investigate and resolve!}
+    }
+  ) if !error_handler($?);
+
+  return $success;
+}
+
+# Install blacklist support
+sub setup () {
+  $success = TRUE;
+
+  if ( -f qq{$env_ref->{'dnsmasq'}/$env_ref->{'oldconf'}} ) {
+    log_msg(
+      {
+        msg_typ => q{INFO},
+        msg_str =>
+          qq{Removing previous version $name blacklist script $env_ref->{'dnsmasq'}/$env_ref->{'oldconf'}}
+      }
+    );
+    unlink(qq{$env_ref->{'dnsmasq'}/$env_ref->{'oldconf'}});
+    if ( -f qq{$env_ref->{'dnsmasq'}/$env_ref->{'oldconf'}} ) {
+      $success = FALSE;
+      log_msg(
+        {
+          msg_typ => q{ERROR},
+          msg_str =>
+            qq{unable to remove previous version $name script $env_ref->{'dnsmasq'}/$env_ref->{'oldconf'}}
+        }
+      );
+    }
+  }
+
+  if ( !-d $env_ref->{'script_dir'} ) {
+    log_msg(
+      {
+        msg_typ => q{INFO},
+        msg_str => qq{Creating $name script $env_ref->{'script_dir'}}
+      }
+    );
+    qx{install -d -o root -g root -m 0755 $env_ref->{'script_dir'}};
+    log_msg(
+      {
+        msg_typ => q{ERROR},
+        msg_str => qq{Unable to create $name script $env_ref->{'script_dir'}}
+      }
+    ) if !error_handler($?);
+  }
+
+  log_msg(
+    {
+      msg_typ => q{INFO},
+      msg_str =>
+        qq{Installing $name $env_ref->{'script'} script to $env_ref->{'script_dir'}/}
+    }
+  );
+
+  qx{install -o root -g root -m 0755 $env_ref->{'script'} "$env_ref->{script_dir}/$env_ref->{'script'}"};
+
+  log_msg(
+    {
+      msg_typ => q{ERROR},
+      msg_str =>
+        qq{unable to install $name $env_ref->{'script'} script to $env_ref->{'script_dir'}/}
+    }
+  ) if !error_handler($?);
+
+  log_msg(
+    {
+      msg_typ => q{INFO},
+      msg_str =>
+        qq{Installing $name dnsmasq blacklist configuration templates...}
+    }
+  );
+
+  qx{cp -rf blacklist/ "$env_ref->{'templates'}/"};
+
+  log_msg(
+    {
+      msg_typ => q{ERROR},
+      msg_str =>
+        qq{ERROR unable to install $name dnsmasq blacklist configuration templates to $env_ref->{'templates'}/blacklist/}
+    }
+  ) if !error_handler($?);
+
+  log_msg(
+    {
+      msg_typ => q{INFO},
+      msg_str =>
+        qq{Creating default $name dnsmasq blacklist sources and task scheduler entries...}
+    }
+  );
+
+  my @command = (
+    qq{$begin;},
+    qq{$set service dns forwarding blacklist dns-redirect-ip '0.0.0.0';},
+    qq{$set service dns forwarding blacklist disabled false;},
+    qq{$set service dns forwarding blacklist domains exclude '122.2o7.net';},
+    qq{$set service dns forwarding blacklist domains exclude 'adobedtm.com';},
+    qq{$set service dns forwarding blacklist domains exclude 'amazonaws.com';},
+    qq{$set service dns forwarding blacklist domains exclude 'apple.com';},
+    qq{$set service dns forwarding blacklist domains exclude 'ask.com';},
+    qq{$set service dns forwarding blacklist domains exclude 'cloudfront.net';},
+    qq{$set service dns forwarding blacklist domains exclude 'coremetrics.com';},
+    qq{$set service dns forwarding blacklist domains exclude 'doubleclick.net';},
+    qq{$set service dns forwarding blacklist domains exclude 'edgesuite.net';},
+    qq{$set service dns forwarding blacklist domains exclude 'github.com';},
+    qq{$set service dns forwarding blacklist domains exclude 'githubusercontent.com';},
+    qq{$set service dns forwarding blacklist domains exclude 'google.com';},
+    qq{$set service dns forwarding blacklist domains exclude 'googleadservices.com';},
+    qq{$set service dns forwarding blacklist domains exclude 'googleapis.com';},
+    qq{$set service dns forwarding blacklist domains exclude 'hulu.com';},
+    qq{$set service dns forwarding blacklist domains exclude 'msdn.com';},
+    qq{$set service dns forwarding blacklist domains exclude 'paypal.com';},
+    qq{$set service dns forwarding blacklist domains exclude 'storage.googleapis.com';},
+    qq{$set service dns forwarding blacklist domains include 'adsrvr.org';},
+    qq{$set service dns forwarding blacklist domains include 'adtechus.net';},
+    qq{$set service dns forwarding blacklist domains include 'advertising.com';},
+    qq{$set service dns forwarding blacklist domains include 'centade.com';},
+    qq{$set service dns forwarding blacklist domains include 'doubleclick.net';},
+    qq{$set service dns forwarding blacklist domains include 'free-counter.co.uk';},
+    qq{$set service dns forwarding blacklist domains include 'kiosked.com';},
+    qq{$set service dns forwarding blacklist domains source malc0de.com description 'List of zones serving malicious executables observed by malc0de.com/database/';},
+    qq{$set service dns forwarding blacklist domains source malc0de.com prefix 'zone ';},
+    qq{$set service dns forwarding blacklist domains source malc0de.com url 'http://malc0de.com/bl/ZONES';},
+    qq{$set service dns forwarding blacklist domains source malc0de.com compress false;},
+    qq{$set service dns forwarding blacklist hosts exclude 'appleglobal.112.2o7.net';},
+    qq{$set service dns forwarding blacklist hosts exclude 'cdn.visiblemeasures.com';},
+    qq{$set service dns forwarding blacklist hosts exclude 'freedns.afraid.org';},
+    qq{$set service dns forwarding blacklist hosts exclude 'hb.disney.go.com';},
+    qq{$set service dns forwarding blacklist hosts exclude 'static.chartbeat.com';},
+    qq{$set service dns forwarding blacklist hosts exclude 'survey.112.2o7.net';},
+    qq{$set service dns forwarding blacklist hosts include 'beap.gemini.yahoo.com';},
+    qq{$set service dns forwarding blacklist hosts source adaway description 'Blocking mobile ad providers and some analytics providers';},
+    qq{$set service dns forwarding blacklist hosts source adaway prefix '127.0.0.1	';},
+    qq{$set service dns forwarding blacklist hosts source adaway url 'http://adaway.org/hosts.txt';},
+    qq{$set service dns forwarding blacklist hosts source openphish.com description 'OpenPhish automatic phishing detection';},
+    qq{$set service dns forwarding blacklist hosts source openphish.com prefix http;},
+    qq{$set service dns forwarding blacklist hosts source openphish.com url 'https://openphish.com/feed.txt';},
+    qq{$set service dns forwarding blacklist hosts source someonewhocares.org description 'Zero based host and domain list';},
+    qq{$set service dns forwarding blacklist hosts source someonewhocares.org prefix 0.0.0.0;},
+    qq{$set service dns forwarding blacklist hosts source someonewhocares.org url 'http://someonewhocares.org/hosts/zero/';},
+    qq{$set service dns forwarding blacklist hosts source volkerschatz.com description 'Ad server blacklists';},
+    qq{$set service dns forwarding blacklist hosts source volkerschatz.com prefix http;},
+    qq{$set service dns forwarding blacklist hosts source volkerschatz.com url 'http://www.volkerschatz.com/net/adpaths';},
+    qq{$set service dns forwarding blacklist hosts source winhelp2002.mvps.org description 'Zero based host and domain list';},
+    qq{$set service dns forwarding blacklist hosts source winhelp2002.mvps.org prefix '0.0.0.0 ';},
+    qq{$set service dns forwarding blacklist hosts source winhelp2002.mvps.org url 'http://winhelp2002.mvps.org/hosts.txt';},
+    qq{$set service dns forwarding blacklist hosts source www.malwaredomainlist.com description '127.0.0.1 based host and domain list';},
+    qq{$set service dns forwarding blacklist hosts source www.malwaredomainlist.com prefix '127.0.0.1 ';},
+    qq{$set service dns forwarding blacklist hosts source www.malwaredomainlist.com url 'http://www.malwaredomainlist.com/hostslist/hosts.txt';},
+    qq{$set service dns forwarding blacklist hosts source yoyo.org description 'Fully Qualified Domain Names only - no prefix to strip';},
+    qq{$set service dns forwarding blacklist hosts source yoyo.org prefix '';},
+    qq{$set service dns forwarding blacklist hosts source yoyo.org url 'http://pgl.yoyo.org/as/serverlist.php?hostformat=nohtml&showintro=1&mimetype=plaintext';},
+    qq{$set system task-scheduler task update_blacklists executable path /config/scripts/update-dnsmasq.pl;},
+    qq{$set system task-scheduler task update_blacklists interval 1d;},
+    qq{$commit;},
+    qq{$save;},
+    qq{$end;},
+  );
+
+  open( my $SHELL, '|-', "@command" );
+
+  # Now run configure and set up the blacklist configuration - capture any
+  # errors in the log
+  while (<$SHELL>) {
+    my $cmd_output = $_;
+    if (
+      !$cmd_output =~ m{The specified configuration node already exists\n}xms )
+    {
+      print $cmd_output;
+      if ( $cmd_output =~ m{error|failed|failure}ixms ) {
+        $success = FALSE;
+        log_msg( { msg_typ => q{ERROR}, msg_str => $cmd_output } );
+      }
+    }
+  }
+
+
+  return ($success);
+}
+
