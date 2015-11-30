@@ -61,14 +61,14 @@ sub cfg_actv {
     my ( $listNodes, $returnValue, $returnValues );
 
     if ( is_configure() ) {
-      $returnValue  = qq{returnValue};
-      $returnValues = qq{returnValues};
-      $listNodes    = qq{listNodes};
+      $returnValue  = q{returnValue};
+      $returnValues = q{returnValues};
+      $listNodes    = q{listNodes};
     }
     else {
-      $returnValue  = qq{returnOrigValue};
-      $returnValues = qq{returnOrigValues};
-      $listNodes    = qq{listOrigNodes};
+      $returnValue  = q{returnOrigValue};
+      $returnValues = q{returnOrigValues};
+      $listNodes    = q{listOrigNodes};
     }
 
     $config->setLevel(q{service dns forwarding blacklist});
@@ -127,7 +127,13 @@ sub cfg_actv {
     && ( !scalar( keys %{ $input->{'config'}->{'hosts'}->{'src'} } ) )
     && ( !scalar( keys %{ $input->{'config'}->{'zones'}->{'src'} } ) ) )
   {
-    log_msg ({msg_ref => q{ERROR}, msg_str => q{At least one domain or host source must be configured}});
+    $show = TRUE;
+    log_msg(
+      {
+        msg_ref => q{ERROR},
+        msg_str => q{At least one domain or host source must be configured}
+      }
+    );
     return (FALSE);
   }
 
@@ -181,14 +187,14 @@ sub delete_file {
     log_msg(
       {
         msg_typ => q{INFO},
-        msg_str => sprintf( q{Deleting file %s', $input->{'file}} )
+        msg_str => sprintf(q{Deleting file %s}, $input->{'file'})
       }
     );
     return unlink( $input->{'file'} )
       or log_msg(
       {
         msg_typ => q{WARNING},
-        msg_str => sprintf( q{Unable to delete %s', $input->{'file}} )
+        msg_str => sprintf(q{Unable to delete %s}, $input->{'file'} )
       }
       );
   }
@@ -212,7 +218,7 @@ sub get_file {
   my $input = shift;
   my @data;
   if ( exists $input->{'file'} ) {
-    open( my $CF, '<', $input->{'file'} )
+    open( my $CF, q{<}, $input->{'file'} )
       or die qq{ERROR: Unable to open $input->{'file'}: $!};
     chomp( @data = <$CF> );
     close($CF);
@@ -355,7 +361,7 @@ sub get_url {
   $ua->agent(
     q{Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11) AppleWebKit/601.1.56 (KHTML, like Gecko) Version/9.0 Safari/601.1.56}
   );
-  $ua->timeout(90);
+  $ua->timeout(60);
   my $get;
   my $lines = 0;
   $input->{'prefix'} =~ s/^["](?<UNCMT>.*)["]$/$+{UNCMT}/g;
@@ -428,13 +434,13 @@ sub log_msg {
   my $msg_ref = shift;
   my $date = strftime qq{%b %e %H:%M:%S %Y}, localtime;
   return (FALSE)
-    unless ( length( $msg_ref->{msg_typ} . $msg_ref->{msg_str} ) > 2 );
+    unless ( length( $msg_ref->{'msg_typ'} . $msg_ref->{'msg_str'} ) > 2 );
 
   my $EOL = scalar($debug) ? qq{\n} : q{};
 
-  say {$LH} (qq{$date: $msg_ref->{msg_typ}: $msg_ref->{msg_str}});
-  print( qq{\r}, q{ } x $cols, qq{\r}} ) if $show;
-  print(qq{$msg_ref->{msg_typ}: $msg_ref->{msg_str}$EOL}) if $show;
+  say {$LH} (qq{$date: $msg_ref->{'msg_typ'}: $msg_ref->{'msg_str'}});
+  print( qq{\r}, q{ } x $cols, qq{\r} ) if $show;
+  print( qq{$msg_ref->{'msg_typ'}: $msg_ref->{'msg_str'}$EOL}) if $show;
 
   return TRUE;
 }
@@ -493,7 +499,7 @@ sub main() {
   $cfg_ref->{'hosts'}->{'exclude'}->{'localhost'} = 1;
 
   # Now choose which data set will define the configuration
-  my $cfg_type = defined($cfg_file) ? q{file' : 'active};
+  my $cfg_type = defined($cfg_file) ? q{file} : q{active};
 
   exit(1) unless get_config( { type => $cfg_type, config => $cfg_ref } );
 
@@ -624,7 +630,7 @@ sub main() {
           exists $cfg_ref->{$area}->{'src'}->{ $data_ref->{'src'} }
             ->{'compress'}
             && $cfg_ref->{$area}->{'src'}->{ $data_ref->{'src'} }->{'compress'}
-            eq 'true' ) ? TRUE : FALSE;
+            eq q{true} ) ? TRUE : FALSE;
         if ( exists $data_ref->{'host'} && scalar($rec_count) ) {
           log_msg(
             {
@@ -721,7 +727,8 @@ sub main() {
             {
               msg_typ => 'INFO',
               msg_str => sprintf(
-                qq{$area blacklisted: domain %s %s times}, $key, $value
+                qq{$area blacklisted: domain %s %s times},
+                $key, $value
               )
             }
           ) if ( $value > $cfg_ref->{'repeat_threshold'} );
@@ -749,7 +756,7 @@ sub main() {
     : qq{$dnsmasq_svc force-reload > /dev/null 2>1&};
 
   # Clean up the status line
-  print( "\r", " " x $cols, "\r" ) if $show;
+  print( qq{\r}, qq{ } x $cols, qq{\r} ) if $show;
 
   log_msg(
     { msg_typ => q{INFO}, msg_str => q{Reloading dnsmasq configuration...} } );
@@ -757,7 +764,10 @@ sub main() {
   # Reload updated dnsmasq conf address redirection files
   qx{$cmd};
   log_msg(
-    { msg_typ => q{ERROR}, msg_str => q{Reloading dnsmasq configuration failed} }
+    {
+      msg_typ => q{ERROR},
+      msg_str => q{Reloading dnsmasq configuration failed}
+    }
   ) if ( $? >> 8 != 0 );
 
   # Close the log
@@ -780,7 +790,7 @@ sub process_data {
   };
 
   # Clear the status lines
-  print( "\r", " " x $cols, "\r" ) if $show;
+  print( qq{\r}, qq{ } x $cols, qq{\r} ) if $show;
 
 # Process the lines we've been given
 LINE:
@@ -846,7 +856,7 @@ LINE:
       ->{'icount'} += scalar(@elements);
 
     printf(
-      q{%s: %s %s processed, (%s discarded) from %s lines\r},
+      qq{%s: %s %s processed, (%s discarded) from %s lines\r},
       $input->{'src'},
       $input->{'config'}->{ $input->{'area'} }->{'src'}->{ $input->{'src'} }
         ->{'icount'},
@@ -870,7 +880,7 @@ LINE:
       {
         msg_typ => q{INFO},
         msg_str => sprintf(
-          q{%s: %s %s processed, (%s duplicates) from %s lines\r},
+          qq{%s: %s %s processed, (%s duplicates) from %s lines\r},
           $input->{'src'},
           $input->{'config'}->{ $input->{'area'} }->{'src'}
             ->{ $input->{'src'} }->{'icount'},
@@ -940,8 +950,8 @@ sub write_file {
   );
 
   for my $val ( @{ $input->{'data'} } ) {
-    printf {$FH} (qq{%s%s%s/%s\n}), $input->{'target'}, $input->{'equals'}, $val,
-      $input->{'ip'};
+    printf {$FH} (qq{%s%s%s/%s\n}), $input->{'target'}, $input->{'equals'},
+      $val, $input->{'ip'};
   }
 
   close($FH);
