@@ -24,13 +24,13 @@
 #
 # **** End License ****
 
-my $version = '3.3beta1';
+my $version = q{3.3beta2};
 
 # use Data::Dumper;
-use feature qw/switch/;
+use feature qw{switch};
 use File::Basename;
 use Getopt::Long;
-use lib '/opt/vyatta/share/perl5/';
+use lib q{/opt/vyatta/share/perl5/};
 use LWP::UserAgent;
 use POSIX qw{geteuid strftime};
 use strict;
@@ -61,17 +61,17 @@ sub cfg_actv {
     my ( $listNodes, $returnValue, $returnValues );
 
     if ( is_configure() ) {
-      $returnValue  = "returnValue";
-      $returnValues = "returnValues";
-      $listNodes    = "listNodes";
+      $returnValue  = qq{returnValue};
+      $returnValues = qq{returnValues};
+      $listNodes    = qq{listNodes};
     }
     else {
-      $returnValue  = "returnOrigValue";
-      $returnValues = "returnOrigValues";
-      $listNodes    = "listOrigNodes";
+      $returnValue  = qq{returnOrigValue};
+      $returnValues = qq{returnOrigValues};
+      $listNodes    = qq{listOrigNodes};
     }
 
-    $config->setLevel('service dns forwarding blacklist');
+    $config->setLevel(q{service dns forwarding blacklist});
     $input->{'config'}->{'disabled'} = $config->$returnValue('disabled')
       // FALSE;
     $input->{'config'}->{'dns_redirect_ip'}
@@ -80,8 +80,8 @@ sub cfg_actv {
     $input->{'config'}->{'disabled'}
       = $input->{'config'}->{'disabled'} eq 'false' ? FALSE : TRUE;
 
-    for my $area (qw/hosts domains zones/) {
-      $config->setLevel("service dns forwarding blacklist $area");
+    for my $area (qw{hosts domains zones}) {
+      $config->setLevel(qq{service dns forwarding blacklist $area});
       $input->{'config'}->{$area}->{'dns_redirect_ip'}
         = $config->$returnValue('dns-redirect-ip')
         // $input->{'config'}->{'dns_redirect_ip'};
@@ -100,14 +100,14 @@ sub cfg_actv {
 
       for my $source ( $config->$listNodes('source') ) {
         $config->setLevel(
-          "service dns forwarding blacklist $area source $source");
+          qq{service dns forwarding blacklist $area source $source});
         $input->{'config'}->{$area}->{'src'}->{$source}->{'url'}
           = $config->$returnValue('url');
         $input->{'config'}->{$area}->{'src'}->{$source}->{'prefix'}
           = $config->$returnValue('prefix');
         $input->{'config'}->{$area}->{'src'}->{$source}->{'compress'}
           = $config->$returnValue('compress')
-          if $area eq 'domains';
+          if $area eq q{domains};
       }
     }
   }
@@ -115,9 +115,9 @@ sub cfg_actv {
     $show = TRUE;
     log_msg(
       {
-        msg_typ => 'ERROR',
+        msg_typ => q{ERROR},
         msg_str =>
-          '[service dns forwarding blacklist is not configured], exiting!'
+          q{[service dns forwarding blacklist is not configured], exiting!}
       }
     );
 
@@ -127,7 +127,7 @@ sub cfg_actv {
     && ( !scalar( keys %{ $input->{'config'}->{'hosts'}->{'src'} } ) )
     && ( !scalar( keys %{ $input->{'config'}->{'zones'}->{'src'} } ) ) )
   {
-    say STDERR ('At least one domain or host source must be configured');
+    log_msg ({msg_ref => q{ERROR}, msg_str => q{At least one domain or host source must be configured}});
     return (FALSE);
   }
 
@@ -150,7 +150,7 @@ sub cfg_file {
     $input->{'config'}->{'disabled'}
       = ( $tmp_ref->{'disabled'} eq 'false' ) ? FALSE : TRUE;
 
-    for my $area (qw/hosts domains zones/) {
+    for my $area (qw{hosts domains zones}) {
       $input->{'config'}->{$area}->{'dns_redirect_ip'}
         = $input->{'config'}->{'dns_redirect_ip'}
         if !exists( $tmp_ref->{$area}->{'dns-redirect-ip'} );
@@ -180,15 +180,15 @@ sub delete_file {
   if ( -f $input->{'file'} ) {
     log_msg(
       {
-        msg_typ => 'INFO',
-        msg_str => sprintf( 'Deleting file %s', $input->{'file'} )
+        msg_typ => q{INFO},
+        msg_str => sprintf( q{Deleting file %s', $input->{'file}} )
       }
     );
     return unlink( $input->{'file'} )
       or log_msg(
       {
-        msg_typ => 'WARNING',
-        msg_str => sprintf( 'Unable to delete %s', $input->{'file'} )
+        msg_typ => q{WARNING},
+        msg_str => sprintf( q{Unable to delete %s', $input->{'file}} )
       }
       );
   }
@@ -207,21 +207,13 @@ sub get_config {
   return FALSE;
 }
 
-# Get directory filtered file lists
-sub get_directory {
-  my $input = shift;
-  my @files = qx{ls $input->{'directory'}/$input->{pattern} 2> /dev/null};
-  chomp(@files);
-  return @files;
-}
-
 # Read a file into memory and return the data to the calling function
 sub get_file {
   my $input = shift;
   my @data;
   if ( exists $input->{'file'} ) {
     open( my $CF, '<', $input->{'file'} )
-      or die "ERROR: Unable to open $input->{'file'}: $!";
+      or die qq{ERROR: Unable to open $input->{'file'}: $!};
     chomp( @data = <$CF> );
     close($CF);
     return $input->{'data'} = \@data;
@@ -326,7 +318,7 @@ sub get_nodes {
         next;
       }
       default {
-        print( sprintf( 'Parse error: "%s"', $line ) );
+        print( sprintf( q{Parse error: "%s"}, $line ) );
       }
     }
   }
@@ -361,9 +353,9 @@ sub get_url {
   my $input = shift;
   my $ua    = LWP::UserAgent->new;
   $ua->agent(
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11) AppleWebKit/601.1.56 (KHTML, like Gecko) Version/9.0 Safari/601.1.56'
+    q{Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11) AppleWebKit/601.1.56 (KHTML, like Gecko) Version/9.0 Safari/601.1.56}
   );
-  $ua->timeout(60);
+  $ua->timeout(90);
   my $get;
   my $lines = 0;
   $input->{'prefix'} =~ s/^["](?<UNCMT>.*)["]$/$+{UNCMT}/g;
@@ -391,11 +383,11 @@ sub get_url {
 sub is_blacklist {
   my $config = new Vyatta::Config;
 
-  $config->setLevel("service dns forwarding");
+  $config->setLevel(q{service dns forwarding});
   my $blklst_exists
     = is_configure()
-    ? $config->exists("blacklist")
-    : $config->existsOrig("blacklist");
+    ? $config->exists(q{blacklist})
+    : $config->existsOrig(q{blacklist});
 
   return defined($blklst_exists) ? TRUE : FALSE;
 }
@@ -414,12 +406,12 @@ sub is_scheduled {
 
   if ( is_blacklist() ) {
     my $config = new Vyatta::Config;
-    $config->setLevel("system task-scheduler task");
+    $config->setLevel(q{system task-scheduler task});
 
     $schedule_exists
       = is_configure()
-      ? $config->exists("blacklist")
-      : $config->existsOrig("blacklist");
+      ? $config->exists(q{blacklist})
+      : $config->existsOrig(q{blacklist});
   }
 
   return my $bool = defined($schedule_exists) ? TRUE : FALSE;
@@ -434,74 +426,74 @@ sub is_sudo {
 # Log and print (if -v or debug)
 sub log_msg {
   my $msg_ref = shift;
-  my $date = strftime "%b %e %H:%M:%S %Y", localtime;
+  my $date = strftime qq{%b %e %H:%M:%S %Y}, localtime;
   return (FALSE)
     unless ( length( $msg_ref->{msg_typ} . $msg_ref->{msg_str} ) > 2 );
 
   my $EOL = scalar($debug) ? qq{\n} : q{};
 
-  say {$LH} ("$date: $msg_ref->{msg_typ}: $msg_ref->{msg_str}");
-  print( "\r", " " x $cols, "\r" ) if $show;
-  print("$msg_ref->{msg_typ}: $msg_ref->{msg_str}$EOL") if $show;
+  say {$LH} (qq{$date: $msg_ref->{msg_typ}: $msg_ref->{msg_str}});
+  print( qq{\r}, q{ } x $cols, qq{\r}} ) if $show;
+  print(qq{$msg_ref->{msg_typ}: $msg_ref->{msg_str}$EOL}) if $show;
 
   return TRUE;
 }
 
 # This is the main function
 sub main() {
-  my $dnsmasq_svc = '/etc/init.d/dnsmasq';
+  my $dnsmasq_svc = q{/etc/init.d/dnsmasq};
   my $cfg_ref     = {
     debug            => 0,
     disabled         => 0,
-    dnsmasq_dir      => '/etc/dnsmasq.d',
-    log_file         => '/var/log/update-dnsmasq.log',
+    dnsmasq_dir      => q{/etc/dnsmasq.d},
+    log_file         => q{/var/log/update-dnsmasq.log},
     repeat_threshold => 3,
     domains          => {
       duplicates => 0,
       icount     => 0,
       records    => 0,
-      target     => 'address',
-      type       => 'domains',
+      target     => q{address},
+      type       => q{domains},
       unique     => 0,
     },
     hosts => {
       duplicates => 0,
       icount     => 0,
       records    => 0,
-      target     => 'address',
-      type       => 'hosts',
+      target     => q{address},
+      type       => q{hosts},
       unique     => 0,
     },
     zones => {
       duplicates => 0,
       icount     => 0,
       records    => 0,
-      target     => 'server',
-      type       => 'zones',
+      target     => q{server},
+      type       => q{zones},
       unique     => 0,
     },
   };
 
   # Get command line options or print help if no valid options
-  get_options() || usage( { option => 'help', exit_code => 1 } );
+  get_options() || usage( { option => q{help}, exit_code => 1 } );
 
   # Find reasons to quit
-  usage( { option => 'sudo', exit_code => 1 } ) if not is_sudo();
-  usage( { option => 'cfg_file', exit_code => 1 } )
+  usage( { option => q{sudo}, exit_code => 1 } ) if not is_sudo();
+  usage( { option => q{cfg_file}, exit_code => 1 } )
     if defined($cfg_file)
     and not( -f $cfg_file );
 
   # Start logging
-  open( $LH, '>>', $cfg_ref->{'log_file'} )
+  open( $LH, q{>>}, $cfg_ref->{'log_file'} )
     or die(q{Cannot open log file - this shouldn't happen!});
   log_msg(
-    { msg_typ => 'INFO', msg_str =>, "---+++ blacklist $version +++---" } );
+    { msg_typ => q{INFO}, msg_str =>, qq{---+++ blacklist $version +++---} } );
 
   # Make sure localhost is always in the exclusions whitelist
   $cfg_ref->{'hosts'}->{'exclude'}->{'localhost'} = 1;
 
   # Now choose which data set will define the configuration
-  my $cfg_type = defined($cfg_file) ? 'file' : 'active';
+  my $cfg_type = defined($cfg_file) ? q{file' : 'active};
 
   exit(1) unless get_config( { type => $cfg_type, config => $cfg_ref } );
 
@@ -510,7 +502,7 @@ sub main() {
     my @areas;
 
     # Add areas to process only if they contain sources
-    for my $area (qw/domains zones hosts/) {
+    for my $area (qw{domains zones hosts}) {
       push( @areas, $area )
         if ( scalar( keys %{ $cfg_ref->{$area}->{'src'} } ) );
     }
@@ -539,17 +531,11 @@ sub main() {
       my $sources_ref = {
         map {
           my $key = $_;
-          "$cfg_ref->{'dnsmasq_dir'}/$area.$key.blacklist.conf" => 1;
+          qq{$cfg_ref->{'dnsmasq_dir'}/$area.$key.blacklist.conf} => 1;
         } @sources
       };
-      my $files_ref = {
-        map { my $key = $_; $key => 1; } &get_directory(
-          {
-            directory => $cfg_ref->{'dnsmasq_dir'},
-            pattern   => "$area.*blacklist.conf"
-          }
-        )
-      };
+      my $files_ref = { map { my $key = $_; $key => 1; }
+          glob(qq{$cfg_ref->{'dnsmasq_dir'}/$area.*blacklist.conf}) };
 
       for my $file ( keys $files_ref ) {
         delete_file( { file => $file } ) if !exists $sources_ref->{$file};
@@ -557,9 +543,9 @@ sub main() {
 
       # write each configured area's includes into individual dnsmasq files
       if ( $cfg_ref->{$area}->{'icount'} > 0 ) {
-        my $equals = ( $area ne 'domains' ) ? '=/' : '=/.';
+        my $equals = ( $area ne q{domains} ) ? q{=/} : q{=/.};
         my $file
-          = "$cfg_ref->{'dnsmasq_dir'}/$area.pre-configured.blacklist.conf";
+          = qq{$cfg_ref->{'dnsmasq_dir'}/$area.pre-configured.blacklist.conf};
         write_file(
           {
             file   => $file,
@@ -568,7 +554,7 @@ sub main() {
             ip     => $cfg_ref->{$area}->{'dns_redirect_ip'},
             data   => [ sort keys %{ $cfg_ref->{$area}->{'blklst'} } ],
           }
-        ) or die( sprintf( "Could not open file: s% $!", $file ) );
+        ) or die( sprintf( qq{Could not open file: s% $!}, $file ) );
       }
 
       for my $source (@sources) {
@@ -593,14 +579,14 @@ sub main() {
             {
               msg_typ => 'INFO',
               msg_str =>
-                sprintf( 'Downloading %s blacklist from %s', $area, $host )
+                sprintf( q{Downloading %s blacklist from %s}, $area, $host )
             }
           ) if $show;
 
           push(
             @threads,
             threads->create(
-              { 'context' => 'list', 'exit' => 'thread_only' },
+              { context => q{list}, exit => q{thread_only} },
               \&get_url,
               {
                 area   => $area,
@@ -616,7 +602,7 @@ sub main() {
           push(
             @threads,
             threads->create(
-              { 'context' => 'list', 'exit' => 'thread_only' },
+              { context => q{list}, exit => q{thread_only} },
               \&get_file,
               { file => $file, src => $source }
             )
@@ -639,18 +625,18 @@ sub main() {
             ->{'compress'}
             && $cfg_ref->{$area}->{'src'}->{ $data_ref->{'src'} }->{'compress'}
             eq 'true' ) ? TRUE : FALSE;
+        if ( exists $data_ref->{'host'} && scalar($rec_count) ) {
+          log_msg(
+            {
+              msg_typ => q{INFO},
+              msg_str => sprintf(
+                q{%s lines received from: %s },
+                $rec_count, $data_ref->{'host'}
+              )
+            }
+          );
 
-        log_msg(
-          {
-            msg_typ => 'INFO',
-            msg_str => sprintf(
-              '%s lines received from: %s ',
-              $rec_count, $data_ref->{'host'}
-            )
-          }
-        ) if exists $data_ref->{'host'};
-
-        if (
+          # Now process what we have received from the web host
           process_data(
             {
               area     => $area,
@@ -660,15 +646,14 @@ sub main() {
               prefix   => $prefix,
               src      => $data_ref->{'src'}
             }
-          )
-          )
-        {
+          );
+
           if (
             $cfg_ref->{$area}->{'src'}->{ $data_ref->{'src'} }->{'icount'} > 0 )
           {
-            my $equals = ( $area ne 'domains' ) ? '=/' : '=/.';
+            my $equals = ( $area ne q{domains} ) ? q{=/} : q{=/.};
             my $file
-              = "$cfg_ref->{'dnsmasq_dir'}/$area.$data_ref->{'src'}.blacklist.conf";
+              = qq{$cfg_ref->{'dnsmasq_dir'}/$area.$data_ref->{'src'}.blacklist.conf};
             write_file(
               {
                 file   => $file,
@@ -682,7 +667,7 @@ sub main() {
                   }
                 ],
               }
-            ) or die( sprintf( "Could not open file: s% $!", $file ) );
+            ) or die( sprintf( qq{Could not open file: s% $!}, $file ) );
 
             $cfg_ref->{$area}->{'unique'} += scalar(
               keys %{
@@ -701,23 +686,22 @@ sub main() {
             # Discard the data now its written to file
             delete $cfg_ref->{$area}->{'src'}->{ $data_ref->{'src'} };
           }
-        }
-        else {
-          # Get outta here if no records returned from all area sources
-          log_msg(
-            {
-              msg_typ => 'WARNING',
-              msg_str => "Zero source records returned from $area!"
-            }
-          );
+          else {
+            log_msg(
+              {
+                msg_typ => q{WARNING},
+                msg_str => qq{Zero records processed from $data_ref->{'src'}!}
+              }
+            );
+          }
         }
       }
 
       log_msg(
         {
-          msg_typ => 'INFO',
+          msg_typ => q{INFO},
           msg_str => sprintf(
-            'Processed %s %s (%s duplicate) from %s records (%s orig.)%s',
+            q{Processed %s %s (%s discarded) from %s records (%s orig.)%s},
             $cfg_ref->{$area}->{'unique'},     $cfg_ref->{$area}->{'type'},
             $cfg_ref->{$area}->{'duplicates'}, $cfg_ref->{$area}->{'icount'},
             $cfg_ref->{$area}->{'records'},    qq{\n},
@@ -737,7 +721,7 @@ sub main() {
             {
               msg_typ => 'INFO',
               msg_str => sprintf(
-                "$area blacklisted: domain %s %s times", $key, $value
+                qq{$area blacklisted: domain %s %s times}, $key, $value
               )
             }
           ) if ( $value > $cfg_ref->{'repeat_threshold'} );
@@ -751,37 +735,29 @@ sub main() {
     }
   }
   elsif ( $cfg_ref->{'disabled'} ) {
-    for my $area (qw{domains hosts zones}) {
-      for my $file (
-        &get_directory(
-          {
-            directory => $cfg_ref->{'dnsmasq_dir'},
-            pattern   => "$area.*.blacklist.conf"
-          }
-        )
-        )
-      {
-        delete_file( { file => $file } );
-      }
+    for my $file (
+      glob(qq{$cfg_ref->{'dnsmasq_dir'}/{domains,hosts,zones}*blacklist.conf}) )
+    {
+      delete_file( { file => $file } );
     }
   }
 
   # Select the appropriate dnsmasq restart for CLI configure or bash shell
   my $cmd
     = is_configure()
-    ? '/opt/vyatta/sbin/vyatta-dns-forwarding.pl --update-dnsforwarding'
-    : "$dnsmasq_svc force-reload > /dev/null 2>1&";
+    ? q{/opt/vyatta/sbin/vyatta-dns-forwarding.pl --update-dnsforwarding}
+    : qq{$dnsmasq_svc force-reload > /dev/null 2>1&};
 
   # Clean up the status line
   print( "\r", " " x $cols, "\r" ) if $show;
 
   log_msg(
-    { msg_typ => 'INFO', msg_str => 'Reloading dnsmasq configuration...' } );
+    { msg_typ => q{INFO}, msg_str => q{Reloading dnsmasq configuration...} } );
 
   # Reload updated dnsmasq conf address redirection files
   qx{$cmd};
   log_msg(
-    { msg_typ => 'ERROR', msg_str => 'Reloading dnsmasq configuration failed' }
+    { msg_typ => q{ERROR}, msg_str => q{Reloading dnsmasq configuration failed} }
   ) if ( $? >> 8 != 0 );
 
   # Close the log
@@ -870,7 +846,7 @@ LINE:
       ->{'icount'} += scalar(@elements);
 
     printf(
-      "%s: %s %s processed, %s duplicates from %s lines\r",
+      q{%s: %s %s processed, (%s discarded) from %s lines\r},
       $input->{'src'},
       $input->{'config'}->{ $input->{'area'} }->{'src'}->{ $input->{'src'} }
         ->{'icount'},
@@ -892,9 +868,9 @@ LINE:
   {
     log_msg(
       {
-        msg_typ => 'INFO',
+        msg_typ => q{INFO},
         msg_str => sprintf(
-          "%s: %s %s processed, %s duplicates from %s lines\r",
+          q{%s: %s %s processed, (%s duplicates) from %s lines\r},
           $input->{'src'},
           $input->{'config'}->{ $input->{'area'} }->{'src'}
             ->{ $input->{'src'} }->{'icount'},
@@ -906,8 +882,9 @@ LINE:
         )
       }
     );
-    return $input;
+    return TRUE;
   }
+  return FALSE;
 }
 
 # Process command line options and print usage
@@ -918,16 +895,16 @@ sub usage {
     cfg_file => sub {
       my $exitcode = shift;
       print STDERR (
-        "$cfg_file not found, check path and file name is correct\n");
+        qq{$cfg_file not found, check path and file name is correct\n});
       exit($exitcode);
     },
     help => sub {
       my $exitcode = shift;
       local $, = "\n";
       print STDERR (@_);
-      print STDERR ("usage: $progname <options>\n");
+      print STDERR (qq{usage: $progname <options>\n});
       print STDERR (
-        'options:',
+        q{options:},
         map( ' ' x 4 . $_->[0],
           sort { $a->[1] cmp $b->[1] }
           grep ( $_->[0] ne '', @{ get_options( { option => TRUE } ) } ) ),
@@ -937,12 +914,12 @@ sub usage {
     },
     sudo => sub {
       my $exitcode = shift;
-      print STDERR ("This script must be run as root, use: sudo $0.\n");
+      print STDERR (qq{This script must be run as root, use: sudo $0.\n});
       exit($exitcode);
     },
     version => sub {
       my $exitcode = shift;
-      printf STDERR ( "%s version: %s\n", $progname, $version );
+      printf STDERR ( qq{%s version: %s\n}, $progname, $version );
       exit($exitcode);
     },
   };
@@ -957,13 +934,13 @@ sub write_file {
   open( my $FH, '>', $input->{'file'} ) or return FALSE;
   log_msg(
     {
-      msg_typ => 'INFO',
-      msg_str => sprintf( "Saving %s", basename( $input->{'file'} ) )
+      msg_typ => q{INFO},
+      msg_str => sprintf( q{Saving %s}, basename( $input->{'file'} ) )
     }
   );
 
   for my $val ( @{ $input->{'data'} } ) {
-    printf {$FH} ("%s%s%s/%s\n"), $input->{'target'}, $input->{'equals'}, $val,
+    printf {$FH} (qq{%s%s%s/%s\n}), $input->{'target'}, $input->{'equals'}, $val,
       $input->{'ip'};
   }
 
