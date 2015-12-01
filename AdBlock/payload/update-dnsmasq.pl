@@ -24,14 +24,14 @@
 #
 # **** End License ****
 
-my $version = q{3.3beta2};
+my $version = q{3.3};
 
 # use Data::Dumper;
 use feature qw{switch};
 use File::Basename;
 use Getopt::Long;
 use lib q{/opt/vyatta/share/perl5/};
-use LWP::UserAgent;
+use HTTP::Tiny;
 use POSIX qw{geteuid strftime};
 use strict;
 use threads;
@@ -187,14 +187,14 @@ sub delete_file {
     log_msg(
       {
         msg_typ => q{INFO},
-        msg_str => sprintf(q{Deleting file %s}, $input->{'file'})
+        msg_str => sprintf( q{Deleting file %s}, $input->{'file'} )
       }
     );
     return unlink( $input->{'file'} )
       or log_msg(
       {
         msg_typ => q{WARNING},
-        msg_str => sprintf(q{Unable to delete %s}, $input->{'file'} )
+        msg_str => sprintf( q{Unable to delete %s}, $input->{'file'} )
       }
       );
   }
@@ -357,13 +357,12 @@ sub get_options {
 # Get lists from web servers
 sub get_url {
   my $input = shift;
-  my $ua    = LWP::UserAgent->new;
+  my $ua    = HTTP::Tiny->new;
   $ua->agent(
     q{Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11) AppleWebKit/601.1.56 (KHTML, like Gecko) Version/9.0 Safari/601.1.56}
   );
-  $ua->timeout(60);
-  my $get;
-  my $lines = 0;
+
+#   $ua->timeout(60);
   $input->{'prefix'} =~ s/^["](?<UNCMT>.*)["]$/$+{UNCMT}/g;
   my $re = {
     REJECT => qr{^#|^$|^\n}o,
@@ -371,17 +370,18 @@ sub get_url {
     SPLIT  => qr{\R|<br \/>}oms,
   };
 
-  $ua->show_progress(TRUE) if $input->{'debug'};
-  $get = $ua->get( $input->{'url'} );
+  my $get = $ua->get( $input->{'url'} );
 
-  $input->{'data'} = { map { my $key = $_; lc($key) => 1 }
-      grep { $_ =~ /$re->{SELECT}/ } split( /$re->{SPLIT}/, $get->content ) };
-
-  if ( $get->is_success ) {
+  if ( $get->{'success'} ) {
+    $input->{'data'}
+      = { map { my $key = $_; lc($key) => 1 }
+        grep { $_ =~ /$re->{SELECT}/ }
+        split( /$re->{SPLIT}/, $get->{'content'} ) };
     return $input;
   }
   else {
-    return $input->{'data'} = {};
+    $input->{'data'} = {};
+    return $input;
   }
 }
 
@@ -440,7 +440,7 @@ sub log_msg {
 
   say {$LH} (qq{$date: $msg_ref->{'msg_typ'}: $msg_ref->{'msg_str'}});
   print( qq{\r}, q{ } x $cols, qq{\r} ) if $show;
-  print( qq{$msg_ref->{'msg_typ'}: $msg_ref->{'msg_str'}$EOL}) if $show;
+  print(qq{$msg_ref->{'msg_typ'}: $msg_ref->{'msg_str'}$EOL}) if $show;
 
   return TRUE;
 }
@@ -453,7 +453,8 @@ sub main() {
     disabled         => 0,
     dnsmasq_dir      => q{/etc/dnsmasq.d},
     log_file         => q{/var/log/update-dnsmasq.log},
-    repeat_threshold => 3,
+    flag_dom_level   => 5,
+    flagged_dom_file => q{/tmp/flagged_domains_blacklist.cmds},
     domains          => {
       duplicates => 0,
       icount     => 0,
@@ -583,12 +584,11 @@ sub main() {
         if ( scalar($url) ) {
           log_msg(
             {
-              msg_typ => 'INFO',
+              msg_typ => q{INFO},
               msg_str =>
                 sprintf( q{Downloading %s blacklist from %s}, $area, $host )
             }
           ) if $show;
-
           push(
             @threads,
             threads->create(
@@ -596,6 +596,7 @@ sub main() {
               \&get_url,
               {
                 area   => $area,
+                debug  => $debug,
                 host   => $host,
                 prefix => $prefix,
                 src    => $source,
@@ -613,11 +614,13 @@ sub main() {
               { file => $file, src => $source }
             )
           );
+
         }
         sleep(1) while ( scalar threads->list(threads::running) >= $max_thrds );
-      }
 
+      }
       for my $thread (@threads) {
+
         my $compress;
         my $data_ref = $thread->join();
         my $rec_count = scalar( keys( %{ $data_ref->{'data'} } ) ) // 0;
@@ -649,10 +652,13 @@ sub main() {
               data     => \%{ $data_ref->{'data'} },
               compress => $compress,
               config   => $cfg_ref,
-              prefix   => $prefix,
+              prefix   => $data_ref->{'prefix'},
               src      => $data_ref->{'src'}
             }
           );
+
+          # Delete $data_ref->{'data'} key and data
+          delete $data_ref->{'data'};
 
           if (
             $cfg_ref->{$area}->{'src'}->{ $data_ref->{'src'} }->{'icount'} > 0 )
@@ -715,24 +721,58 @@ sub main() {
         }
       );
 
-      # Now lets report the domains that were seen more than 3 times
-      if ( keys %{ $cfg_ref->{'hosts'}->{'exclude'} } ) {
-        my %repeat_offenders = map {
-          my $key = $_;
-          $key => $cfg_ref->{'hosts'}->{'exclude'}->{$key};
-        } keys %{ $cfg_ref->{'hosts'}->{'exclude'} };
+# Now lets report the domains that were seen more than $cfg->{'flag_dom_level'}
+#       my %repeat_offenders;
+#       if ( keys %{ $cfg_ref->{'hosts'}->{'exclude'} } ) {
+#         while ( my ( $key, $value )
+#             = each( %{ $cfg_ref->{'hosts'}->{'exclude'} } ) )
+#           {
+#             $cfg_ref->{'hosts'}->{'exclude'}->{$key} = $value;
+#           }
+#         my %repeat_offenders = map {
+#           my $key = $_;
+#           $key => $cfg_ref->{'hosts'}->{'exclude'}->{$key};
+#         } keys %{ $cfg_ref->{'hosts'}->{'exclude'} };
+      my @flagged_domains = ();
 
-        while ( my ( $key, $value ) = each %repeat_offenders ) {
+ # Now lets report the domains that were seen more than $cfg->{'flag_dom_level'}
+      for my $key (
+        sort {
+          $cfg_ref->{'hosts'}->{'exclude'}->{$b}
+            <=> $cfg_ref->{'hosts'}->{'exclude'}->{$a}
+        } keys %{ $cfg_ref->{'hosts'}->{'exclude'} }
+        )
+      {
+        my $value = $cfg_ref->{'hosts'}->{'exclude'}->{$key};
+        if ( $value >= $cfg_ref->{'flag_dom_level'} && length($key) > 5 ) {
           log_msg(
             {
-              msg_typ => 'INFO',
+              msg_typ => q{INFO},
               msg_str => sprintf(
                 qq{$area blacklisted: domain %s %s times},
                 $key, $value
               )
             }
-          ) if ( $value > $cfg_ref->{'repeat_threshold'} );
+          );
+          push( @flagged_domains, qq{$key # $value times} );
         }
+      }
+
+      if (@flagged_domains) {
+        my $file = qq{$cfg_ref->{'flagged_dom_file'}};
+        write_file(
+          {
+            file          => $file,
+            write_flagged => TRUE,
+            domains       => \@flagged_domains
+          }
+        ) or die( sprintf( qq{Could not open file: s% $!}, $file ) );
+        log_msg(
+          {
+            msg_typ => q{INFO},
+            msg_str => qq{Flagged domain configure command set written to $file}
+          }
+        );
       }
 
       $area_count--;
@@ -812,9 +852,15 @@ LINE:
 
       # Break it down into it components
       my @domain = split( /[.]/, $element );
+      my $is_domain = FALSE;
 
       # Convert to a domain if it is more than two elements
-      shift(@domain) if ( scalar(@domain) > 2 );
+      if ( scalar(@domain) > 2 ) {
+        shift(@domain);
+      }
+      else {
+        $is_domain = TRUE;
+      }
       my $elem_count = scalar(@domain);
       my $domain_name = join( '.', @domain );
 
@@ -834,13 +880,20 @@ LINE:
         }
       }
 
-      # Now add the key
+      # Now add the key, convert to .domain.tld if only two elements
       if ( !$key_exists ) {
-        ( $input->{'compress'} == TRUE )
-          ? $input->{'config'}->{ $input->{'area'} }->{'src'}
-          ->{ $input->{'src'} }->{'blklst'}->{$domain_name} = 1
-          : $input->{'config'}->{ $input->{'area'} }->{'src'}
-          ->{ $input->{'src'} }->{'blklst'}->{$element} = 1;
+        if ( $input->{'compress'} == TRUE ) {
+          $input->{'config'}->{ $input->{'area'} }->{'src'}
+            ->{ $input->{'src'} }->{'blklst'}->{$domain_name} = 1;
+        }
+        elsif ( $is_domain && $input->{'area'} ne q{domains} ) {
+          $input->{'config'}->{ $input->{'area'} }->{'src'}
+            ->{ $input->{'src'} }->{'blklst'}->{qq{.$domain_name}} = 1;
+        }
+        else {
+          $input->{'config'}->{ $input->{'area'} }->{'src'}
+            ->{ $input->{'src'} }->{'blklst'}->{$element} = 1;
+        }
       }
       else {
         $input->{'config'}->{ $input->{'area'} }->{'src'}->{ $input->{'src'} }
@@ -948,11 +1001,19 @@ sub write_file {
       msg_str => sprintf( q{Saving %s}, basename( $input->{'file'} ) )
     }
   );
-
-  for my $val ( @{ $input->{'data'} } ) {
-    printf {$FH} (qq{%s%s%s/%s\n}), $input->{'target'}, $input->{'equals'},
-      $val, $input->{'ip'};
+  if ( $input->{'write_flagged'} ) {
+    for my $val ( @{ $input->{'domains'} } ) {
+      printf {$FH}
+        ( qq{set service dns forwarding blacklist domains include %s\n}, $val );
+    }
   }
+  elsif ( @{ $input->{'data'} } ) {
+    for my $val ( @{ $input->{'data'} } ) {
+      printf {$FH} (qq{%s%s%s/%s\n}), $input->{'target'}, $input->{'equals'},
+        $val, $input->{'ip'};
+    }
+  }
+
 
   close($FH);
 
