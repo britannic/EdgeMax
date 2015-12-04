@@ -2,8 +2,8 @@
 export COPY_EXTENDED_ATTRIBUTES_DISABLE=true
 export COPYFILE_DISABLE=true
 
-VERSION="3.24"
-DROPBOX="/Users/Neil/Dropbox/EdgeMax"
+VERSION='3.3'
+DROPBOX='/Users/Neil/Dropbox/EdgeMax'
 ADBLOCK="ADBLOCK.${VERSION}."
 INSTALL="install_adblock.v${VERSION}"
 
@@ -11,6 +11,7 @@ if [[ -e "${0##*/}" ]]; then
 	BASEDIR="$(pwd)"
 	[[ -f ${ADBLOCK}setup.tgz ]] && rm ${ADBLOCK}setup.tgz
 	cd payload
+	echo ${VERSION} > version
 	tar zcf ../payload.tgz --exclude='._*' --exclude='.svn' --exclude='.DS_Store' --exclude='*.bak' --exclude='*~' ./*
 	cd ..
 
@@ -25,11 +26,10 @@ if [[ -e "${0##*/}" ]]; then
 	tar zcf ${INSTALL}.tgz ${INSTALL}
 	echo "${INSTALL} created"
 	[[ -d "${DROPBOX}/" ]] && install -m 0755 ${INSTALL}.tgz "${DROPBOX}/"
-	cd ..
-	tar -zcf ${ADBLOCK}setup.tgz --exclude='._*' --exclude='.svn' --exclude='.DS_Store' --exclude='*.bak' --exclude='*~' "${BASEDIR}"/*
-	mv ${ADBLOCK}setup.tgz "${BASEDIR}"/
-	cd "${BASEDIR}"
-	[[ ${1} ]] && /usr/bin/scp "${BASEDIR}"/${INSTALL} ${1}@scratch:/tmp/ersetup
+	tar -zcf ../${ADBLOCK}setup.tgz --exclude='._*' --exclude='.svn' --exclude='.DS_Store' --exclude='*.bak' --exclude='*~' "${BASEDIR}"/*
+	mv ../${ADBLOCK}setup.tgz "${BASEDIR}"/
+
+# 	[[ ${1} ]] && /usr/bin/scp "${BASEDIR}"/${INSTALL} ${1}@scratch:/tmp/ersetup
 else
 	echo "$(basename $0) must be run in the directory where it is located."
 fi
