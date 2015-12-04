@@ -17,7 +17,7 @@
 # MA 02110-1301, USA.
 #
 # Author: Neil Beadle
-# Date: Novemeber 2015
+# Date: December 2015
 #
 # **** End License ****
 # Install dnsmasq BLACKLIST and blacklist blocking onto an EdgeMax router
@@ -28,8 +28,8 @@ use File::Basename;
 use Getopt::Long;
 use HTTP::Tiny;
 use IPC::Open3;
-use lib      q{/opt/vyatta/share/perl5/};
-use POSIX   qw{geteuid strftime};
+use lib q{/opt/vyatta/share/perl5/};
+use POSIX qw{geteuid strftime};
 use strict;
 use threads;
 use URI;
@@ -40,7 +40,7 @@ use warnings;
 use constant TRUE  => 1;
 use constant FALSE => 0;
 
-chomp (my $version = qx{cat version});
+chomp( my $version = qx{cat version} );
 my $cols    = qx{tput cols};
 my $program = basename($0);
 my $EOL     = qq{\n};
@@ -63,7 +63,7 @@ my $env_ref = {
   oldscript  => q{update-blacklists-dnsmasq.pl},
   script     => q{update-dnsmasq.pl},
   script_dir => q{/config/scripts},
-  templates =>  q{/opt/vyatta/share/vyatta-cfg/templates/service/dns/forwarding},
+  templates  => q{/opt/vyatta/share/vyatta-cfg/templates/service/dns/forwarding},
 };
 my ( $LH, $success );
 
@@ -71,7 +71,7 @@ my ( $LH, $success );
 &main();
 
 # Exit normally
-exit(0);
+exit 0;
 ################################################################################
 
 # Process the active (not committed or saved) configuration
@@ -139,27 +139,26 @@ sub cfg_actv {
       {
         msg_typ => q{ERROR},
         msg_str =>
-          q{[service dns forwarding blacklist is not configured], exiting!}
+          q{[service dns forwarding blacklist is not configured], exiting!},
       }
     );
 
-    return (FALSE);
+    return FALSE;
   }
-  if ( ( !scalar( keys %{ $input->{'config'}->{'domains'}->{'src'} } ) )
-    && ( !scalar( keys %{ $input->{'config'}->{'hosts'}->{'src'} } ) )
-    && ( !scalar( keys %{ $input->{'config'}->{'zones'}->{'src'} } ) ) )
+  if ( ( !scalar keys %{ $input->{'config'}->{'domains'}->{'src'} } )
+    && ( !scalar keys %{ $input->{'config'}->{'hosts'}->{'src'} } )
+    && ( !scalar keys %{ $input->{'config'}->{'zones'}->{'src'} } ) )
   {
     $show = TRUE;
     log_msg(
       {
         msg_ref => q{ERROR},
-        msg_str => q{At least one domain or host source must be configured}
+        msg_str => q{At least one domain or host source must be configured},
       }
     );
-    return (FALSE);
+    return FALSE;
   }
-
-  return (TRUE);
+  return TRUE;
 }
 
 # Remove previous configuration files
@@ -171,7 +170,8 @@ sub delete_file {
     log_msg(
       {
         msg_typ => q{INFO},
-        msg_str => sprintf( q{Deleting file %s}, $input->{'file'} )
+        msg_str => sprintf q{Deleting file %s},
+        $input->{'file'},
       }
     );
     unlink $input->{'file'};
@@ -181,7 +181,8 @@ sub delete_file {
     log_msg(
       {
         msg_typ => q{WARNING},
-        msg_str => sprintf( q{Unable to delete %s}, $input->{'file'} )
+        msg_str => sprintf q{Unable to delete %s},
+        $input->{'file'},
       }
     );
     return FALSE;
@@ -191,13 +192,13 @@ sub delete_file {
 
 # Error handler
 sub error_handler {
-  $success = ( shift >> 8 != 0 ) ? FALSE : TRUE;
+  $success = shift >> 8 != 0 ? FALSE : TRUE;
   return $success;
 }
 
 # Runs the subs to process the blacklist
 sub get_blacklist {
-  $EOL            = q{};
+  $EOL = q{};
   my $dnsmasq_svc = q{/etc/init.d/dnsmasq};
   my $cfg_ref     = {
     debug            => 0,
@@ -244,15 +245,12 @@ sub get_blacklist {
 
     # Add areas to process only if they contain sources
     for my $area (qw{domains zones hosts}) {
-      push( @areas, $area )
-        if ( scalar( keys %{ $cfg_ref->{$area}->{'src'} } ) );
+      push @areas, $area if scalar keys %{ $cfg_ref->{$area}->{'src'} };
     }
 
     # Feed all blacklists from the zones and domains into host's exclude list
     for my $list (qw{domains zones}) {
-      while ( my ( $key, $value )
-        = each( %{ $cfg_ref->{$list}->{'exclude'} } ) )
-      {
+      while ( my ( $key, $value ) = each %{ $cfg_ref->{$list}->{'exclude'} } ) {
         $cfg_ref->{'hosts'}->{'exclude'}->{$key} = $value;
       }
     }
@@ -264,7 +262,7 @@ sub get_blacklist {
       my $max_thrds = 8;
       my @sources   = keys %{ $cfg_ref->{$area}->{'src'} };
       $cfg_ref->{$area}->{'icount'}
-        = scalar( keys %{ $cfg_ref->{$area}->{'blklst'} } ) // 0;
+        = scalar keys %{ $cfg_ref->{$area}->{'blklst'} } // 0;
       $cfg_ref->{$area}->{'records'} = $cfg_ref->{$area}->{'icount'};
       $cfg_ref->{$area}->{'unique'}  = $cfg_ref->{$area}->{'icount'};
 
@@ -276,7 +274,7 @@ sub get_blacklist {
         } @sources
       };
       my $files_ref = { map { my $key = $_; $key => 1; }
-          glob(qq{$cfg_ref->{'dnsmasq_dir'}/$area.*blacklist.conf}) };
+          glob qq{$cfg_ref->{'dnsmasq_dir'}/$area.*blacklist.conf} };
 
       for my $file ( keys $files_ref ) {
         delete_file( { file => $file } ) if !exists $sources_ref->{$file};
@@ -284,7 +282,7 @@ sub get_blacklist {
 
       # write each configured area's includes into individual dnsmasq files
       if ( $cfg_ref->{$area}->{'icount'} > 0 ) {
-        my $equals = ( $area ne q{domains} ) ? q{=/} : q{=/.};
+        my $equals = $area ne q{domains} ? q{=/} : q{=/.};
         my $file
           = qq{$cfg_ref->{'dnsmasq_dir'}/$area.pre-configured.blacklist.conf};
         write_file(
@@ -292,14 +290,13 @@ sub get_blacklist {
             data => [
               map {
                 my $value = $_;
-                sprintf( qq{%s%s%s/%s\n},
-                  $cfg_ref->{$area}->{'target'},
-                  $equals, $value, $cfg_ref->{$area}->{'dns_redirect_ip'} );
+                sprintf qq{%s%s%s/%s\n}, $cfg_ref->{$area}->{'target'},
+                  $equals, $value, $cfg_ref->{$area}->{'dns_redirect_ip'};
               } sort keys %{ $cfg_ref->{$area}->{'blklst'} }
             ],
             file => $file,
           }
-        ) or die( sprintf( qq{Could not open file: s% $!}, $file ) );
+        ) or die sprintf qq{Could not open file: s% $!}, $file;
 
       }
 
@@ -320,48 +317,41 @@ sub get_blacklist {
           ? qr{(?:^(?:http:|https:){1}[/]{1,2})}o
           : $cfg_ref->{$area}->{'src'}->{$source}->{'prefix'};
 
-        if ( scalar($url) ) {
+        if ( scalar $url ) {
           log_msg(
             {
               msg_typ => q{INFO},
-              msg_str =>
-                sprintf( q{Downloading %s blacklist from %s}, $area, $host )
+              msg_str => sprintf q{Downloading %s blacklist from %s},
+              $area, $host,
             }
           ) if $show || $debug;
-          push(
-            @threads,
+          push @threads,
             threads->create(
-              { context => q{list}, exit => q{thread_only} },
-              \&get_url,
-              {
-                area   => $area,
-                debug  => $debug,
-                host   => $host,
-                prefix => $prefix,
-                src    => $source,
-                url    => $url
-              }
-            )
-          );
+            { context => q{list}, exit => q{thread_only} },
+            \&get_url,
+            {
+              area   => $area,
+              debug  => $debug,
+              host   => $host,
+              prefix => $prefix,
+              src    => $source,
+              url    => $url
+            }
+            );
         }
         elsif ($file) {    # get file data
-          push(
-            @threads,
-            threads->create(
-              { context => q{list}, exit => q{thread_only} },
-              \&get_file,
-              { file => $file, src => $source }
-            )
-          );
+          push @threads,
+            threads->create( { context => q{list}, exit => q{thread_only} },
+            \&get_file, { file => $file, src => $source } );
         }
-        sleep(1) while ( scalar threads->list(threads::running) >= $max_thrds );
+        sleep 1 while ( scalar threads->list(threads::running) >= $max_thrds );
       }
 
       for my $thread (@threads) {
 
         my $compress;
         my $data_ref = $thread->join();
-        my $rec_count = scalar( keys( %{ $data_ref->{'data'} } ) ) // 0;
+        my $rec_count = scalar keys %{ $data_ref->{'data'} } // 0;
 
         $cfg_ref->{$area}->{'src'}->{ $data_ref->{'src'} }->{'records'}
           += $rec_count;
@@ -376,10 +366,8 @@ sub get_blacklist {
           log_msg(
             {
               msg_typ => q{INFO},
-              msg_str => sprintf(
-                q{%s lines received from: %s },
-                $rec_count, $data_ref->{'host'}
-              )
+              msg_str => sprintf q{%s lines received from: %s },
+              $rec_count, $data_ref->{'host'},
             }
           );
 
@@ -409,9 +397,8 @@ sub get_blacklist {
                 data => [
                   map {
                     my $value = $_;
-                    sprintf( qq{%s%s%s/%s\n},
-                      $cfg_ref->{$area}->{'target'},
-                      $equals, $value, $cfg_ref->{$area}->{'dns_redirect_ip'} );
+                    sprintf qq{%s%s%s/%s\n}, $cfg_ref->{$area}->{'target'},
+                      $equals, $value, $cfg_ref->{$area}->{'dns_redirect_ip'};
                     } sort keys %{
                     $cfg_ref->{$area}->{'src'}->{ $data_ref->{'src'} }
                       ->{'blklst'}
@@ -419,14 +406,13 @@ sub get_blacklist {
                 ],
                 file => $file,
               }
-            ) or die( sprintf( qq{Could not open file: s% $!}, $file ) );
+            ) or die sprintf qq{Could not open file: s% $!}, $file;
 
 
-            $cfg_ref->{$area}->{'unique'} += scalar(
-              keys %{
-                $cfg_ref->{$area}->{'src'}->{ $data_ref->{'src'} }->{'blklst'}
-              }
-            );
+            $cfg_ref->{$area}->{'unique'}
+              += scalar keys
+              %{ $cfg_ref->{$area}->{'src'}->{ $data_ref->{'src'} }->{'blklst'}
+              };
             $cfg_ref->{$area}->{'icount'}
               += $cfg_ref->{$area}->{'src'}->{ $data_ref->{'src'} }->{'icount'};
             $cfg_ref->{$area}->{'duplicates'}
@@ -443,7 +429,7 @@ sub get_blacklist {
             log_msg(
               {
                 msg_typ => q{WARNING},
-                msg_str => qq{Zero records processed from $data_ref->{'src'}!}
+                msg_str => qq{Zero records processed from $data_ref->{'src'}!},
               }
             );
           }
@@ -453,12 +439,11 @@ sub get_blacklist {
       log_msg(
         {
           msg_typ => q{INFO},
-          msg_str => sprintf(
+          msg_str => sprintf
             q{Processed %s %s (%s discarded) from %s records (%s orig.)%s},
-            $cfg_ref->{$area}->{'unique'},     $cfg_ref->{$area}->{'type'},
-            $cfg_ref->{$area}->{'duplicates'}, $cfg_ref->{$area}->{'icount'},
-            $cfg_ref->{$area}->{'records'},    qq{\n},
-          )
+          $cfg_ref->{$area}->{'unique'},     $cfg_ref->{$area}->{'type'},
+          $cfg_ref->{$area}->{'duplicates'}, $cfg_ref->{$area}->{'icount'},
+          $cfg_ref->{$area}->{'records'},    qq{\n},
         }
       );
 
@@ -477,13 +462,11 @@ sub get_blacklist {
           log_msg(
             {
               msg_typ => q{INFO},
-              msg_str => sprintf(
-                qq{$area blacklisted: domain %s %s times},
-                $key, $value
-              )
+              msg_str => sprintf qq{$area blacklisted: domain %s %s times},
+              $key, $value,
             }
           );
-          push( @flagged_domains, qq{$key # $value times} );
+          push @flagged_domains, qq{$key # $value times};
         }
       }
 
@@ -494,14 +477,14 @@ sub get_blacklist {
             data => [
               map {
                 my $value = $_;
-                sprintf(
+                sprintf
                   qq{set service dns forwarding blacklist domains include %s\n},
-                  $value );
+                  $value;
               } @flagged_domains
             ],
             file => $file,
           }
-        ) or die( sprintf( qq{Could not open file: s% $!}, $file ) );
+        ) or die sprintf qq{Could not open file: s% $!}, $file;
 
         log_msg(
           {
@@ -512,14 +495,14 @@ sub get_blacklist {
       }
 
       $area_count--;
-      say(q{})
+      say q{}
         if ( $area_count == 1 )
         && ( $show || $debug );    # print a final line feed
     }
   }
   elsif ( $cfg_ref->{'disabled'} ) {
     for my $file (
-      glob(qq{$cfg_ref->{'dnsmasq_dir'}/{domains,hosts,zones}*blacklist.conf}) )
+      glob qq{$cfg_ref->{'dnsmasq_dir'}/{domains,hosts,zones}*blacklist.conf} )
     {
       delete_file( { file => $file } );
     }
@@ -532,10 +515,10 @@ sub get_blacklist {
     : qq{$dnsmasq_svc force-reload > /dev/null 2>1&};
 
   # Clean up the status line
-  print( qq{\r}, qq{ } x $cols, qq{\r} ) if $show || $debug;
+  print qq{\r}, qq{ } x $cols, qq{\r} if $show || $debug;
 
   log_msg(
-    { msg_typ => q{INFO}, msg_str => q{Reloading dnsmasq configuration...} } );
+    { msg_typ => q{INFO}, msg_str => q{Reloading dnsmasq configuration...}, } );
 
   # Reload updated dnsmasq conf address redirection files
   qx{$cmd};
@@ -544,15 +527,15 @@ sub get_blacklist {
     log_msg(
       {
         msg_typ => q{ERROR},
-        msg_str => q{Reloading dnsmasq configuration failed}
+        msg_str => q{Reloading dnsmasq configuration failed},
       }
     );
   }
 
   # Finish with a linefeed if '-v' or debug is selected
-  say(q{}) if $show || $debug;
+  say q{} if $show || $debug;
 
-  $EOL         = qq{\n};
+  $EOL = qq{\n};
 }
 
 # Determine which type of configuration to get (default, active or saved)
@@ -562,7 +545,7 @@ sub get_config {
 
   given ( $input->{'type'} ) {
     when (/active/) { return cfg_actv( { config => $input->{'config'} } ); }
-    when (/file/  ) { return cfg_file( { config => $input->{'config'} } ); }
+    when (/file/) { return cfg_file( { config => $input->{'config'} } ); }
   }
 
   return FALSE;
@@ -588,10 +571,11 @@ sub get_url {
   my $get = $ua->get( $input->{'url'} );
 
   if ( $get->{'success'} ) {
-    $input->{'data'}
-      = { map { my $key = $_; lc($key) => 1 }
-        grep { $_ =~ /$re->{SELECT}/ }
-        split( /$re->{SPLIT}/, $get->{'content'} ) };
+    $input->{'data'} = {
+      map { my $key = $_; lc($key) => 1 }
+        grep { $_ =~ /$re->{SELECT}/ } split /$re->{SPLIT}/,
+      $get->{'content'}
+    };
     return $input;
   }
   else {
@@ -611,7 +595,7 @@ sub is_blacklist {
     ? $config->exists(q{blacklist})
     : $config->existsOrig(q{blacklist});
 
-  return defined($blklst_exists) ? TRUE : FALSE;
+  return defined $blklst_exists ? TRUE : FALSE;
 }
 
 # check version and set up environment
@@ -635,49 +619,49 @@ sub is_build {
 
 # Check to see if we are being run under configure
 sub is_configure () {
-
   qx{/bin/cli-shell-api inSession};
   my $exit_code = $?;
+
   say qq{Running sub is_configure(Exit code = $exit_code);} if $debug;
 
-  return ( $exit_code > 0 ) ? FALSE : TRUE;
+  return $exit_code > 0 ? FALSE : TRUE;
 }
 
 # Make sure script runs as root
 sub is_sudo {
-  return (TRUE) if geteuid() == 0;
-  return (FALSE);
+  return TRUE if geteuid() == 0;
+  return FALSE;
 }
 
 # get EdgeOS version
 sub is_version {
   my ( $build, $version ) = ( q{UNKNOWN BUILD}, q{UNKNOWN VERSION} );
-  chomp (my $edgeOS = qx{cat /opt/vyatta/etc/version});
+  chomp( my $edgeOS = qx{cat /opt/vyatta/etc/version} );
   if ( $? >> 8 == 0 ) {
     if ( $edgeOS =~ s{^Version:\s*(?<VERSION>.*)$}{$+{VERSION}}xms ) {
       my @ver = split /\./, $edgeOS;
-      $version = join( ".", @ver[ 0, 1, 2 ] );
+      $version = join ".", @ver[ 0, 1, 2 ];
       $build = $ver[3];
     }
   }
-  return ( { version => $version, build => $build } );
+  return { version => $version, build => $build };
 }
 
 # Log and print
 sub log_msg {
   my $msg_ref = shift;
-  my $date    = strftime qq{%b %e %H:%M:%S %Y}, localtime;
+  my $date = strftime qq{%b %e %H:%M:%S %Y}, localtime;
 
-  return (FALSE)
-    unless ( length( $msg_ref->{'msg_typ'} . $msg_ref->{'msg_str'} ) > 2 );
+  return FALSE
+    unless ( length $msg_ref->{'msg_typ'} . $msg_ref->{'msg_str'} > 2 );
 
-  say {$LH} (qq{$date: $msg_ref->{'msg_typ'}: $msg_ref->{'msg_str'}});
-  print( qq{\r}, q{ } x $cols, qq{\r} ) if $show;
+  say {$LH} qq{$date: $msg_ref->{'msg_typ'}: $msg_ref->{'msg_str'}};
+  print qq{\r}, q{ } x $cols, qq{\r} if $show;
   if ( $msg_ref->{'msg_typ'} eq q{INFO} ) {
-    print(qq{$msg_ref->{'msg_typ'}: $msg_ref->{'msg_str'}$EOL}) if $show;
+    print qq{$msg_ref->{'msg_typ'}: $msg_ref->{'msg_str'}$EOL} if $show;
   }
   else {
-    print STDERR (qq{$msg_ref->{'msg_typ'}: $msg_ref->{'msg_str'}$EOL})
+    print STDERR qq{$msg_ref->{'msg_typ'}: $msg_ref->{'msg_str'}$EOL}
       if $show || $debug;
   }
 
@@ -689,17 +673,17 @@ sub main {
   # Exit if we're not root/sudo
   if ( !is_sudo() ) {
     say qq{$name $program must be executed as sudo/root} . q{!};
-    exit(1);
+    exit 1;
   }
 
   # Start logging
-  open( $LH, '>', $logfile )
-    or die(qq{$name $program Cannot open $logfile - this shouldn't happen!});
+  open $LH, '>', $logfile
+    or die qq{$name $program Cannot open $logfile - this shouldn't happen!};
 
   log_msg(
     {
       msg_typ => q{INFO},
-      msg_str => qq{---+++ $name $program $version +++--- }
+      msg_str => qq{---+++ $name $program $version +++--- },
     }
   );
 
@@ -710,14 +694,14 @@ sub main {
           {
             msg_typ => q{INFO},
             msg_str =>
-              qq{Installing $name version $version blocking dnsmasq support...}
+              qq{Installing $name version $version blocking dnsmasq support...},
           }
         );
         if ( setup() ) {
           log_msg(
             {
               msg_typ => q{INFO},
-              msg_str => qq{$name version $version installation successful...}
+              msg_str => qq{$name version $version installation successful...},
             }
           );
         }
@@ -726,10 +710,10 @@ sub main {
             {
               msg_typ => q{ERROR},
               msg_str => qq{$name version $version installation failed} . q{!}
-                . qq{\nReview the log file: $logfile...}
+                . qq{\nReview the log file: $logfile...},
             }
           );
-          exit(1);
+          exit 1;
         }
       }
       else {
@@ -737,10 +721,11 @@ sub main {
           {
             msg_typ => q{ERROR},
             msg_str =>
-              qq{Edgemax $edgeOS->{'version'} is not supported, upgrade!} . q{!}
+              qq{Edgemax $edgeOS->{'version'} is not supported, upgrade!}
+              . q{!},
           }
         );
-        exit(1);
+        exit 1;
       }
     }
     when (m/remove/) {
@@ -748,7 +733,7 @@ sub main {
         log_msg(
           {
             msg_typ => q{INFO},
-            msg_str => qq{$name version $version removal successful...}
+            msg_str => qq{$name version $version removal successful...},
           }
         );
       }
@@ -757,21 +742,21 @@ sub main {
           {
             msg_typ => q{ERROR},
             msg_str => qq{$name version $version removal failed} . q{!}
-              . qq{\nReview the log file: $logfile...}
+              . qq{\nReview the log file: $logfile...},
           }
         );
-        exit(1);
+        exit 1;
       }
     }
   }
 
-  close($LH);
+  close $LH;
   exit 0;
 }
 
 # Crunch the data and throw out anything we don't need
 sub process_data {
-  say qq{Running sub process_data(@_);} if $debug;
+  say qq{Running sub process_data(%{$_});} if $debug;
   my $input = shift;
   my $re    = {
     FQDOMN =>
@@ -783,12 +768,12 @@ sub process_data {
   };
 
   # Clear the status lines
-  print( qq{\r}, qq{ } x $cols, qq{\r} ) if $show || $debug;
+  print qq{\r}, qq{ } x $cols, qq{\r} if $show || $debug;
 
 # Process the lines we've been given
 LINE:
   for my $line ( keys %{ $input->{'data'} } ) {
-    next LINE if $line eq q{} || !defined($line);
+    next LINE if $line eq q{} || !defined $line;
     $line =~ s/$re->{PREFIX}//;
     $line =~ s/$re->{SUFFIX}//;
     $line =~ s/$re->{LSPACE}//;
@@ -796,7 +781,7 @@ LINE:
 
     # Get all of the FQDNs or domains in the line
     my @elements = $line =~ m/$re->{FQDOMN}/gc;
-    next LINE if !scalar(@elements);
+    next LINE if !scalar @elements;
 
     # We use map to individually pull 1 to N FQDNs or domains from @elements
     map {
@@ -804,24 +789,24 @@ LINE:
       my $element = $_;
 
       # Break it down into it components
-      my @domain = split( /[.]/, $element );
+      my @domain = split /[.]/, $element;
       my $is_domain = FALSE;
 
       # Convert to a domain if it is more than two elements
-      if ( scalar(@domain) > 2 ) {
-        shift(@domain);
+      if ( scalar @domain > 2 ) {
+        shift @domain;
       }
       else {
         $is_domain = TRUE;
       }
-      my $elem_count = scalar(@domain);
-      my $domain_name = join( q{.}, @domain );
+      my $elem_count = scalar @domain;
+      my $domain_name = join q{.}, @domain;
 
       # Create an array of all the subdomains
       my @keys;
       for my $i ( 2 .. $elem_count ) {
-        push( @keys, join( q{.}, @domain ) );
-        shift(@domain);
+        push @keys, join q{.}, @domain;
+        shift @domain;
       }
 
       # Have we seen this key before?
@@ -859,42 +844,35 @@ LINE:
     } @elements;
 
     $input->{'config'}->{ $input->{'area'} }->{'src'}->{ $input->{'src'} }
-      ->{'icount'} += scalar(@elements);
+      ->{'icount'} += scalar @elements;
 
-    printf(
-      qq{%s: %s %s processed, (%s discarded) from %s lines\r},
+    printf qq{%s: %s %s processed, (%s discarded) from %s lines\r},
       $input->{'src'},
       $input->{'config'}->{ $input->{'area'} }->{'src'}->{ $input->{'src'} }
-        ->{'icount'},
-      $input->{'config'}->{ $input->{'area'} }->{'type'},
+      ->{'icount'}, $input->{'config'}->{ $input->{'area'} }->{'type'},
       $input->{'config'}->{ $input->{'area'} }->{'src'}->{ $input->{'src'} }
-        ->{'duplicates'},
+      ->{'duplicates'},
       $input->{'config'}->{ $input->{'area'} }->{'src'}->{ $input->{'src'} }
-        ->{'records'}
-    ) if $show || $debug;
+      ->{'records'}
+      if $show || $debug;
   }
 
   if (
-    scalar(
-      $input->{'config'}->{ $input->{'area'} }->{'src'}->{ $input->{'src'} }
-        ->{'icount'}
-    )
-    )
+    scalar $input->{'config'}->{ $input->{'area'} }->{'src'}
+    ->{ $input->{'src'} }->{'icount'} )
   {
     log_msg(
       {
         msg_typ => q{INFO},
-        msg_str => sprintf(
+        msg_str => sprintf
           qq{%s: %s %s processed, (%s duplicates) from %s lines\r},
-          $input->{'src'},
-          $input->{'config'}->{ $input->{'area'} }->{'src'}
-            ->{ $input->{'src'} }->{'icount'},
-          $input->{'config'}->{ $input->{'area'} }->{'type'},
-          $input->{'config'}->{ $input->{'area'} }->{'src'}
-            ->{ $input->{'src'} }->{'duplicates'},
-          $input->{'config'}->{ $input->{'area'} }->{'src'}
-            ->{ $input->{'src'} }->{'records'}
-        )
+        $input->{'src'},
+        $input->{'config'}->{ $input->{'area'} }->{'src'}->{ $input->{'src'} }
+          ->{'icount'}, $input->{'config'}->{ $input->{'area'} }->{'type'},
+        $input->{'config'}->{ $input->{'area'} }->{'src'}->{ $input->{'src'} }
+          ->{'duplicates'},
+        $input->{'config'}->{ $input->{'area'} }->{'src'}->{ $input->{'src'} }
+          ->{'records'},
       }
     );
     return TRUE;
@@ -906,29 +884,31 @@ LINE:
 sub remove {
   $success = TRUE;
 
-  my @directory = glob(
-    qq{$env_ref->{'dnsmasq'}/{domains,hosts,zones}*$env_ref->{'cnf_ext'}});
+  my @directory = glob
+    qq{$env_ref->{'dnsmasq'}/{domains,hosts,zones}*$env_ref->{'cnf_ext'}};
 
   if (@directory) {
     log_msg(
       {
         msg_typ => q{INFO},
         msg_str =>
-          qq{Removing dnsmasq blacklist files from directory: $env_ref->{'dnsmasq'}/}
+          qq{Removing dnsmasq blacklist files from directory: $env_ref->{'dnsmasq'}/},
       }
     );
 
     for my $file (@directory) {
       if ( -f $file ) {
         log_msg(
-          { msg_typ => q{INFO}, msg_str => q{Removing } . basename($file) } );
-        unlink($file);
+          { msg_typ => q{INFO}, msg_str => q{Removing } . basename($file), } );
+
+        unlink $file;
+
         if ( -f $file ) {
           $success = FALSE;
           log_msg(
             {
               msg_typ => q{ERROR},
-              msg_str => q{unable to remove } . basename($file)
+              msg_str => q{unable to remove } . basename($file),
             }
           );
         }
@@ -941,17 +921,17 @@ sub remove {
       {
         msg_typ => q{INFO},
         msg_str =>
-          qq{Removing $name dnsmasq blacklist script $env_ref->{script_dir}/$env_ref->{'script'}}
+          qq{Removing $name dnsmasq blacklist script $env_ref->{script_dir}/$env_ref->{'script'}},
       }
     );
-    unlink(qq{$env_ref->{script_dir}/$env_ref->{'script'}});
+    unlink qq{$env_ref->{script_dir}/$env_ref->{'script'}};
     if ( -f qq{$env_ref->{script_dir}/$env_ref->{'script'}} ) {
       $success = FALSE;
       log_msg(
         {
           msg_typ => q{ERROR},
           msg_str =>
-            qq{unable to remove $env_ref->{script_dir}/$env_ref->{'script'}}
+            qq{unable to remove $env_ref->{script_dir}/$env_ref->{'script'}},
         }
       );
     }
@@ -962,17 +942,17 @@ sub remove {
       {
         msg_typ => q{INFO},
         msg_str =>
-          qq{Removing $name $env_ref->{'oldscript'} from $env_ref->{script_dir}/}
+          qq{Removing $name $env_ref->{'oldscript'} from $env_ref->{script_dir}/},
       }
     );
-    unlink(qq{$env_ref->{script_dir}/$env_ref->{'oldscript'}});
+    unlink qq{$env_ref->{script_dir}/$env_ref->{'oldscript'}};
     if ( -f qq{$env_ref->{script_dir}/$env_ref->{'oldscript'}} ) {
       $success = FALSE;
       log_msg(
         {
           msg_typ => q{ERROR},
           msg_str =>
-            qq{Unable to remove $name $env_ref->{'oldscript'} from $env_ref->{script_dir}/}
+            qq{Unable to remove $name $env_ref->{'oldscript'} from $env_ref->{script_dir}/},
         }
       );
     }
@@ -982,7 +962,7 @@ sub remove {
     {
       msg_typ => q{INFO},
       msg_str =>
-        qq{Removing $name dnsmasq blacklist sources and task scheduler entries...}
+        qq{Removing $name dnsmasq blacklist sources and task scheduler entries...},
     }
   );
 
@@ -997,19 +977,18 @@ sub remove {
 
   chomp( my @output = qx{@command} );
 
-  if ( ( q{Nothing to delete (the specified node does not exist)} ~~ @output ) )
-  {
+  if ( q{Nothing to delete (the specified node does not exist)} ~~ @output ) {
     log_msg(
       {
         msg_typ => q{INFO},
         msg_str =>
-          qq{$name dnsmasq blacklist wasn't configured, nothing to delete.}
+          qq{$name dnsmasq blacklist wasn't configured, nothing to delete.},
       }
     );
   }
   else {
     for my $message (@output) {
-      log_msg( { msg_typ => q{INFO}, msg_str => $message } );
+      log_msg( { msg_typ => q{INFO}, msg_str => $message, } );
     }
   }
 
@@ -1018,17 +997,19 @@ sub remove {
       {
         msg_typ => q{INFO},
         msg_str =>
-          qq{Removing $name dnsmasq blacklist configuration templates...}
+          qq{Removing $name dnsmasq blacklist configuration templates...},
       }
     );
+
     qx{rm -rf "$env_ref->{'templates'}/blacklist/"};
+
     if ( -d qq{$env_ref->{'templates'}/blacklist/} ) {
       $success = FALSE;
       log_msg(
         {
           msg_typ => q{ERROR},
           msg_str =>
-            qq{Unable to remove $name dnsmasq blacklist configuration templates...}
+            qq{Unable to remove $name dnsmasq blacklist configuration templates...},
         }
       );
     }
@@ -1039,7 +1020,7 @@ sub remove {
     {
       msg_typ => q{ERROR},
       msg_str =>
-        q{dnsmasq service did not successfully restart, investigate and resolve!}
+        q{dnsmasq service did not successfully restart, investigate and resolve!},
     }
   ) if !error_handler($?);
 
@@ -1051,32 +1032,32 @@ sub setup () {
   $success = TRUE;
 
   # Create a no op file to stop the CLI automatically running update-dnsmasq.pl
-  open( my $NO_OP, q{>}, qq{$env_ref->{'no_op'}} );
-  close($NO_OP);
+  open my $NO_OP, q{>}, qq{$env_ref->{'no_op'}};
+  close $NO_OP;
 
-  my @directory = glob(qq{$env_ref->{'dnsmasq'}/$env_ref->{'oldconf'}});
+  my @directory = glob qq{$env_ref->{'dnsmasq'}/$env_ref->{'oldconf'}};
 
   if (@directory) {
     log_msg(
       {
         msg_typ => q{INFO},
         msg_str =>
-          qq{Removing previous version blacklist files from directory: $env_ref->{'dnsmasq'}/}
+          qq{Removing previous version blacklist files from directory: $env_ref->{'dnsmasq'}/},
       }
     );
 
     for my $file (@directory) {
       if ( -f $file ) {
         log_msg(
-          { msg_typ => q{INFO}, msg_str => q{Removing } . basename($file) } );
-        unlink($file);
+          { msg_typ => q{INFO}, msg_str => q{Removing } . basename($file), } );
+        unlink $file;
         if ( -f $file ) {
           $success = FALSE;
           log_msg(
             {
               msg_typ => q{ERROR},
               msg_str => q{unable to remove previous version file }
-                . basename($file)
+                . basename($file),
             }
           );
         }
@@ -1089,17 +1070,19 @@ sub setup () {
       {
         msg_typ => q{INFO},
         msg_str =>
-          qq{Removing $name $env_ref->{'oldscript'} from $env_ref->{script_dir}/}
+          qq{Removing $name $env_ref->{'oldscript'} from $env_ref->{script_dir}/},
       }
     );
-    unlink(qq{$env_ref->{script_dir}/$env_ref->{'oldscript'}});
+
+    unlink qq{$env_ref->{script_dir}/$env_ref->{'oldscript'}};
+
     if ( -f qq{$env_ref->{script_dir}/$env_ref->{'oldscript'}} ) {
       $success = FALSE;
       log_msg(
         {
           msg_typ => q{ERROR},
           msg_str =>
-            qq{Unable to remove $name $env_ref->{'oldscript'} from $env_ref->{script_dir}/}
+            qq{Unable to remove $name $env_ref->{'oldscript'} from $env_ref->{script_dir}/},
         }
       );
     }
@@ -1109,14 +1092,16 @@ sub setup () {
     log_msg(
       {
         msg_typ => q{INFO},
-        msg_str => qq{Creating $name script $env_ref->{'script_dir'}}
+        msg_str => qq{Creating $name script $env_ref->{'script_dir'}},
       }
     );
+
     qx{install -d -o root -g root -m 0755 $env_ref->{'script_dir'}};
+
     log_msg(
       {
         msg_typ => q{ERROR},
-        msg_str => qq{Unable to create $name script $env_ref->{'script_dir'}}
+        msg_str => qq{Unable to create $name script $env_ref->{'script_dir'}},
       }
     ) if !error_handler($?);
   }
@@ -1125,7 +1110,7 @@ sub setup () {
     {
       msg_typ => q{INFO},
       msg_str =>
-        qq{Installing $name $env_ref->{'script'} script to $env_ref->{'script_dir'}/}
+        qq{Installing $name $env_ref->{'script'} script to $env_ref->{'script_dir'}/},
     }
   );
 
@@ -1135,7 +1120,7 @@ sub setup () {
     {
       msg_typ => q{ERROR},
       msg_str =>
-        qq{unable to install $name $env_ref->{'script'} script to $env_ref->{'script_dir'}/}
+        qq{unable to install $name $env_ref->{'script'} script to $env_ref->{'script_dir'}/},
     }
   ) if !error_handler($?);
 
@@ -1143,7 +1128,7 @@ sub setup () {
     {
       msg_typ => q{INFO},
       msg_str =>
-        qq{Installing $name dnsmasq blacklist configuration templates...}
+        qq{Installing $name dnsmasq blacklist configuration templates...},
     }
   );
 
@@ -1153,7 +1138,7 @@ sub setup () {
     {
       msg_typ => q{ERROR},
       msg_str =>
-        qq{ERROR unable to install $name dnsmasq blacklist configuration templates to $env_ref->{'templates'}/blacklist/}
+        qq{ERROR unable to install $name dnsmasq blacklist configuration templates to $env_ref->{'templates'}/blacklist/},
     }
   ) if !error_handler($?);
 
@@ -1161,7 +1146,7 @@ sub setup () {
     {
       msg_typ => q{INFO},
       msg_str =>
-        qq{Creating default $name dnsmasq blacklist sources and task scheduler entries...}
+        qq{Creating default $name dnsmasq blacklist sources and task scheduler entries...},
     }
   );
 
@@ -1240,48 +1225,52 @@ sub setup () {
 # Now run configure and set up the blacklist configuration - capture any
 # errors in the log
   my $in = q{};
-  my $pid = open3( $in, \*CMD_OUT, \*CMD_ERR, qq{@commands} );
+  my $pid = open3 $in, \*CMD_OUT, \*CMD_ERR, qq{@commands};
   while ( my $cli_out = <CMD_OUT> ) {
     if ( !$cli_out =~ m/The specified configuration node already exists\n/ ) {
-      print($cli_out);
+      print $cli_out;
       if ( $cli_out =~ m/aborted|error|failed|failure|not valid/ ) {
         $success = FALSE;
-        log_msg( { msg_typ => q{ERROR}, msg_str => $cli_out } );
+        log_msg( { msg_typ => q{ERROR}, msg_str => $cli_out, } );
       }
     }
   }
   while ( my $cli_err = <CMD_ERR> ) {
     if ( !$cli_err =~ m/The specified configuration node already exists\n/ ) {
-      print($cli_err);
+      print $cli_err;
       if ( $cli_err =~ m/aborted|error|failed|failure|not valid/ ) {
         $success = FALSE;
-        log_msg( { msg_typ => q{ERROR}, msg_str => $cli_err } );
+        log_msg( { msg_typ => q{ERROR}, msg_str => $cli_err, } );
       }
     }
   }
-  waitpid( $pid, 0 );
+  waitpid $pid, 0;
 
   get_blacklist();
 
-  return ($success);
+  # Remove the no op file
+  unlink qq{$env_ref->{'no_op'}};
+
+  return $success;
 }
 
 # Write the data to file
 sub write_file {
   say qq{Running sub write_file(%{$_});} if $debug;
   my $input = shift;
-  open( my $FH, '>', $input->{'file'} ) or return FALSE;
+  open my $FH, '>', $input->{'file'} or return FALSE;
   log_msg(
     {
       msg_typ => q{INFO},
-      msg_str => sprintf( q{Saving %s}, basename( $input->{'file'} ) )
+      msg_str => sprintf q{Saving %s},
+      basename( $input->{'file'} ),
     }
   );
   for my $line ( @{ $input->{'data'} } ) {
-    print {$FH} ($line);
+    print {$FH} $line;
   }
 
-  close($FH);
+  close $FH;
 
   return TRUE;
 }
