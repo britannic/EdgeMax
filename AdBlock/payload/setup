@@ -59,7 +59,7 @@ my $env_ref = {
   cnf_ext    => q{.conf},
   dnsmasq    => q{/etc/dnsmasq.d},
   no_op      => q{/tmp/.update-dnsmasq.no-op},
-  oldconf    => qq{{domains,hosts,zones}.blacklist.conf},
+  oldconf    => qq{{domai*,hos*,zon*}.blacklist.conf},
   oldscript  => q{update-blacklists-dnsmasq.pl},
   script     => q{update-dnsmasq.pl},
   script_dir => q{/config/scripts},
@@ -204,7 +204,6 @@ sub get_blacklist {
     debug            => 0,
     disabled         => 0,
     dnsmasq_dir      => q{/etc/dnsmasq.d},
-    no_op            => q{/tmp/.update-dnsmasq.no-op},
     log_file         => q{/var/log/update-dnsmasq.log},
     flag_dom_level   => 5,
     flagged_dom_file => q{/var/log/update-dnsmasq_flagged_domains.cmds},
@@ -884,8 +883,25 @@ LINE:
 sub remove {
   $success = TRUE;
 
+  log_msg(
+    {
+      msg_typ => q{INFO},
+      msg_str =>
+        qq{Removing dnsmasq blacklist 'no op' file $env_ref->{'no_op'}},
+    }
+  );
+  # Remove the no op file
+  unlink qq{$env_ref->{'no_op'}};
+  log_msg(
+    {
+      msg_typ => q{INFO},
+      msg_str =>
+        qq{Could not remove dnsmasq blacklist 'no op' file $env_ref->{'no_op'}},
+    }
+  ) if -f qq{$env_ref->{'no_op'}};
+
   my @directory = glob
-    qq{$env_ref->{'dnsmasq'}/{domains,hosts,zones}*$env_ref->{'cnf_ext'}};
+    qq{$env_ref->{'dnsmasq'}/$env_ref->{'oldconf'}};
 
   if (@directory) {
     log_msg(
@@ -1153,6 +1169,8 @@ sub setup () {
   #The standard data set for everyone else
   my @commands = (
     qq{$begin;},
+    qq{$delete service dns forwarding blacklist;},
+    qq{$delete system task-scheduler task update_blacklists;},
     qq{$set service dns forwarding blacklist dns-redirect-ip '0.0.0.0';},
     qq{$set service dns forwarding blacklist disabled false;},
     qq{$set service dns forwarding blacklist domains exclude '122.2o7.net';},
@@ -1193,6 +1211,7 @@ sub setup () {
     qq{$set service dns forwarding blacklist hosts exclude 'freedns.afraid.org';},
     qq{$set service dns forwarding blacklist hosts exclude 'hb.disney.go.com';},
     qq{$set service dns forwarding blacklist hosts exclude 'static.chartbeat.com';},
+    qq{$set service dns forwarding blacklist hosts exclude www.yimg.com},
     qq{$set service dns forwarding blacklist hosts include 'beap.gemini.yahoo.com';},
     qq{$set service dns forwarding blacklist hosts source adaway description 'Blocking mobile ad providers and some analytics providers';},
     qq{$set service dns forwarding blacklist hosts source adaway prefix '127.0.0.1 ';},
@@ -1248,8 +1267,22 @@ sub setup () {
 
   get_blacklist();
 
+  log_msg(
+    {
+      msg_typ => q{INFO},
+      msg_str =>
+        qq{Removing dnsmasq blacklist 'no op' file $env_ref->{'no_op'}},
+    }
+  );
   # Remove the no op file
   unlink qq{$env_ref->{'no_op'}};
+  log_msg(
+    {
+      msg_typ => q{INFO},
+      msg_str =>
+        qq{Could not remove dnsmasq blacklist 'no op' file $env_ref->{'no_op'}},
+    }
+  ) if -f qq{$env_ref->{'no_op'}};
 
   return $success;
 }
