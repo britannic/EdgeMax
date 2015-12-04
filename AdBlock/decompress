@@ -15,11 +15,14 @@ install_menu () {
 	while true; do
 		select CHOICE in ${OPTIONS}; do
 			case ${REPLY} in
-				1)		./installer
-						return 0
+				1)		./setup
+						return $?
 						;;
-				2)		./remove_adblock
-						return 0
+				2)		if /opt/vyatta/bin/yesno -n 'Do you want to completely remove Blacklist? [y/N]: '
+						then
+							./remove
+						fi
+						return $?
 						;;
 				3|*)	return 0
 				;;
