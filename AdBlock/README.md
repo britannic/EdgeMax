@@ -20,7 +20,74 @@ EdgeMax Blacklist and Ad Server Blocking is derived from the received wisdom fou
 * Since the EdgeOS is a fork and port of Vyatta 6.3, this script could easily be adapted for work on VyOS and Vyatta derived ports
 
 ## Versions
-* v3.24a: Updates include:
+* v3.3
+    - What is new:
+    - Non-essential functions have been pruned, command line switches reduced to:
+
+            /config/scripts/update-dnsmasq.pl -h
+            usage: update-dnsmasq.pl <options>
+            options:
+                --debug     # enable debug output
+                -f <file>   # load a configuration file
+                --help      # show help and usage text
+                -v          # verbose output
+                --version   # show program version number
+    - Improved exclusion list rejection
+    - Ability to create a domain list from a source that has FQDNs using the new 'compress' switch (note, use with caution, since you may find legit domains getting completely blocked - especially cloud services like amazonaws, in that case you will need to add specific excludes):
+            set service dns forwarding blacklist domains source FQDNs_Source compress true
+    - Install/remove scripts rewritten in Perl for better error checking
+    - Install/remove logs will be written to /var/log for diagnostics
+    - Flagged domain list with optional include commands written to /var/log/update-dnsmasq_flagged_domains.cmds
+    - Each source will be written to its own file:
+            root@ubnt:/etc/dnsmasq.d# ls
+            README
+            domains.malc0de.com.blacklist.conf
+            domains.pre-configured.blacklist.conf
+            hosts.adaway.blacklist.conf
+            hosts.hpHosts.blacklist.conf
+            hosts.pre-configured.blacklist.conf
+            hosts.someonewhocares.org.blacklist.conf
+            hosts.winhelp2002.mvps.org.blacklist.conf
+            hosts.www.malwaredomainlist.com.blacklist.conf
+            hosts.yoyo.org.blacklist.conf
+    - Log file (/var/log/update-dnsmasq.pl) now flags frequently blacklisted domains, so you can optionally decide to add them as an include under domains:
+            root@ubnt:/etc/dnsmasq.d# tail -n 30 /var/log/update-dnsmasq.log
+            Nov 29 09:45:50 2015: INFO: hosts blacklisted: domain loniricarena.ru 4 times
+            Nov 29 09:45:50 2015: INFO: hosts blacklisted: domain starwave.com 5 times
+            Nov 29 09:45:50 2015: INFO: hosts blacklisted: domain axf8.net 41 times
+            Nov 29 09:45:50 2015: INFO: hosts blacklisted: domain com-swd.net 4 times
+            Nov 29 09:45:51 2015: INFO: hosts blacklisted: domain jaimiehonoria.com 4 times
+            Nov 29 09:45:51 2015: INFO: hosts blacklisted: domain your-drug-blog.com 4 times
+            Nov 29 09:45:51 2015: INFO: hosts blacklisted: domain wileenallix.ru 5 times
+            Nov 29 09:45:51 2015: INFO: hosts blacklisted: domain com-5ny.net 4 times
+            Nov 29 09:45:51 2015: INFO: hosts blacklisted: domain bb.13900139000.com 4 times
+            Nov 29 09:45:51 2015: INFO: hosts blacklisted: domain in.th 6 times
+            Nov 29 09:45:51 2015: INFO: hosts blacklisted: domain adhese.com 5 times
+            Nov 29 09:45:51 2015: INFO: hosts blacklisted: domain gueneveredeane.com 4 times
+            Nov 29 09:45:51 2015: INFO: hosts blacklisted: domain xn--c1aqdux1a.xn 4 times
+            Nov 29 09:45:51 2015: INFO: hosts blacklisted: domain kathlingertrud.com 5 times
+            Nov 29 09:45:51 2015: INFO: hosts blacklisted: domain peqi.healthhuman.net 4 times
+            Nov 29 09:45:51 2015: INFO: hosts blacklisted: domain jessamineelvira.ru 9 times
+            Nov 29 09:45:51 2015: INFO: hosts blacklisted: domain xn--c1abhkul5co5f.xn 7 times
+            Nov 29 09:45:51 2015: INFO: hosts blacklisted: domain com-0to.net 6 times
+            Nov 29 09:45:51 2015: INFO: hosts blacklisted: domain 9458.302br.net 19 times
+            Nov 29 09:45:51 2015: INFO: hosts blacklisted: domain xn--80aasb3bf1bvw.xn 5 times
+            Nov 29 09:45:51 2015: INFO: hosts blacklisted: domain web.id 4 times
+            Nov 29 09:45:51 2015: INFO: hosts blacklisted: domain ap.org 4 times
+            Nov 29 09:45:51 2015: INFO: hosts blacklisted: domain webjump.com 4 times
+            Nov 29 09:45:51 2015: INFO: hosts blacklisted: domain blueseek.com 11 times
+            Nov 29 09:45:51 2015: INFO: hosts blacklisted: domain j595j4.com 4 times
+            Nov 29 09:45:51 2015: INFO: hosts blacklisted: domain axeynlzljpld.com 4 times
+            Nov 29 09:45:51 2015: INFO: hosts blacklisted: domain jemieandrea.com 59 times
+            Nov 29 09:45:51 2015: INFO: hosts blacklisted: domain llnwd.net 24 times
+            Nov 29 09:45:51 2015: INFO: hosts blacklisted: domain thomasadot.com 4 times
+            Nov 29 09:45:52 2015: INFO: Reloading dnsmasq configuration...
+    - Improved memory usage for threads has been implemented
+    - Uses HTTP::Tiny for smaller memory footprint with threads
+    - Optional -f config.boot parser has been completely rewritten, so that the XorpConfigParser.pm module is no longer required (saves on memory overhead and compilation time)
+    - Over 70% of the code has been rewritten or updated
+
+* v3.24d: Updates include:
     - 'hosts' exclusions now incorporates 'domains' exclusions and blacklists
     - Additional 'good hosts' excluded from blacklisting in the supplied install configuration
     - Fixes excluded FQDNs by using precise matching instead of fuzzy (i.e. 1.domain.tld won't also exclude b1.domain.tld)
