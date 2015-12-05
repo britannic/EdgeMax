@@ -48,17 +48,20 @@ my ( $cfg_file, $LH, $debug, $show );
 
 ############################### script runs here ###############################
 say q{Running sub main();} if $debug;
+
 &main();
 
 # Exit normally
 say q{Exiting with $? = 0;} if $debug;
-exit(0);
+
+exit 0;
 ################################################################################
 
 # Process the active (not committed or saved) configuration
 sub cfg_actv {
-  say qq{Running sub cfg_actv(%{$_});} if $debug;
   my $input = shift;
+  say qq{Running sub cfg_actv($input);} if $debug;
+
   if ( is_blacklist() ) {
     my $config = new Vyatta::Config;
     my ( $listNodes, $returnValue, $returnValues );
@@ -143,8 +146,8 @@ sub cfg_actv {
 
 # Process a configuration file in memory after get_file() loads it
 sub cfg_file {
-  say qq{Running sub cfg_file(%{$_});} if $debug;
   my $input = shift;
+  say qq{Running sub cfg_file($input->{'config'});} if $debug;
   my $tmp_ref
     = get_nodes( { config_data => get_file( { file => $cfg_file } ) } );
   my $configured
@@ -182,8 +185,8 @@ sub cfg_file {
 
 # Remove previous configuration files
 sub delete_file {
-  say qq{Running sub delete_file(%{$_});} if $debug;
   my $input = shift;
+  say qq{Running sub delete_file($input->{'file'});} if $debug;
 
   if ( -f $input->{'file'} ) {
     log_msg(
@@ -211,8 +214,8 @@ sub delete_file {
 
 # Determine which type of configuration to get (default, active or saved)
 sub get_config {
-  say qq{Running sub get_config(%{$_});} if $debug;
   my $input = shift;
+  say qq{Running sub get_config($input->{'type'});} if $debug;
 
   given ( $input->{'type'} ) {
     when (/active/) { return cfg_actv( { config => $input->{'config'} } ); }
@@ -224,9 +227,9 @@ sub get_config {
 
 # Read a file into memory and return the data to the calling function
 sub get_file {
-  say qq{Running sub get_file(%{$_});} if $debug;
   my $input = shift;
-  my @data  = ();
+  say qq{Running sub get_file($input->{'file'});} if $debug;
+  my @data = ();
   if ( exists $input->{'file'} ) {
     open my $CF, q{<}, $input->{'file'}
       or die qq{ERROR: Unable to open $input->{'file'}: $!};
@@ -239,12 +242,13 @@ sub get_file {
 
 # Build hashes from the configuration file data (called by get_nodes())
 sub get_hash {
-  say qq{Running sub get_hash(%{\$_});} if $debug;
   my $input    = shift;
   my $hash     = \$input->{'hash_ref'};
   my @nodes    = @{ $input->{'nodes'} };
   my $value    = pop @nodes;
   my $hash_ref = ${$hash};
+
+  say qq{Running sub get_hash($input);} if $debug;
 
   for my $key (@nodes) {
     $hash = \${$hash}->{$key};
@@ -257,7 +261,6 @@ sub get_hash {
 
 # Process a configure file and extract the blacklist data set
 sub get_nodes {
-  say qq{Running sub get_nodes(%{$_});} if $debug;
   my $input = shift;
   my ( @hasher, @nodes );
   my $cfg_ref = {};
@@ -276,6 +279,8 @@ sub get_nodes {
     NODE => qr/^(?<NODE>[\w-]+)\s[{]{1}$/o,
     RSPC => qr/^\s+/o,
   };
+
+  say qq{Running sub get_nodes($input->{'config_data'});} if $debug;
 
   for my $line ( @{ $input->{'config_data'} } ) {
     $line =~ s/$re->{LSPC}//;
@@ -343,21 +348,22 @@ sub get_nodes {
 
 # Set up command line options
 sub get_options {
-  say qq{Running sub get_options(%{$_});} if $debug;
   my $input = shift;
   my @opts  = (
     [ q{-f <file> # load a configuration file}, q{f=s}   => \$cfg_file ],
-    [ q{--debug   # enable debug output},       q{debug} => \$debug ],
+    [ q{-debug    # enable debug output},       q{debug} => \$debug ],
     [
-      q{--help    # show help and usage text},
+      q{-help     # show help and usage text},
       q{help} => sub { usage( { option => q{help}, exit_code => 0 } ) }
     ],
     [ q{-v        # verbose output}, q{v} => \$show ],
     [
-      q{--version # show program version number},
+      q{-version  # show program version number},
       q{version} => sub { usage( { option => q{version}, exit_code => 0 } ) }
     ],
   );
+
+  say qq{Running sub get_options($input->{'option'});} if $debug;
 
   return \@opts if $input->{'option'};
 
@@ -368,12 +374,13 @@ sub get_options {
 
 # Get lists from web servers
 sub get_url {
-  say qq{Running sub get_url(%{$_});} if $debug;
   my $input = shift;
   my $ua    = HTTP::Tiny->new;
   $ua->agent(
     q{Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11) AppleWebKit/601.1.56 (KHTML, like Gecko) Version/9.0 Safari/601.1.56}
   );
+
+  say qq{Running sub get_url($input);} if $debug;
 
 #   $ua->timeout(60);
   $input->{'prefix'} =~ s/^["](?<UNCMT>.*)["]$/$+{UNCMT}/g;
@@ -402,7 +409,7 @@ sub get_url {
 # Check to see if blacklist is configured
 sub is_blacklist {
   my $config = new Vyatta::Config;
-  say qq{Running sub is_blacklist(%{$config});} if $debug;
+  say qq{Running sub is_blacklist($config);} if $debug;
 
   $config->setLevel(q{service dns forwarding});
   my $blklst_exists
@@ -499,14 +506,13 @@ sub main {
 
   usage( { option => q{sudo}, exit_code => 1 } ) if not is_sudo();
   usage( { option => q{cfg_file}, exit_code => 1 } )
-    if defined($cfg_file)
-    and !( -f $cfg_file );
+    if defined $cfg_file && !-f $cfg_file;
 
   # Start logging
   open $LH, q{>>}, $cfg_ref->{'log_file'}
     or die q{Cannot open log file - this shouldn't happen!};
   log_msg(
-    { msg_typ => q{INFO}, msg_str =>, qq{---+++ blacklist $version +++---}, } );
+    { msg_typ => q{INFO}, msg_str =>, qq{---+++ dnsmasq blacklist $version +++---}, } );
 
   # Make sure localhost is always in the exclusions whitelist
   $cfg_ref->{'hosts'}->{'exclude'}->{'localhost'} = 1;
@@ -523,13 +529,6 @@ sub main {
     # Add areas to process only if they contain sources
     for my $area (qw{domains zones hosts}) {
       push @areas, $area if ( scalar keys %{ $cfg_ref->{$area}->{'src'} } );
-    }
-
-    # Feed all blacklists from the zones and domains into host's exclude list
-    for my $list (qw{domains zones}) {
-      while ( my ( $key, $value ) = each %{ $cfg_ref->{$list}->{'exclude'} } ) {
-        $cfg_ref->{'hosts'}->{'exclude'}->{$key} = $value;
-      }
     }
 
     # Process each area
@@ -686,9 +685,14 @@ sub main {
               += scalar keys
               %{ $cfg_ref->{$area}->{'src'}->{ $data_ref->{'src'} }->{'blklst'}
               };
-            @{ $cfg_ref->{$area} }{qw (duplicates icount records)}
-              += @{ $cfg_ref->{$area}->{'src'}->{ $data_ref->{'src'} } }
-              {qw (duplicates icount records)};
+            $cfg_ref->{$area}->{'duplicates'}
+              += $cfg_ref->{$area}->{'src'}->{ $data_ref->{'src'} }
+              ->{'duplicates'};
+            $cfg_ref->{$area}->{'icount'}
+              += $cfg_ref->{$area}->{'src'}->{ $data_ref->{'src'} }->{'icount'};
+            $cfg_ref->{$area}->{'records'}
+              += $cfg_ref->{$area}->{'src'}->{ $data_ref->{'src'} }
+              ->{'records'};
 
             # Discard the data now its written to file
             delete $cfg_ref->{$area}->{'src'}->{ $data_ref->{'src'} };
@@ -806,8 +810,6 @@ sub main {
 
 # Crunch the data and throw out anything we don't need
 sub process_data {
-  say qq{Running sub process_data(@_);} if $debug;
-
   my $input = shift;
   my $re    = {
     FQDOMN =>
@@ -817,6 +819,8 @@ sub process_data {
     PREFIX => qr{^$input->{'prefix'}},
     SUFFIX => qr{(?:#.*$|\{.*$|[/[].*$)}o,
   };
+
+  say qq{Running sub process_data($input);} if $debug;
 
   # Clear the status lines
   print qq{\r}, qq{ } x $cols, qq{\r} if $show || $debug;
@@ -863,9 +867,11 @@ LINE:
       # Have we seen this key before?
       my $key_exists = FALSE;
       for my $key (@keys) {
-        if ( exists $input->{'config'}->{'hosts'}->{'exclude'}->{$key} ) {
+        if (
+          exists $input->{'config'}->{ $input->{'area'} }->{'exclude'}->{$key} )
+        {
           $key_exists = TRUE;
-          $input->{'config'}->{'hosts'}->{'exclude'}->{$key}++;
+          $input->{'config'}->{ $input->{'area'} }->{'exclude'}->{$key}++;
         }
       }
 
@@ -970,8 +976,10 @@ sub usage {
 
 # Write the data to file
 sub write_file {
-  say qq{Running sub write_file(%{$_});} if $debug;
   my $input = shift;
+
+  say qq{Running sub write_file($input);} if $debug;
+
   open my $FH, '>', $input->{'file'} or return FALSE;
   log_msg(
     {

@@ -47,7 +47,7 @@ my $EOL     = qq{\n};
 my $edgeOS  = &is_version();
 my $debug   = FALSE;
 my $show    = TRUE;
-my $name    = q{ADBlock};
+my $name    = q{dnsmasq blacklist};
 my $logfile = qq{/var/log/$name-$version-$program.log};
 my $begin   = q{/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper begin};
 my $commit  = q{/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper commit};
@@ -76,7 +76,6 @@ exit 0;
 
 # Process the active (not committed or saved) configuration
 sub cfg_actv {
-  say qq{Running sub cfg_actv(%{$_});} if $debug;
   my $input = shift;
   if ( is_blacklist() ) {
     my $config = new Vyatta::Config;
@@ -163,7 +162,6 @@ sub cfg_actv {
 
 # Remove previous configuration files
 sub delete_file {
-  say qq{Running sub delete_file(%{$_});} if $debug;
   my $input = shift;
 
   if ( -f $input->{'file'} ) {
@@ -198,7 +196,7 @@ sub error_handler {
 
 # Runs the subs to process the blacklist
 sub get_blacklist {
-  $EOL = q{};
+  $EOL            = q{};
   my $dnsmasq_svc = q{/etc/init.d/dnsmasq};
   my $cfg_ref     = {
     debug            => 0,
@@ -233,6 +231,9 @@ sub get_blacklist {
     },
   };
 
+  # Hide the cursor
+  qx{tput civis};
+
   # Make sure localhost is always in the exclusions whitelist
   $cfg_ref->{'hosts'}->{'exclude'}->{'localhost'} = 1;
 
@@ -245,13 +246,6 @@ sub get_blacklist {
     # Add areas to process only if they contain sources
     for my $area (qw{domains zones hosts}) {
       push @areas, $area if scalar keys %{ $cfg_ref->{$area}->{'src'} };
-    }
-
-    # Feed all blacklists from the zones and domains into host's exclude list
-    for my $list (qw{domains zones}) {
-      while ( my ( $key, $value ) = each %{ $cfg_ref->{$list}->{'exclude'} } ) {
-        $cfg_ref->{'hosts'}->{'exclude'}->{$key} = $value;
-      }
     }
 
     # Process each area
@@ -535,11 +529,13 @@ sub get_blacklist {
   say q{} if $show || $debug;
 
   $EOL = qq{\n};
+
+  # Show the cursor
+  qx{tput cnorm};
 }
 
 # Determine which type of configuration to get (default, active or saved)
 sub get_config {
-  say qq{Running sub get_config(%{$_});} if $debug;
   my $input = shift;
 
   given ( $input->{'type'} ) {
@@ -552,7 +548,6 @@ sub get_config {
 
 # Get lists from web servers
 sub get_url {
-  say qq{Running sub get_url(%{$_});} if $debug;
   my $input = shift;
   my $ua    = HTTP::Tiny->new;
   $ua->agent(
@@ -586,7 +581,6 @@ sub get_url {
 # Check to see if blacklist is configured
 sub is_blacklist {
   my $config = new Vyatta::Config;
-  say qq{Running sub is_blacklist(%{$config});} if $debug;
 
   $config->setLevel(q{service dns forwarding});
   my $blklst_exists
@@ -620,9 +614,6 @@ sub is_build {
 sub is_configure () {
   qx{/bin/cli-shell-api inSession};
   my $exit_code = $?;
-
-  say qq{Running sub is_configure(Exit code = $exit_code);} if $debug;
-
   return $exit_code > 0 ? FALSE : TRUE;
 }
 
@@ -755,7 +746,6 @@ sub main {
 
 # Crunch the data and throw out anything we don't need
 sub process_data {
-  say qq{Running sub process_data(%{$_});} if $debug;
   my $input = shift;
   my $re    = {
     FQDOMN =>
@@ -811,9 +801,11 @@ LINE:
       # Have we seen this key before?
       my $key_exists = FALSE;
       for my $key (@keys) {
-        if ( exists $input->{'config'}->{'hosts'}->{'exclude'}->{$key} ) {
+        if (
+          exists $input->{'config'}->{ $input->{'area'} }->{'exclude'}->{$key} )
+        {
           $key_exists = TRUE;
-          $input->{'config'}->{'hosts'}->{'exclude'}->{$key}++;
+          $input->{'config'}->{ $input->{'area'} }->{'exclude'}->{$key}++;
         }
       }
 
@@ -838,8 +830,8 @@ LINE:
       }
 
       # Add to the exclude list, so the next source doesn't duplicate values
-      $input->{'config'}->{ $input->{'area'} }->{'exclude'}->{$element}     = 1;
-      $input->{'config'}->{ $input->{'area'} }->{'exclude'}->{$domain_name} = 1;
+      @{ $input->{'config'}->{ $input->{'area'} }->{'exclude'} }{ $domain_name,
+        $element } = ( 1, 1 );
     } @elements;
 
     $input->{'config'}->{ $input->{'area'} }->{'src'}->{ $input->{'src'} }
@@ -849,10 +841,8 @@ LINE:
       $input->{'src'},
       $input->{'config'}->{ $input->{'area'} }->{'src'}->{ $input->{'src'} }
       ->{'icount'}, $input->{'config'}->{ $input->{'area'} }->{'type'},
-      $input->{'config'}->{ $input->{'area'} }->{'src'}->{ $input->{'src'} }
-      ->{'duplicates'},
-      $input->{'config'}->{ $input->{'area'} }->{'src'}->{ $input->{'src'} }
-      ->{'records'}
+      @{ $input->{'config'}->{ $input->{'area'} }->{'src'}->{ $input->{'src'} }
+      }{ 'duplicates', 'records' },
       if $show || $debug;
   }
 
@@ -867,11 +857,11 @@ LINE:
           qq{%s: %s %s processed, (%s duplicates) from %s lines\r},
         $input->{'src'},
         $input->{'config'}->{ $input->{'area'} }->{'src'}->{ $input->{'src'} }
-          ->{'icount'}, $input->{'config'}->{ $input->{'area'} }->{'type'},
-        $input->{'config'}->{ $input->{'area'} }->{'src'}->{ $input->{'src'} }
-          ->{'duplicates'},
-        $input->{'config'}->{ $input->{'area'} }->{'src'}->{ $input->{'src'} }
-          ->{'records'},
+          ->{'icount'},
+        $input->{'config'}->{ $input->{'area'} }->{'type'},
+        @{
+          $input->{'config'}->{ $input->{'area'} }->{'src'}->{ $input->{'src'} }
+        }{ 'duplicates', 'records' },
       }
     );
     return TRUE;
@@ -937,7 +927,7 @@ sub remove {
       {
         msg_typ => q{INFO},
         msg_str =>
-          qq{Removing $name dnsmasq blacklist script $env_ref->{script_dir}/$env_ref->{'script'}},
+          qq{Removing $name script $env_ref->{script_dir}/$env_ref->{'script'}},
       }
     );
     unlink qq{$env_ref->{script_dir}/$env_ref->{'script'}};
@@ -978,7 +968,7 @@ sub remove {
     {
       msg_typ => q{INFO},
       msg_str =>
-        qq{Removing $name dnsmasq blacklist sources and task scheduler entries...},
+        qq{Removing $name sources and task scheduler entries...},
     }
   );
 
@@ -998,7 +988,7 @@ sub remove {
       {
         msg_typ => q{INFO},
         msg_str =>
-          qq{$name dnsmasq blacklist wasn't configured, nothing to delete.},
+          qq{$name wasn't configured, nothing to delete.},
       }
     );
   }
@@ -1013,7 +1003,7 @@ sub remove {
       {
         msg_typ => q{INFO},
         msg_str =>
-          qq{Removing $name dnsmasq blacklist configuration templates...},
+          qq{Removing $name configuration templates...},
       }
     );
 
@@ -1025,7 +1015,7 @@ sub remove {
         {
           msg_typ => q{ERROR},
           msg_str =>
-            qq{Unable to remove $name dnsmasq blacklist configuration templates...},
+            qq{Unable to remove $name configuration templates...},
         }
       );
     }
@@ -1144,7 +1134,7 @@ sub setup () {
     {
       msg_typ => q{INFO},
       msg_str =>
-        qq{Installing $name dnsmasq blacklist configuration templates...},
+        qq{Installing $name configuration templates...},
     }
   );
 
@@ -1154,7 +1144,7 @@ sub setup () {
     {
       msg_typ => q{ERROR},
       msg_str =>
-        qq{ERROR unable to install $name dnsmasq blacklist configuration templates to $env_ref->{'templates'}/blacklist/},
+        qq{ERROR unable to install $name configuration templates to $env_ref->{'templates'}/blacklist/},
     }
   ) if !error_handler($?);
 
@@ -1162,7 +1152,7 @@ sub setup () {
     {
       msg_typ => q{INFO},
       msg_str =>
-        qq{Creating default $name dnsmasq blacklist sources and task scheduler entries...},
+        qq{Creating default $name sources and task scheduler entries...},
     }
   );
 
@@ -1173,46 +1163,46 @@ sub setup () {
     qq{$delete system task-scheduler task update_blacklists;},
     qq{$set service dns forwarding blacklist dns-redirect-ip '0.0.0.0';},
     qq{$set service dns forwarding blacklist disabled false;},
-    qq{$set service dns forwarding blacklist domains exclude '122.2o7.net';},
-    qq{$set service dns forwarding blacklist domains exclude 'adobedtm.com';},
-    qq{$set service dns forwarding blacklist domains exclude 'amazonaws.com';},
-    qq{$set service dns forwarding blacklist domains exclude 'apple.com';},
-    qq{$set service dns forwarding blacklist domains exclude 'ask.com';},
-    qq{$set service dns forwarding blacklist domains exclude 'cloudfront.net';},
-    qq{$set service dns forwarding blacklist domains exclude 'coremetrics.com';},
-    qq{$set service dns forwarding blacklist domains exclude 'doubleclick.net';},
-    qq{$set service dns forwarding blacklist domains exclude 'edgesuite.net';},
-    qq{$set service dns forwarding blacklist domains exclude 'github.com';},
-    qq{$set service dns forwarding blacklist domains exclude 'githubusercontent.com';},
-    qq{$set service dns forwarding blacklist domains exclude 'google.com';},
-    qq{$set service dns forwarding blacklist domains exclude 'googleadservices.com';},
-    qq{$set service dns forwarding blacklist domains exclude 'googleapis.com';},
-    qq{$set service dns forwarding blacklist domains exclude 'gstatic.com';},
-    qq{$set service dns forwarding blacklist domains exclude 'hulu.com';},
-    qq{$set service dns forwarding blacklist domains exclude 'msdn.com';},
-    qq{$set service dns forwarding blacklist domains exclude 'paypal.com';},
-    qq{$set service dns forwarding blacklist domains exclude 'schema.org';},
-    qq{$set service dns forwarding blacklist domains exclude 'smacargo.com';},
-    qq{$set service dns forwarding blacklist domains exclude 'ssl-on9.com';},
-    qq{$set service dns forwarding blacklist domains exclude 'ssl-on9.net';},
-    qq{$set service dns forwarding blacklist domains exclude 'storage.googleapis.com';},
-    qq{$set service dns forwarding blacklist domains include 'adsrvr.org';},
-    qq{$set service dns forwarding blacklist domains include 'adtechus.net';},
-    qq{$set service dns forwarding blacklist domains include 'advertising.com';},
-    qq{$set service dns forwarding blacklist domains include 'centade.com';},
-    qq{$set service dns forwarding blacklist domains include 'doubleclick.net';},
-    qq{$set service dns forwarding blacklist domains include 'free-counter.co.uk';},
-    qq{$set service dns forwarding blacklist domains include 'kiosked.com';},
+    qq{$set service dns forwarding blacklist domains exclude 122.2o7.net;},
+    qq{$set service dns forwarding blacklist domains exclude adobedtm.com;},
+    qq{$set service dns forwarding blacklist domains exclude amazonaws.com;},
+    qq{$set service dns forwarding blacklist domains exclude apple.com;},
+    qq{$set service dns forwarding blacklist domains exclude ask.com;},
+    qq{$set service dns forwarding blacklist domains exclude cloudfront.net;},
+    qq{$set service dns forwarding blacklist domains exclude coremetrics.com;},
+    qq{$set service dns forwarding blacklist domains exclude doubleclick.net;},
+    qq{$set service dns forwarding blacklist domains exclude edgesuite.net;},
+    qq{$set service dns forwarding blacklist domains exclude github.com;},
+    qq{$set service dns forwarding blacklist domains exclude githubusercontent.com;},
+    qq{$set service dns forwarding blacklist domains exclude google.com;},
+    qq{$set service dns forwarding blacklist domains exclude googleadservices.com;},
+    qq{$set service dns forwarding blacklist domains exclude googleapis.com;},
+    qq{$set service dns forwarding blacklist domains exclude gstatic.com;},
+    qq{$set service dns forwarding blacklist domains exclude hulu.com;},
+    qq{$set service dns forwarding blacklist domains exclude msdn.com;},
+    qq{$set service dns forwarding blacklist domains exclude paypal.com;},
+    qq{$set service dns forwarding blacklist domains exclude schema.org;},
+    qq{$set service dns forwarding blacklist domains exclude smacargo.com;},
+    qq{$set service dns forwarding blacklist domains exclude ssl-on9.com;},
+    qq{$set service dns forwarding blacklist domains exclude ssl-on9.net;},
+    qq{$set service dns forwarding blacklist domains exclude storage.googleapis.com;},
+    qq{$set service dns forwarding blacklist domains exclude yimg.com;},
+    qq{$set service dns forwarding blacklist domains include adsrvr.org;},
+    qq{$set service dns forwarding blacklist domains include adtechus.net;},
+    qq{$set service dns forwarding blacklist domains include advertising.com;},
+    qq{$set service dns forwarding blacklist domains include centade.com;},
+    qq{$set service dns forwarding blacklist domains include doubleclick.net;},
+    qq{$set service dns forwarding blacklist domains include free-counter.co.uk;},
+    qq{$set service dns forwarding blacklist domains include kiosked.com;},
     qq{$set service dns forwarding blacklist domains source malc0de compress false;},
     qq{$set service dns forwarding blacklist domains source malc0de description 'List of zones serving malicious executables observed by malc0de.com/database/';},
     qq{$set service dns forwarding blacklist domains source malc0de prefix 'zone ';},
     qq{$set service dns forwarding blacklist domains source malc0de url 'http://malc0de.com/bl/ZONES';},
-    qq{$set service dns forwarding blacklist hosts exclude 'cdn.visiblemeasures.com';},
-    qq{$set service dns forwarding blacklist hosts exclude 'freedns.afraid.org';},
-    qq{$set service dns forwarding blacklist hosts exclude 'hb.disney.go.com';},
-    qq{$set service dns forwarding blacklist hosts exclude 'static.chartbeat.com';},
-    qq{$set service dns forwarding blacklist hosts exclude www.yimg.com},
-    qq{$set service dns forwarding blacklist hosts include 'beap.gemini.yahoo.com';},
+    qq{$set service dns forwarding blacklist hosts exclude cdn.visiblemeasures.com;},
+    qq{$set service dns forwarding blacklist hosts exclude freedns.afraid.org;},
+    qq{$set service dns forwarding blacklist hosts exclude hb.disney.go.com;},
+    qq{$set service dns forwarding blacklist hosts exclude static.chartbeat.com;},
+    qq{$set service dns forwarding blacklist hosts include beap.gemini.yahoo.com;},
     qq{$set service dns forwarding blacklist hosts source adaway description 'Blocking mobile ad providers and some analytics providers';},
     qq{$set service dns forwarding blacklist hosts source adaway prefix '127.0.0.1 ';},
     qq{$set service dns forwarding blacklist hosts source adaway url 'http://adaway.org/hosts.txt';},
@@ -1289,7 +1279,6 @@ sub setup () {
 
 # Write the data to file
 sub write_file {
-  say qq{Running sub write_file(%{$_});} if $debug;
   my $input = shift;
   open my $FH, '>', $input->{'file'} or return FALSE;
   log_msg(
