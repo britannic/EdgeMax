@@ -41,9 +41,18 @@ use warnings;
 use constant TRUE  => 1;
 use constant FALSE => 0;
 
-my $version = q{3.3.1};
+my $version = q{3.3.4};
 
 my $cols = qx{tput cols};
+my $crsr = {
+  off               => qq{\033[?25l},
+  on                => qq{\033[?25h},
+  clear             => qq{\033[0m},
+  reset             => qq{\033[0m},
+  bright_green      => qq{\033[92m},
+  bright_magenta    => qq{\033[95m},
+  bright_red        => qq{\033[91m},
+};
 my ( $cfg_file, $LH, $debug, $show );
 
 ############################### script runs here ###############################
@@ -121,7 +130,7 @@ sub cfg_actv {
       {
         msg_typ => q{ERROR},
         msg_str =>
-          q{[service dns forwarding blacklist is not configured], exiting!}
+          q{[service dns forwarding blacklist is not configured], exiting!},
       }
     );
 
@@ -140,7 +149,6 @@ sub cfg_actv {
     );
     return FALSE;
   }
-
   return TRUE;
 }
 
@@ -448,12 +456,12 @@ sub log_msg {
     unless ( length $msg_ref->{'msg_typ'} . $msg_ref->{'msg_str'} > 2 );
 
   say {$LH} qq{$date: $msg_ref->{'msg_typ'}: $msg_ref->{'msg_str'}};
-  print qq{\r}, q{ } x $cols, qq{\r} if $show;
+  print $crsr->{'off'}, qq{\r}, q{ } x $cols, qq{\r} if $show;
   if ( $msg_ref->{'msg_typ'} eq q{INFO} ) {
-    print qq{$msg_ref->{'msg_typ'}: $msg_ref->{'msg_str'}$EOL} if $show;
+    print $crsr->{'off'}, qq{$msg_ref->{'msg_typ'}: $msg_ref->{'msg_str'}$EOL} if $show;
   }
   else {
-    print STDERR qq{$msg_ref->{'msg_typ'}: $msg_ref->{'msg_str'}$EOL}
+    print STDERR $crsr->{'off'}, $crsr->{'bright_red'}, qq{$msg_ref->{'msg_typ'}: $msg_ref->{'msg_str'}$crsr->{'reset'}$EOL}
       if $show || $debug;
   }
 
@@ -512,7 +520,12 @@ sub main {
   open $LH, q{>>}, $cfg_ref->{'log_file'}
     or die q{Cannot open log file - this shouldn't happen!};
   log_msg(
-    { msg_typ => q{INFO}, msg_str =>, qq{---+++ dnsmasq blacklist $version +++---}, } );
+    {
+      msg_typ => q{INFO},
+      msg_str =>,
+      qq{---+++ dnsmasq blacklist $version +++---},
+    }
+  );
 
   # Make sure localhost is always in the exclusions whitelist
   $cfg_ref->{'hosts'}->{'exclude'}->{'localhost'} = 1;
@@ -528,7 +541,7 @@ sub main {
 
     # Add areas to process only if they contain sources
     for my $area (qw{domains zones hosts}) {
-      push @areas, $area if ( scalar keys %{ $cfg_ref->{$area}->{'src'} } );
+      push @areas, $area if scalar keys %{ $cfg_ref->{$area}->{'src'} };
     }
 
     # Process each area
@@ -590,12 +603,12 @@ sub main {
           ? qr{(?:^(?:http:|https:){1}[/]{1,2})}o
           : $cfg_ref->{$area}->{'src'}->{$source}->{'prefix'};
 
-        if ( scalar($url) ) {
+        if ( scalar $url ) {
           log_msg(
             {
               msg_typ => q{INFO},
               msg_str => sprintf q{Downloading %s blacklist from %s},
-              $area, $host
+              $area, $host,
             }
           ) if $show || $debug;
           push @threads,
@@ -617,13 +630,13 @@ sub main {
             threads->create( { context => q{list}, exit => q{thread_only} },
             \&get_file, { file => $file, src => $source } );
         }
-        sleep(1) while ( scalar threads->list(threads::running) >= $max_thrds );
+        sleep 1 while ( scalar threads->list(threads::running) >= $max_thrds );
       }
 
       for my $thread (@threads) {
         my $compress;
         my $data_ref = $thread->join();
-        my $rec_count = scalar( keys( %{ $data_ref->{'data'} } ) ) // 0;
+        my $rec_count = scalar keys %{ $data_ref->{'data'} } // 0;
 
         $cfg_ref->{$area}->{'src'}->{ $data_ref->{'src'} }->{'records'}
           += $rec_count;
@@ -767,7 +780,7 @@ sub main {
       }
 
       $area_count--;
-      say(q{})
+      say q{}
         if ( $area_count == 1 )
         && ( $show || $debug );    # print a final line feed
     }
@@ -787,7 +800,7 @@ sub main {
     : qq{$dnsmasq_svc force-reload > /dev/null 2>1&};
 
   # Clean up the status line
-  print qq{\r}, qq{ } x $cols, qq{\r} if $show || $debug;
+  print $crsr->{'off'}, qq{\r}, qq{ } x $cols, qq{\r} if $show || $debug;
 
   log_msg(
     { msg_typ => q{INFO}, msg_str => q{Reloading dnsmasq configuration...}, } );
@@ -797,7 +810,7 @@ sub main {
   log_msg(
     {
       msg_typ => q{ERROR},
-      msg_str => q{Reloading dnsmasq configuration failed}
+      msg_str => q{Reloading dnsmasq configuration failed},
     }
   ) if ( $? >> 8 != 0 );
 
@@ -805,7 +818,7 @@ sub main {
   close $LH;
 
   # Finish with a linefeed if '-v' or debug is selected
-  say q{} if $show || $debug;
+  say $crsr->{on}, q{} if $show || $debug;
 }
 
 # Crunch the data and throw out anything we don't need
@@ -823,12 +836,12 @@ sub process_data {
   say qq{Running sub process_data($input);} if $debug;
 
   # Clear the status lines
-  print qq{\r}, qq{ } x $cols, qq{\r} if $show || $debug;
+  print $crsr->{'off'}, qq{\r}, qq{ } x $cols, qq{\r} if $show || $debug;
 
 # Process the lines we've been given
 LINE:
   for my $line ( keys %{ $input->{'data'} } ) {
-    next LINE if $line eq q{} || !defined($line);
+    next LINE if $line eq q{} || !defined $line;
     $line =~ s/$re->{PREFIX}//;
     $line =~ s/$re->{SUFFIX}//;
     $line =~ s/$re->{LSPACE}//;
@@ -896,19 +909,20 @@ LINE:
       }
 
       # Add to the exclude list, so the next source doesn't duplicate values
-      @{ $input->{'config'}->{ $input->{'area'} }->{'exclude'} }{ $domain_name,
-        $element } = ( 1, 1 );
+      @{ $input->{'config'}->{ $input->{'area'} }->{'exclude'} }
+        { qq{.$domain_name}, $domain_name, $element } = ( 1, 1, 1 );
     } @elements;
 
     $input->{'config'}->{ $input->{'area'} }->{'src'}->{ $input->{'src'} }
       ->{'icount'} += scalar @elements;
 
-    printf qq{%s: %s %s processed, (%s discarded) from %s lines\r},
+    printf
+      qq{%s: $crsr->{'bright_green'}%s$crsr->{'reset'} %s processed, ($crsr->{'bright_red'}%s$crsr->{'reset'} discarded) from $crsr->{'bright_magenta'}%s$crsr->{'reset'} lines\r},
       $input->{'src'},
       $input->{'config'}->{ $input->{'area'} }->{'src'}->{ $input->{'src'} }
       ->{'icount'}, $input->{'config'}->{ $input->{'area'} }->{'type'},
       @{ $input->{'config'}->{ $input->{'area'} }->{'src'}->{ $input->{'src'} }
-      }{ 'duplicates', 'records' },
+      }{ 'duplicates', 'records' }
       if $show || $debug;
   }
 
