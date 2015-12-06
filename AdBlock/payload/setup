@@ -1,4 +1,5 @@
 #!/usr/bin/env perl
+#
 # **** License ****
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -6,7 +7,7 @@
 #
 # This program is distributed in the hope that it will be useful, but
 # WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	See the GNU
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 # General Public License for more details.
 #
 # A copy of the GNU General Public License is available as
@@ -17,7 +18,7 @@
 # MA 02110-1301, USA.
 #
 # Author: Neil Beadle
-# Date: December 2015
+# Date:   December 2015
 #
 # **** End License ****
 # Install dnsmasq BLACKLIST and blacklist blocking onto an EdgeMax router
@@ -42,12 +43,18 @@ use constant FALSE => 0;
 
 chomp( my $version = qx{cat version} );
 my $cols    = qx{tput cols};
+my $crsr = {
+  off               => qq{\033[?25l},
+  on                => qq{\033[?25h},
+  clear             => qq{\033[0m},
+  reset             => qq{\033[0m},
+  bright_green      => qq{\033[92m},
+  bright_magenta    => qq{\033[95m},
+  bright_red        => qq{\033[91m},
+};
 my $program = basename($0);
-my $EOL     = qq{\n};
 my $edgeOS  = &is_version();
-my $debug   = FALSE;
-my $show    = TRUE;
-my $name    = q{ADBlock};
+my $name    = q{dnsmasq blacklist};
 my $logfile = qq{/var/log/$name-$version-$program.log};
 my $begin   = q{/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper begin};
 my $commit  = q{/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper commit};
@@ -59,11 +66,11 @@ my $env_ref = {
   cnf_ext    => q{.conf},
   dnsmasq    => q{/etc/dnsmasq.d},
   no_op      => q{/tmp/.update-dnsmasq.no-op},
-  oldconf    => qq{{domains,hosts,zones}.blacklist.conf},
+  oldconf    => qq{{domai*,hos*,zon*}.blacklist.conf},
   oldscript  => q{update-blacklists-dnsmasq.pl},
   script     => q{update-dnsmasq.pl},
   script_dir => q{/config/scripts},
-  templates  => q{/opt/vyatta/share/vyatta-cfg/templates/service/dns/forwarding},
+  templates => q{/opt/vyatta/share/vyatta-cfg/templates/service/dns/forwarding},
 };
 my ( $LH, $success );
 
@@ -76,7 +83,6 @@ exit 0;
 
 # Process the active (not committed or saved) configuration
 sub cfg_actv {
-  say qq{Running sub cfg_actv(%{$_});} if $debug;
   my $input = shift;
   if ( is_blacklist() ) {
     my $config = new Vyatta::Config;
@@ -123,23 +129,20 @@ sub cfg_actv {
       for my $source ( $config->$listNodes(q{source}) ) {
         $config->setLevel(
           qq{service dns forwarding blacklist $area source $source});
-        $input->{'config'}->{$area}->{'src'}->{$source}->{'url'}
-          = $config->$returnValue('url');
-        $input->{'config'}->{$area}->{'src'}->{$source}->{'prefix'}
-          = $config->$returnValue('prefix');
+        @{ $input->{'config'}->{$area}->{'src'}->{$source} }{qw(prefix url)}
+          = ( $config->$returnValue('prefix'), $config->$returnValue('url') );
         $input->{'config'}->{$area}->{'src'}->{$source}->{'compress'}
-          = $config->$returnValue(q{compress})
+          = $config->$returnValue('compress')
           if $area eq q{domains};
       }
     }
   }
   else {
-    $show = TRUE;
     log_msg(
       {
         msg_typ => q{ERROR},
         msg_str =>
-          q{[service dns forwarding blacklist is not configured], exiting!},
+          qq{[service dns forwarding blacklist is not configured], exiting!},
       }
     );
 
@@ -149,11 +152,10 @@ sub cfg_actv {
     && ( !scalar keys %{ $input->{'config'}->{'hosts'}->{'src'} } )
     && ( !scalar keys %{ $input->{'config'}->{'zones'}->{'src'} } ) )
   {
-    $show = TRUE;
     log_msg(
       {
         msg_ref => q{ERROR},
-        msg_str => q{At least one domain or host source must be configured},
+        msg_str => qq{At least one domain or host source must be configured},
       }
     );
     return FALSE;
@@ -163,7 +165,6 @@ sub cfg_actv {
 
 # Remove previous configuration files
 sub delete_file {
-  say qq{Running sub delete_file(%{$_});} if $debug;
   my $input = shift;
 
   if ( -f $input->{'file'} ) {
@@ -198,13 +199,10 @@ sub error_handler {
 
 # Runs the subs to process the blacklist
 sub get_blacklist {
-  $EOL = q{};
   my $dnsmasq_svc = q{/etc/init.d/dnsmasq};
   my $cfg_ref     = {
-    debug            => 0,
     disabled         => 0,
     dnsmasq_dir      => q{/etc/dnsmasq.d},
-    no_op            => q{/tmp/.update-dnsmasq.no-op},
     log_file         => q{/var/log/update-dnsmasq.log},
     flag_dom_level   => 5,
     flagged_dom_file => q{/var/log/update-dnsmasq_flagged_domains.cmds},
@@ -248,13 +246,6 @@ sub get_blacklist {
       push @areas, $area if scalar keys %{ $cfg_ref->{$area}->{'src'} };
     }
 
-    # Feed all blacklists from the zones and domains into host's exclude list
-    for my $list (qw{domains zones}) {
-      while ( my ( $key, $value ) = each %{ $cfg_ref->{$list}->{'exclude'} } ) {
-        $cfg_ref->{'hosts'}->{'exclude'}->{$key} = $value;
-      }
-    }
-
     # Process each area
     my $area_count = (@areas);
     for my $area (@areas) {
@@ -263,8 +254,8 @@ sub get_blacklist {
       my @sources   = keys %{ $cfg_ref->{$area}->{'src'} };
       $cfg_ref->{$area}->{'icount'}
         = scalar keys %{ $cfg_ref->{$area}->{'blklst'} } // 0;
-      $cfg_ref->{$area}->{'records'} = $cfg_ref->{$area}->{'icount'};
-      $cfg_ref->{$area}->{'unique'}  = $cfg_ref->{$area}->{'icount'};
+      @{ $cfg_ref->{$area} }{ 'records', 'unique' }
+        = @{ $cfg_ref->{$area} }{ 'icount', 'icount' };
 
       # Remove any files that no longer have configured sources
       my $sources_ref = {
@@ -297,20 +288,17 @@ sub get_blacklist {
             file => $file,
           }
         ) or die sprintf qq{Could not open file: s% $!}, $file;
-
       }
 
       for my $source (@sources) {
-        my $url  = $cfg_ref->{$area}->{'src'}->{$source}->{'url'};
-        my $file = $cfg_ref->{$area}->{'src'}->{$source}->{'file'};
+        my ( $file, $url )
+          = @{ $cfg_ref->{$area}->{'src'}->{$source} }{ 'file', 'url' };
         my $uri  = new URI($url);
         my $host = $uri->host;
 
         # Initialize the source's counters
-        $cfg_ref->{$area}->{'src'}->{$source}->{'records'}    = 0;
-        $cfg_ref->{$area}->{'src'}->{$source}->{'icount'}     = 0;
-        $cfg_ref->{$area}->{'src'}->{$source}->{'unique'}     = 0;
-        $cfg_ref->{$area}->{'src'}->{$source}->{'duplicates'} = 0;
+        @{ $cfg_ref->{$area}->{'src'}->{$source} }
+          {qw(duplicates icount records unique)} = ( 0, 0, 0, 0 );
 
         $prefix
           = $cfg_ref->{$area}->{'src'}->{$source}->{'prefix'} ~~ 'http'
@@ -324,14 +312,13 @@ sub get_blacklist {
               msg_str => sprintf q{Downloading %s blacklist from %s},
               $area, $host,
             }
-          ) if $show || $debug;
+          );
           push @threads,
             threads->create(
             { context => q{list}, exit => q{thread_only} },
             \&get_url,
             {
               area   => $area,
-              debug  => $debug,
               host   => $host,
               prefix => $prefix,
               src    => $source,
@@ -348,7 +335,6 @@ sub get_blacklist {
       }
 
       for my $thread (@threads) {
-
         my $compress;
         my $data_ref = $thread->join();
         my $rec_count = scalar keys %{ $data_ref->{'data'} } // 0;
@@ -362,7 +348,7 @@ sub get_blacklist {
             ->{'compress'}
             && $cfg_ref->{$area}->{'src'}->{ $data_ref->{'src'} }->{'compress'}
             eq q{true} ) ? TRUE : FALSE;
-        if ( exists $data_ref->{'host'} && scalar($rec_count) ) {
+        if ( exists $data_ref->{'host'} && scalar $rec_count ) {
           log_msg(
             {
               msg_typ => q{INFO},
@@ -389,7 +375,7 @@ sub get_blacklist {
           if (
             $cfg_ref->{$area}->{'src'}->{ $data_ref->{'src'} }->{'icount'} > 0 )
           {
-            my $equals = ( $area ne q{domains} ) ? q{=/} : q{=/.};
+            my $equals = $area ne q{domains} ? q{=/} : q{=/.};
             my $file
               = qq{$cfg_ref->{'dnsmasq_dir'}/$area.$data_ref->{'src'}.blacklist.conf};
             write_file(
@@ -413,11 +399,11 @@ sub get_blacklist {
               += scalar keys
               %{ $cfg_ref->{$area}->{'src'}->{ $data_ref->{'src'} }->{'blklst'}
               };
-            $cfg_ref->{$area}->{'icount'}
-              += $cfg_ref->{$area}->{'src'}->{ $data_ref->{'src'} }->{'icount'};
             $cfg_ref->{$area}->{'duplicates'}
               += $cfg_ref->{$area}->{'src'}->{ $data_ref->{'src'} }
               ->{'duplicates'};
+            $cfg_ref->{$area}->{'icount'}
+              += $cfg_ref->{$area}->{'src'}->{ $data_ref->{'src'} }->{'icount'};
             $cfg_ref->{$area}->{'records'}
               += $cfg_ref->{$area}->{'src'}->{ $data_ref->{'src'} }
               ->{'records'};
@@ -441,9 +427,8 @@ sub get_blacklist {
           msg_typ => q{INFO},
           msg_str => sprintf
             q{Processed %s %s (%s discarded) from %s records (%s orig.)%s},
-          $cfg_ref->{$area}->{'unique'},     $cfg_ref->{$area}->{'type'},
-          $cfg_ref->{$area}->{'duplicates'}, $cfg_ref->{$area}->{'icount'},
-          $cfg_ref->{$area}->{'records'},    qq{\n},
+          @{ $cfg_ref->{$area} }{qw(unique type duplicates icount records)},
+          qq{\n},
         }
       );
 
@@ -458,7 +443,7 @@ sub get_blacklist {
         )
       {
         my $value = $cfg_ref->{'hosts'}->{'exclude'}->{$key};
-        if ( $value >= $cfg_ref->{'flag_dom_level'} && length($key) > 5 ) {
+        if ( $value >= $cfg_ref->{'flag_dom_level'} && length $key > 5 ) {
           log_msg(
             {
               msg_typ => q{INFO},
@@ -489,15 +474,14 @@ sub get_blacklist {
         log_msg(
           {
             msg_typ => q{INFO},
-            msg_str => qq{Flagged domain configure command set written to $file}
+            msg_str =>
+              qq{Flagged domain configure command set written to $file},
           }
         );
       }
 
       $area_count--;
-      say q{}
-        if ( $area_count == 1 )
-        && ( $show || $debug );    # print a final line feed
+      say q{} if ( $area_count == 1 );    # print a final line feed
     }
   }
   elsif ( $cfg_ref->{'disabled'} ) {
@@ -515,32 +499,28 @@ sub get_blacklist {
     : qq{$dnsmasq_svc force-reload > /dev/null 2>1&};
 
   # Clean up the status line
-  print qq{\r}, qq{ } x $cols, qq{\r} if $show || $debug;
+  print $crsr->{'off'}, qq{\r}, qq{ } x $cols, qq{\r};
 
   log_msg(
     { msg_typ => q{INFO}, msg_str => q{Reloading dnsmasq configuration...}, } );
 
   # Reload updated dnsmasq conf address redirection files
   qx{$cmd};
-  if ( $? >> 8 != 0 ) {
-    $success = FALSE;
+  if ( !error_handler($?) ) {
     log_msg(
       {
         msg_typ => q{ERROR},
-        msg_str => q{Reloading dnsmasq configuration failed},
+        msg_str => q{Reloading dnsmasq configuration failed!},
       }
     );
   }
 
-  # Finish with a linefeed if '-v' or debug is selected
-  say q{} if $show || $debug;
-
-  $EOL = qq{\n};
+  # Finish with a linefeed if '-v' is selected
+  say q{};
 }
 
 # Determine which type of configuration to get (default, active or saved)
 sub get_config {
-  say qq{Running sub get_config(%{$_});} if $debug;
   my $input = shift;
 
   given ( $input->{'type'} ) {
@@ -553,7 +533,6 @@ sub get_config {
 
 # Get lists from web servers
 sub get_url {
-  say qq{Running sub get_url(%{$_});} if $debug;
   my $input = shift;
   my $ua    = HTTP::Tiny->new;
   $ua->agent(
@@ -587,7 +566,6 @@ sub get_url {
 # Check to see if blacklist is configured
 sub is_blacklist {
   my $config = new Vyatta::Config;
-  say qq{Running sub is_blacklist(%{$config});} if $debug;
 
   $config->setLevel(q{service dns forwarding});
   my $blklst_exists
@@ -621,9 +599,6 @@ sub is_build {
 sub is_configure () {
   qx{/bin/cli-shell-api inSession};
   my $exit_code = $?;
-
-  say qq{Running sub is_configure(Exit code = $exit_code);} if $debug;
-
   return $exit_code > 0 ? FALSE : TRUE;
 }
 
@@ -656,13 +631,12 @@ sub log_msg {
     unless ( length $msg_ref->{'msg_typ'} . $msg_ref->{'msg_str'} > 2 );
 
   say {$LH} qq{$date: $msg_ref->{'msg_typ'}: $msg_ref->{'msg_str'}};
-  print qq{\r}, q{ } x $cols, qq{\r} if $show;
+
   if ( $msg_ref->{'msg_typ'} eq q{INFO} ) {
-    print qq{$msg_ref->{'msg_typ'}: $msg_ref->{'msg_str'}$EOL} if $show;
+    say qq{$msg_ref->{'msg_typ'}: $msg_ref->{'msg_str'}};
   }
   else {
-    print STDERR qq{$msg_ref->{'msg_typ'}: $msg_ref->{'msg_str'}$EOL}
-      if $show || $debug;
+    say STDERR qq{$msg_ref->{'msg_typ'}: $msg_ref->{'msg_str'}};
   }
 
   return TRUE;
@@ -750,13 +724,14 @@ sub main {
     }
   }
 
+  print $crsr->{'on'};
+
   close $LH;
   exit 0;
 }
 
 # Crunch the data and throw out anything we don't need
 sub process_data {
-  say qq{Running sub process_data(%{$_});} if $debug;
   my $input = shift;
   my $re    = {
     FQDOMN =>
@@ -768,7 +743,7 @@ sub process_data {
   };
 
   # Clear the status lines
-  print qq{\r}, qq{ } x $cols, qq{\r} if $show || $debug;
+  print $crsr->{'off'}, qq{\r}, qq{ } x $cols, qq{\r};
 
 # Process the lines we've been given
 LINE:
@@ -812,9 +787,11 @@ LINE:
       # Have we seen this key before?
       my $key_exists = FALSE;
       for my $key (@keys) {
-        if ( exists $input->{'config'}->{'hosts'}->{'exclude'}->{$key} ) {
+        if (
+          exists $input->{'config'}->{ $input->{'area'} }->{'exclude'}->{$key} )
+        {
           $key_exists = TRUE;
-          $input->{'config'}->{'hosts'}->{'exclude'}->{$key}++;
+          $input->{'config'}->{ $input->{'area'} }->{'exclude'}->{$key}++;
         }
       }
 
@@ -839,22 +816,20 @@ LINE:
       }
 
       # Add to the exclude list, so the next source doesn't duplicate values
-      $input->{'config'}->{ $input->{'area'} }->{'exclude'}->{$element}     = 1;
-      $input->{'config'}->{ $input->{'area'} }->{'exclude'}->{$domain_name} = 1;
+      @{ $input->{'config'}->{ $input->{'area'} }->{'exclude'} }
+        { qq{.$domain_name}, $domain_name, $element } = ( 1, 1, 1 );
     } @elements;
 
     $input->{'config'}->{ $input->{'area'} }->{'src'}->{ $input->{'src'} }
       ->{'icount'} += scalar @elements;
 
-    printf qq{%s: %s %s processed, (%s discarded) from %s lines\r},
+    printf
+      qq{%s: $crsr->{'bright_green'}%s$crsr->{'reset'} %s processed, ($crsr->{'bright_red'}%s$crsr->{'reset'} discarded) from $crsr->{'bright_magenta'}%s$crsr->{'reset'} lines\r},
       $input->{'src'},
       $input->{'config'}->{ $input->{'area'} }->{'src'}->{ $input->{'src'} }
       ->{'icount'}, $input->{'config'}->{ $input->{'area'} }->{'type'},
-      $input->{'config'}->{ $input->{'area'} }->{'src'}->{ $input->{'src'} }
-      ->{'duplicates'},
-      $input->{'config'}->{ $input->{'area'} }->{'src'}->{ $input->{'src'} }
-      ->{'records'}
-      if $show || $debug;
+      @{ $input->{'config'}->{ $input->{'area'} }->{'src'}->{ $input->{'src'} }
+      }{ 'duplicates', 'records' };
   }
 
   if (
@@ -868,11 +843,11 @@ LINE:
           qq{%s: %s %s processed, (%s duplicates) from %s lines\r},
         $input->{'src'},
         $input->{'config'}->{ $input->{'area'} }->{'src'}->{ $input->{'src'} }
-          ->{'icount'}, $input->{'config'}->{ $input->{'area'} }->{'type'},
-        $input->{'config'}->{ $input->{'area'} }->{'src'}->{ $input->{'src'} }
-          ->{'duplicates'},
-        $input->{'config'}->{ $input->{'area'} }->{'src'}->{ $input->{'src'} }
-          ->{'records'},
+          ->{'icount'},
+        $input->{'config'}->{ $input->{'area'} }->{'type'},
+        @{
+          $input->{'config'}->{ $input->{'area'} }->{'src'}->{ $input->{'src'} }
+        }{ 'duplicates', 'records' },
       }
     );
     return TRUE;
@@ -884,8 +859,25 @@ LINE:
 sub remove {
   $success = TRUE;
 
-  my @directory = glob
-    qq{$env_ref->{'dnsmasq'}/{domains,hosts,zones}*$env_ref->{'cnf_ext'}};
+  log_msg(
+    {
+      msg_typ => q{INFO},
+      msg_str =>
+        qq{Removing dnsmasq blacklist 'no op' file $env_ref->{'no_op'}},
+    }
+  );
+
+  # Remove the no op file
+  unlink qq{$env_ref->{'no_op'}};
+  log_msg(
+    {
+      msg_typ => q{INFO},
+      msg_str =>
+        qq{Could not remove dnsmasq blacklist 'no op' file $env_ref->{'no_op'}},
+    }
+  ) if -f qq{$env_ref->{'no_op'}};
+
+  my @directory = glob qq{$env_ref->{'dnsmasq'}/$env_ref->{'oldconf'}};
 
   if (@directory) {
     log_msg(
@@ -921,7 +913,7 @@ sub remove {
       {
         msg_typ => q{INFO},
         msg_str =>
-          qq{Removing $name dnsmasq blacklist script $env_ref->{script_dir}/$env_ref->{'script'}},
+          qq{Removing $name script $env_ref->{script_dir}/$env_ref->{'script'}},
       }
     );
     unlink qq{$env_ref->{script_dir}/$env_ref->{'script'}};
@@ -961,12 +953,11 @@ sub remove {
   log_msg(
     {
       msg_typ => q{INFO},
-      msg_str =>
-        qq{Removing $name dnsmasq blacklist sources and task scheduler entries...},
+      msg_str => qq{Removing $name sources and task scheduler entries...},
     }
   );
 
-  my @command = (
+  my @commands = (
     qq{$begin;},
     qq{$delete service dns forwarding blacklist;},
     qq{$delete system task-scheduler task update_blacklists;},
@@ -975,29 +966,35 @@ sub remove {
     qq{$end;},
   );
 
-  chomp( my @output = qx{@command} );
-
-  if ( q{Nothing to delete (the specified node does not exist)} ~~ @output ) {
-    log_msg(
-      {
-        msg_typ => q{INFO},
-        msg_str =>
-          qq{$name dnsmasq blacklist wasn't configured, nothing to delete.},
-      }
-    );
-  }
-  else {
-    for my $message (@output) {
-      log_msg( { msg_typ => q{INFO}, msg_str => $message, } );
+# Now run configure and set up the blacklist configuration - capture any
+# errors in the log
+  my $in = q{};
+  my $pid = open3 $in, \*CMD_OUT, \*CMD_ERR, qq{@commands};
+  while ( my $cli_out = <CMD_OUT> ) {
+    if ( $cli_out =~ m/aborted|error|failed|failure|not valid/ ) {
+      $success = FALSE;
+      log_msg( { msg_typ => q{ERROR}, msg_str => $cli_out, } );
+    }
+    else {
+      print $cli_out;
     }
   }
+  while ( my $cli_err = <CMD_ERR> ) {
+    if ( $cli_err =~ m/aborted|error|failed|failure|not valid/ ) {
+      $success = FALSE;
+      log_msg( { msg_typ => q{ERROR}, msg_str => $cli_err, } );
+    }
+    else {
+      print $cli_err;
+    }
+  }
+  waitpid $pid, 0;
 
   if ( -d qq{$env_ref->{'templates'}/blacklist/} ) {
     log_msg(
       {
         msg_typ => q{INFO},
-        msg_str =>
-          qq{Removing $name dnsmasq blacklist configuration templates...},
+        msg_str => qq{Removing $name configuration templates...},
       }
     );
 
@@ -1008,8 +1005,7 @@ sub remove {
       log_msg(
         {
           msg_typ => q{ERROR},
-          msg_str =>
-            qq{Unable to remove $name dnsmasq blacklist configuration templates...},
+          msg_str => qq{Unable to remove $name configuration templates...},
         }
       );
     }
@@ -1127,8 +1123,7 @@ sub setup () {
   log_msg(
     {
       msg_typ => q{INFO},
-      msg_str =>
-        qq{Installing $name dnsmasq blacklist configuration templates...},
+      msg_str => qq{Installing $name configuration templates...},
     }
   );
 
@@ -1138,7 +1133,7 @@ sub setup () {
     {
       msg_typ => q{ERROR},
       msg_str =>
-        qq{ERROR unable to install $name dnsmasq blacklist configuration templates to $env_ref->{'templates'}/blacklist/},
+        qq{ERROR unable to install $name configuration templates to $env_ref->{'templates'}/blacklist/},
     }
   ) if !error_handler($?);
 
@@ -1146,53 +1141,62 @@ sub setup () {
     {
       msg_typ => q{INFO},
       msg_str =>
-        qq{Creating default $name dnsmasq blacklist sources and task scheduler entries...},
+        qq{Creating default $name sources and task scheduler entries...},
     }
   );
 
   #The standard data set for everyone else
   my @commands = (
     qq{$begin;},
-    qq{$set service dns forwarding blacklist dns-redirect-ip '0.0.0.0';},
+    qq{$delete service dns forwarding blacklist;},
+    qq{$delete system task-scheduler task update_blacklists;},
     qq{$set service dns forwarding blacklist disabled false;},
-    qq{$set service dns forwarding blacklist domains exclude '122.2o7.net';},
-    qq{$set service dns forwarding blacklist domains exclude 'adobedtm.com';},
-    qq{$set service dns forwarding blacklist domains exclude 'amazonaws.com';},
-    qq{$set service dns forwarding blacklist domains exclude 'apple.com';},
-    qq{$set service dns forwarding blacklist domains exclude 'ask.com';},
-    qq{$set service dns forwarding blacklist domains exclude 'cloudfront.net';},
-    qq{$set service dns forwarding blacklist domains exclude 'coremetrics.com';},
-    qq{$set service dns forwarding blacklist domains exclude 'doubleclick.net';},
-    qq{$set service dns forwarding blacklist domains exclude 'edgesuite.net';},
-    qq{$set service dns forwarding blacklist domains exclude 'github.com';},
-    qq{$set service dns forwarding blacklist domains exclude 'githubusercontent.com';},
-    qq{$set service dns forwarding blacklist domains exclude 'google.com';},
-    qq{$set service dns forwarding blacklist domains exclude 'googleadservices.com';},
-    qq{$set service dns forwarding blacklist domains exclude 'googleapis.com';},
-    qq{$set service dns forwarding blacklist domains exclude 'gstatic.com';},
-    qq{$set service dns forwarding blacklist domains exclude 'hulu.com';},
-    qq{$set service dns forwarding blacklist domains exclude 'msdn.com';},
-    qq{$set service dns forwarding blacklist domains exclude 'paypal.com';},
-    qq{$set service dns forwarding blacklist domains exclude 'schema.org';},
-    qq{$set service dns forwarding blacklist domains exclude 'smacargo.com';},
-    qq{$set service dns forwarding blacklist domains exclude 'ssl-on9.com';},
-    qq{$set service dns forwarding blacklist domains exclude 'ssl-on9.net';},
-    qq{$set service dns forwarding blacklist domains exclude 'storage.googleapis.com';},
-    qq{$set service dns forwarding blacklist domains include 'adsrvr.org';},
-    qq{$set service dns forwarding blacklist domains include 'adtechus.net';},
-    qq{$set service dns forwarding blacklist domains include 'advertising.com';},
-    qq{$set service dns forwarding blacklist domains include 'centade.com';},
-    qq{$set service dns forwarding blacklist domains include 'doubleclick.net';},
-    qq{$set service dns forwarding blacklist domains include 'free-counter.co.uk';},
-    qq{$set service dns forwarding blacklist domains include 'kiosked.com';},
+    qq{$set service dns forwarding blacklist dns-redirect-ip '0.0.0.0';},
+    qq{$set service dns forwarding blacklist domains exclude 122.2o7.net;},
+    qq{$set service dns forwarding blacklist domains exclude adobedtm.com;},
+    qq{$set service dns forwarding blacklist domains exclude amazonaws.com;},
+    qq{$set service dns forwarding blacklist domains exclude apple.com;},
+    qq{$set service dns forwarding blacklist domains exclude ask.com;},
+    qq{$set service dns forwarding blacklist domains exclude cloudfront.net;},
+    qq{$set service dns forwarding blacklist domains exclude coremetrics.com;},
+    qq{$set service dns forwarding blacklist domains exclude doubleclick.net;},
+    qq{$set service dns forwarding blacklist domains exclude edgesuite.net;},
+    qq{$set service dns forwarding blacklist domains exclude github.com;},
+    qq{$set service dns forwarding blacklist domains exclude githubusercontent.com;},
+    qq{$set service dns forwarding blacklist domains exclude google.com;},
+    qq{$set service dns forwarding blacklist domains exclude googleadservices.com;},
+    qq{$set service dns forwarding blacklist domains exclude googleapis.com;},
+    qq{$set service dns forwarding blacklist domains exclude gstatic.com;},
+    qq{$set service dns forwarding blacklist domains exclude hulu.com;},
+    qq{$set service dns forwarding blacklist domains exclude msdn.com;},
+    qq{$set service dns forwarding blacklist domains exclude paypal.com;},
+    qq{$set service dns forwarding blacklist domains exclude schema.org;},
+    qq{$set service dns forwarding blacklist domains exclude smacargo.com;},
+    qq{$set service dns forwarding blacklist domains exclude ssl-on9.com;},
+    qq{$set service dns forwarding blacklist domains exclude ssl-on9.net;},
+    qq{$set service dns forwarding blacklist domains exclude storage.googleapis.com;},
+    qq{$set service dns forwarding blacklist domains exclude ytimg.com;},
+    qq{$set service dns forwarding blacklist domains include adsrvr.org;},
+    qq{$set service dns forwarding blacklist domains include adtechus.net;},
+    qq{$set service dns forwarding blacklist domains include advertising.com;},
+    qq{$set service dns forwarding blacklist domains include centade.com;},
+    qq{$set service dns forwarding blacklist domains include doubleclick.net;},
+    qq{$set service dns forwarding blacklist domains include free-counter.co.uk;},
+    qq{$set service dns forwarding blacklist domains include kiosked.com;},
     qq{$set service dns forwarding blacklist domains source malc0de compress false;},
     qq{$set service dns forwarding blacklist domains source malc0de description 'List of zones serving malicious executables observed by malc0de.com/database/';},
     qq{$set service dns forwarding blacklist domains source malc0de prefix 'zone ';},
     qq{$set service dns forwarding blacklist domains source malc0de url 'http://malc0de.com/bl/ZONES';},
-    qq{$set service dns forwarding blacklist hosts exclude 'cdn.visiblemeasures.com';},
-    qq{$set service dns forwarding blacklist hosts exclude 'freedns.afraid.org';},
-    qq{$set service dns forwarding blacklist hosts exclude 'hb.disney.go.com';},
-    qq{$set service dns forwarding blacklist hosts exclude 'static.chartbeat.com';},
+    qq{$set service dns forwarding blacklist hosts exclude cdn.visiblemeasures.com;},
+    qq{$set service dns forwarding blacklist hosts exclude freedns.afraid.org;},
+    qq{$set service dns forwarding blacklist hosts exclude google.com;},
+    qq{$set service dns forwarding blacklist hosts exclude googleadservices.com;},
+    qq{$set service dns forwarding blacklist hosts exclude googleapis.com;},
+    qq{$set service dns forwarding blacklist hosts exclude gstatic.com;},
+    qq{$set service dns forwarding blacklist hosts exclude hb.disney.go.com;},
+    qq{$set service dns forwarding blacklist hosts exclude static.chartbeat.com;},
+    qq{$set service dns forwarding blacklist hosts exclude storage.googleapis.com;},
+    qq{$set service dns forwarding blacklist hosts exclude ytimg.com;},
     qq{$set service dns forwarding blacklist hosts include 'beap.gemini.yahoo.com';},
     qq{$set service dns forwarding blacklist hosts source adaway description 'Blocking mobile ad providers and some analytics providers';},
     qq{$set service dns forwarding blacklist hosts source adaway prefix '127.0.0.1 ';},
@@ -1229,7 +1233,7 @@ sub setup () {
   while ( my $cli_out = <CMD_OUT> ) {
     if ( !$cli_out =~ m/The specified configuration node already exists\n/ ) {
       print $cli_out;
-      if ( $cli_out =~ m/aborted|error|failed|failure|not valid/ ) {
+      if ( $cli_out =~ m/aborted|error|failed|failure|not valid|Set failed/ ) {
         $success = FALSE;
         log_msg( { msg_typ => q{ERROR}, msg_str => $cli_out, } );
       }
@@ -1238,7 +1242,7 @@ sub setup () {
   while ( my $cli_err = <CMD_ERR> ) {
     if ( !$cli_err =~ m/The specified configuration node already exists\n/ ) {
       print $cli_err;
-      if ( $cli_err =~ m/aborted|error|failed|failure|not valid/ ) {
+      if ( $cli_err =~ m/aborted|error|failed|failure|not valid|Set failed/ ) {
         $success = FALSE;
         log_msg( { msg_typ => q{ERROR}, msg_str => $cli_err, } );
       }
@@ -1248,15 +1252,29 @@ sub setup () {
 
   get_blacklist();
 
+  log_msg(
+    {
+      msg_typ => q{INFO},
+      msg_str =>
+        qq{Removing dnsmasq blacklist 'no op' file $env_ref->{'no_op'}},
+    }
+  );
+
   # Remove the no op file
   unlink qq{$env_ref->{'no_op'}};
+  log_msg(
+    {
+      msg_typ => q{INFO},
+      msg_str =>
+        qq{Could not remove dnsmasq blacklist 'no op' file $env_ref->{'no_op'}},
+    }
+  ) if -f qq{$env_ref->{'no_op'}};
 
   return $success;
 }
 
 # Write the data to file
 sub write_file {
-  say qq{Running sub write_file(%{$_});} if $debug;
   my $input = shift;
   open my $FH, '>', $input->{'file'} or return FALSE;
   log_msg(
