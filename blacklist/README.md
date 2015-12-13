@@ -1,27 +1,38 @@
-# UBNT EdgeMax Blacklist and Adware Server Blocking
-https://community.ubnt.com/t5/EdgeMAX/Self-Installer-to-configure-Ad-Server-and-Blacklist-Blocking/td-p/1337892
+# UBNT EdgeMax dnsmasq Blacklist and Adware Blocking
+[community.ubnt.com](https://community.ubnt.com/t5/EdgeMAX/Self-Installer-to-configure-Ad-Server-and-Blacklist-Blocking/td-p/1337892)
 
 NOTE: THIS IS NOT OFFICIAL UBIQUITI SOFTWARE AND THEREFORE NOT SUPPORTED OR ENDORSED BY Ubiquiti Networks®
 
 ## Overview
-EdgeMax Blacklist and Ad Server Blocking is derived from the received wisdom found at (https://community.ubnt.com/t5/EdgeMAX/bd-p/EdgeMAX)
+EdgeMax dnsmasq Blacklist and Adware Blocking is derived from the received wisdom found at (https://community.ubnt.com/t5/EdgeMAX/bd-p/EdgeMAX)
 
 ## Licenses
 * GNU General Public License, version 3
 * GNU Lesser General Public License, version 3
 
 ## Features
-* Generates a dnsmasq configuration file that can be used directly by dnsmasq
+* Generates configuration files used directly by dnsmasq to redirect dns lookups
 * Integrated with the EdgeMax OS CLI
-* Any FQDN in the blacklist will force dnsmasq to return the configured Blackhole IP address
+* Any FQDN in the blacklist will force dnsmasq to return the configured dns redirect IP address
 
 ## Compatibility
 * update-dnsmasq.pl has been tested on the EdgeRouter Lite family of routers, version v1.6.0-v1.8.0.
-* Since the EdgeOS is a fork and port of Vyatta 6.3, this script could easily be adapted for work on VyOS and Vyatta derived ports
+* Since the EdgeOS is a fork and port of Vyatta 6.3, this script could easily be adapted to work on VyOS and Vyatta derived ports
 
 ## Versions
-* v3.3
-    - What is new:
+* v3.5: Updates include:
+    - Removed debug option
+    - Installer includes new options
+| # | Option  |:Function                                                 :|
+|:-:|---------|----------------------------------------------------------:|
+| 1 | INSTALL | Install dnsmasq blacklist CLI configuration functionality |
+| 2 | REMOVE  |  Remove dnsmasq blacklist CLI configuration functionality |
+| 3 | TEST    |    Test dnsmasq blacklist CLI configuration functionality |
+| 4 | BACKUP  |      Backup blacklist to /config/user-data/blacklist.cmds |
+| 5 | QUIT    | Exit the installer                                        |
+
+---
+* v3.3.2: What is new:
     - Non-essential functions have been pruned, command line switches reduced to:
 
             /config/scripts/update-dnsmasq.pl -h
@@ -86,7 +97,8 @@ EdgeMax Blacklist and Ad Server Blocking is derived from the received wisdom fou
     - Uses HTTP::Tiny for smaller memory footprint with threads
     - Optional -f config.boot parser has been completely rewritten, so that the XorpConfigParser.pm module is no longer required (saves on memory overhead and compilation time)
     - Over 70% of the code has been rewritten or updated
-
+* Version History:
+---
 * v3.24d: Updates include:
     - 'hosts' exclusions now incorporates 'domains' exclusions and blacklists
     - Additional 'good hosts' excluded from blacklisting in the supplied install configuration
