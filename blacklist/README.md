@@ -23,13 +23,14 @@ EdgeMax dnsmasq Blacklist and Adware Blocking is derived from the received wisdo
 * v3.5: Updates include:
     - Removed debug option
     - Installer includes new options
-| # | Option  |:Function                                                 :|
-|:-:|---------|----------------------------------------------------------:|
+
+| # | Option  |                         Function                          |
+|---|---------|-----------------------------------------------------------|
 | 1 | INSTALL | Install dnsmasq blacklist CLI configuration functionality |
-| 2 | REMOVE  |  Remove dnsmasq blacklist CLI configuration functionality |
-| 3 | TEST    |    Test dnsmasq blacklist CLI configuration functionality |
-| 4 | BACKUP  |      Backup blacklist to /config/user-data/blacklist.cmds |
-| 5 | QUIT    | Exit the installer                                        |
+| 2 | REMOVE  |Remove dnsmasq blacklist CLI configuration functionality |
+| 3 | TEST    |Test dnsmasq blacklist CLI configuration functionality |
+| 4 | BACKUP  |Backup blacklist configuration to /config/user-data/blacklist.cmds |
+| 5 | QUIT    |Exit the installer                                        |
 
 ---
 * v3.3.2: What is new:
@@ -113,7 +114,7 @@ EdgeMax dnsmasq Blacklist and Adware Blocking is derived from the received wisdo
     - Useragent: HTTP get requests now include browser agent information to prevent website robot rejection
     - Useragent: HTTP/HTTPS handling uses useragent for improved error/timeout control
     - Uses own node.def to maintain configuration changes. This also forces the script to run the dnsmasq configuration update after DNS is up during boot time
-
+---
 * 3.22rc1: Updates include:
     - Fixes excluded FQDNs by using precise matching instead of fuzzy (i.e. 1.domain.tld won't also exclude b1.domain.tld)
     - New --disable switch enables ADBlock by setting [set service dns forwarding blacklist enabled false]
@@ -125,7 +126,7 @@ EdgeMax dnsmasq Blacklist and Adware Blocking is derived from the received wisdo
     - Useragent: HTTP/HTTPS handling uses useragent for improved error/timeout control
     - Uses own node.def to maintain configuration changes. This also forces the script to run the dnsmasq configuration update after DNS is up during boot time
     - Uses own node.def to maintain configuration changes. This also forces the script to run the dnsmasq configuration update after DNS is up during router boot time
-
+---
 * 3.15: Added features include:
     - Logging to /var/log/update-blacklists-dnsmasq.log
     - --debug option: prints status messages
@@ -133,13 +134,13 @@ EdgeMax dnsmasq Blacklist and Adware Blocking is derived from the received wisdo
     - Added retry logic for download sources that time out (inspired by @mseeEngineer﻿)
     - Task scheduler update interval is now every 6 hours, as some of the sources change hourly (configure interval using "set system task-scheduler task update_blacklists interval"
     - Status line retains previous downloads for more detail
-
+---
 * Version 3.12: Fixed bug reported by @soehest﻿ where certain FQDNs were being rejected by the stream processor.
-
+---
 * Version 3.10: Now supports https:// source URLs and improved regex handling in the stream processing engine.
-
+---
 * Version 3.00: No longer requires regex strings, just the line prefix/preamble before the hostname in the download. If a version of ADBlock was installed previously, you will need to select option 2 to remove it and then install this version. This is necessary to ensure the configure paths are correctly set up for the new prefix option which replaces the regex string.
-
+---
 ## Installation
 
 To install:
