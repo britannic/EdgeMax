@@ -21,12 +21,17 @@ EdgeMax dnsmasq Blacklist and Adware Blocking is derived from the received wisdo
 
 ## Versions
 * v3.5: Updates include:
-    - Removed debug option
+    -
+    - Removed --debug option from update-dnsmasq.pl
+    - New validator script (/configure/scripts/blacklist.t) runs a battery of tests on the blacklist configuration to ensure it is working correctly or checks it is removed correctly
+    - setup and remove scripts rewritten in Perl
+    - Fixed issue with install that prevented admin user configuration
+    - Installer now runs under admin and only uses sudo where absolutely necessary
     - Installer includes new options
 
 | # | Option  |                         Function                          |
 |---|---------|-----------------------------------------------------------|
-| 1 | INSTALL | Install dnsmasq blacklist CLI configuration functionality |
+| 1 | INSTALL |Install dnsmasq blacklist CLI configuration functionality |
 | 2 | REMOVE  |Remove dnsmasq blacklist CLI configuration functionality |
 | 3 | TEST    |Test dnsmasq blacklist CLI configuration functionality |
 | 4 | BACKUP  |Backup blacklist configuration to /config/user-data/blacklist.cmds |
@@ -44,13 +49,17 @@ EdgeMax dnsmasq Blacklist and Adware Blocking is derived from the received wisdo
                 --help      # show help and usage text
                 -v          # verbose output
                 --version   # show program version number
+
     - Improved exclusion list rejection
     - Ability to create a domain list from a source that has FQDNs using the new 'compress' switch (note, use with caution, since you may find legit domains getting completely blocked - especially cloud services like amazonaws, in that case you will need to add specific excludes):
+
             set service dns forwarding blacklist domains source FQDNs_Source compress true
+
     - Install/remove scripts rewritten in Perl for better error checking
     - Install/remove logs will be written to /var/log for diagnostics
     - Flagged domain list with optional include commands written to /var/log/update-dnsmasq_flagged_domains.cmds
     - Each source will be written to its own file:
+
             root@ubnt:/etc/dnsmasq.d# ls
             README
             domains.malc0de.com.blacklist.conf
@@ -62,7 +71,9 @@ EdgeMax dnsmasq Blacklist and Adware Blocking is derived from the received wisdo
             hosts.winhelp2002.mvps.org.blacklist.conf
             hosts.www.malwaredomainlist.com.blacklist.conf
             hosts.yoyo.org.blacklist.conf
+
     - Log file (/var/log/update-dnsmasq.pl) now flags frequently blacklisted domains, so you can optionally decide to add them as an include under domains:
+
             root@ubnt:/etc/dnsmasq.d# tail -n 30 /var/log/update-dnsmasq.log
             Nov 29 09:45:50 2015: INFO: hosts blacklisted: domain loniricarena.ru 4 times
             Nov 29 09:45:50 2015: INFO: hosts blacklisted: domain starwave.com 5 times
@@ -94,10 +105,12 @@ EdgeMax dnsmasq Blacklist and Adware Blocking is derived from the received wisdo
             Nov 29 09:45:51 2015: INFO: hosts blacklisted: domain llnwd.net 24 times
             Nov 29 09:45:51 2015: INFO: hosts blacklisted: domain thomasadot.com 4 times
             Nov 29 09:45:52 2015: INFO: Reloading dnsmasq configuration...
+
     - Improved memory usage for threads has been implemented
     - Uses HTTP::Tiny for smaller memory footprint with threads
     - Optional -f config.boot parser has been completely rewritten, so that the XorpConfigParser.pm module is no longer required (saves on memory overhead and compilation time)
     - Over 70% of the code has been rewritten or updated
+
 * Version History:
 ---
 * v3.24d: Updates include:

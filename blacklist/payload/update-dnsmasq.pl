@@ -64,68 +64,68 @@ exit 0;
 
 # Process the active (not committed or saved) configuration
 sub cfg_actv {
-  my $input = shift;
+  my $config       = new Vyatta::Config;
+  my $input        = shift;
+  my $exists       = q{existsOrig};
+  my $listNodes    = q{listOrigNodes};
+  my $returnValue  = q{returnOrigValue};
+  my $returnValues = q{returnOrigValues};
 
-  if ( is_blacklist() ) {
-    my $config = new Vyatta::Config;
-    my ( $listNodes, $returnValue, $returnValues );
+  if ( is_configure() ) {
+    $exists       = q{exists};
+    $listNodes    = q{listNodes};
+    $returnValue  = q{returnValue};
+    $returnValues = q{returnValues};
+  }
 
-    if ( is_configure() ) {
-      $returnValue  = q{returnValue};
-      $returnValues = q{returnValues};
-      $listNodes    = q{listNodes};
-    }
-    else {
-      $returnValue  = q{returnOrigValue};
-      $returnValues = q{returnOrigValues};
-      $listNodes    = q{listOrigNodes};
-    }
+# Check to see if blacklist is configured
+  $config->setLevel(q{service dns forwarding});
+  my $blklst_exists = $config->$exists(q{blacklist}) ? TRUE : FALSE;
 
+  if ($blklst_exists) {
     $config->setLevel(q{service dns forwarding blacklist});
-    $input->{'config'}->{'disabled'} = $config->$returnValue(q{disabled})
-      // FALSE;
-
-    $input->{'config'}->{'dns_redirect_ip'}
+    $input->{config}->{disabled} = $config->$returnValue(q{disabled}) // FALSE;
+    $input->{config}->{dns_redirect_ip}
       = $config->$returnValue(q{dns-redirect-ip}) // q{0.0.0.0};
 
     for my $key ( $config->$returnValues(q{exclude}) ) {
-      $input->{'config'}->{'exclude'}->{$key} = 1;
+      $input->{config}->{exclude}->{$key} = 1;
     }
 
-    $input->{'config'}->{'disabled'}
-      = $input->{'config'}->{'disabled'} eq q{false} ? FALSE : TRUE;
+    $input->{config}->{disabled}
+      = $input->{config}->{disabled} eq q{false} ? FALSE : TRUE;
 
     for my $area (qw{hosts domains zones}) {
       $config->setLevel(qq{service dns forwarding blacklist $area});
-      $input->{'config'}->{$area}->{'dns_redirect_ip'}
+      $input->{config}->{$area}->{dns_redirect_ip}
         = $config->$returnValue(q{dns-redirect-ip})
-        // $input->{'config'}->{'dns_redirect_ip'};
+        // $input->{config}->{dns_redirect_ip};
 
-      for my $key ( $config->$returnValues('include') ) {
-        $input->{'config'}->{$area}->{'blklst'}->{$key} = 1;
+      for my $key ( $config->$returnValues(q{include}) ) {
+        $input->{config}->{$area}->{blklst}->{$key} = 1;
       }
 
-      while ( my ( $key, $value ) = each $input->{'config'}->{'exclude'} ) {
-        $input->{'config'}->{$area}->{'exclude'}->{$key} = $value;
+      while ( my ( $key, $value ) = each $input->{config}->{exclude} ) {
+        $input->{config}->{$area}->{exclude}->{$key} = $value;
       }
 
       for my $key ( $config->$returnValues(q{exclude}) ) {
-        $input->{'config'}->{$area}->{'exclude'}->{$key} = 1;
+        $input->{config}->{$area}->{exclude}->{$key} = 1;
       }
 
-      if ( !keys %{ $input->{'config'}->{$area}->{'exclude'} } ) {
-        $input->{'config'}->{$area}->{'exclude'} = {};
+      if ( !keys %{ $input->{config}->{$area}->{exclude} } ) {
+        $input->{config}->{$area}->{exclude} = {};
       }
 
-      if ( !keys %{ $input->{'config'}->{'exclude'} } ) {
-        $input->{'config'}->{'exclude'} = {};
+      if ( !keys %{ $input->{config}->{exclude} } ) {
+        $input->{config}->{exclude} = {};
       }
 
       for my $source ( $config->$listNodes(q{source}) ) {
         $config->setLevel(
           qq{service dns forwarding blacklist $area source $source});
-        @{ $input->{'config'}->{$area}->{'src'}->{$source} }{qw(prefix url)}
-          = ( $config->$returnValue('prefix'), $config->$returnValue('url') );
+        @{ $input->{config}->{$area}->{src}->{$source} }{qw(prefix url)}
+          = ( $config->$returnValue(q{prefix}), $config->$returnValue(q{url}) );
       }
     }
   }
@@ -141,9 +141,9 @@ sub cfg_actv {
 
     return;
   }
-  if ( ( !scalar keys %{ $input->{'config'}->{'domains'}->{'src'} } )
-    && ( !scalar keys %{ $input->{'config'}->{'hosts'}->{'src'} } )
-    && ( !scalar keys %{ $input->{'config'}->{'zones'}->{'src'} } ) )
+  if ( ( !scalar keys %{ $input->{config}->{domains}->{src} } )
+    && ( !scalar keys %{ $input->{config}->{hosts}->{src} } )
+    && ( !scalar keys %{ $input->{config}->{zones}->{src} } ) )
   {
     $show = TRUE;
     log_msg(
@@ -163,28 +163,28 @@ sub cfg_file {
   my $tmp_ref
     = get_nodes( { config_data => get_file( { file => $cfg_file } ) } );
   my $configured
-    = (  $tmp_ref->{'domains'}->{'source'}
-      || $tmp_ref->{'hosts'}->{'source'}
-      || $tmp_ref->{'zones'}->{'source'} ) ? TRUE : FALSE;
+    = (  $tmp_ref->{domains}->{source}
+      || $tmp_ref->{hosts}->{source}
+      || $tmp_ref->{zones}->{source} ) ? TRUE : FALSE;
 
   if ($configured) {
-    $input->{'config'}->{'dns_redirect_ip'} = $tmp_ref->{'dns-redirect-ip'}
+    $input->{config}->{dns_redirect_ip} = $tmp_ref->{q{dns-redirect-ip}}
       // q{0.0.0.0};
-    $input->{'config'}->{'disabled'}
-      = $tmp_ref->{'disabled'} eq q{false} ? FALSE : TRUE;
-    $input->{'config'}->{'exclude'}
-      = exists $tmp_ref->{'exclude'} ? $tmp_ref->{'exclude'} : ();
+    $input->{config}->{disabled}
+      = $tmp_ref->{disabled} eq q{false} ? FALSE : TRUE;
+    $input->{config}->{exclude}
+      = exists $tmp_ref->{exclude} ? $tmp_ref->{exclude} : ();
 
     for my $area (qw{hosts domains zones}) {
-      $input->{'config'}->{$area}->{'dns_redirect_ip'}
-        = $input->{'config'}->{'dns_redirect_ip'}
-        if !exists( $tmp_ref->{$area}->{'dns-redirect-ip'} );
+      $input->{config}->{$area}->{dns_redirect_ip}
+        = $input->{config}->{dns_redirect_ip}
+        if !exists( $tmp_ref->{$area}->{q{dns-redirect-ip}} );
 
-      @{ $input->{'config'}->{$area} }{qw(blklst exclude src)}
+      @{ $input->{config}->{$area} }{qw(blklst exclude src)}
         = @{ $tmp_ref->{$area} }{qw(include exclude source)};
 
-      while ( my ( $key, $value ) = each $tmp_ref->{$area}->{'exclude'} ) {
-        $input->{'config'}->{$area}->{'exclude'}->{$key} = $value;
+      while ( my ( $key, $value ) = each $tmp_ref->{$area}->{exclude} ) {
+        $input->{config}->{$area}->{exclude}->{$key} = $value;
       }
     }
   }
@@ -205,23 +205,23 @@ sub cfg_file {
 sub delete_file {
   my $input = shift;
 
-  if ( -f $input->{'file'} ) {
+  if ( -f $input->{file} ) {
     log_msg(
       {
         msg_typ => q{info},
         msg_str => sprintf q{Deleting file %s},
-        $input->{'file'},
+        $input->{file},
       }
     );
-    unlink $input->{'file'};
+    unlink $input->{file};
   }
 
-  if ( -f $input->{'file'} ) {
+  if ( -f $input->{file} ) {
     log_msg(
       {
         msg_typ => q{warning},
         msg_str => sprintf q{Unable to delete %s},
-        $input->{'file'},
+        $input->{file},
       }
     );
     return;
@@ -233,9 +233,9 @@ sub delete_file {
 sub get_config {
   my $input = shift;
 
-  given ( $input->{'type'} ) {
-    when (/active/) { return cfg_actv( { config => $input->{'config'} } ); }
-    when (/file/) { return cfg_file( { config => $input->{'config'} } ); }
+  given ( $input->{type} ) {
+    when (/active/) { return cfg_actv( { config => $input->{config} } ); }
+    when (/file/) { return cfg_file( { config => $input->{config} } ); }
   }
 
   return;
@@ -245,22 +245,21 @@ sub get_config {
 sub get_file {
   my $input = shift;
   my @data  = ();
-  if ( exists $input->{'file'} ) {
-    open my $CF, q{<}, $input->{'file'}
-      or die qq{error: Unable to open $input->{'file'}: $!};
-    local $/;
+  if ( exists $input->{file} ) {
+    open my $CF, q{<}, $input->{file}
+      or die qq{error: Unable to open $input->{file}: $!};
     chomp( @data = <$CF> );
 
     close $CF;
   }
-  return $input->{'data'} = \@data;
+  return $input->{data} = \@data;
 }
 
 # Build hashes from the configuration file data (called by get_nodes())
 sub get_hash {
   my $input    = shift;
-  my $hash     = \$input->{'hash_ref'};
-  my @nodes    = @{ $input->{'nodes'} };
+  my $hash     = \$input->{hash_ref};
+  my @nodes    = @{ $input->{nodes} };
   my $value    = pop @nodes;
   my $hash_ref = ${$hash};
 
@@ -294,7 +293,7 @@ sub get_nodes {
     RSPC => qr/^\s+/o,
   };
 
-  for my $line ( @{ $input->{'config_data'} } ) {
+  for my $line ( @{ $input->{config_data} } ) {
     $line =~ s/$re->{LSPC}//;
     $line =~ s/$re->{RSPC}//;
 
@@ -355,7 +354,7 @@ sub get_nodes {
       }
     }
   }
-  return $cfg_ref->{'service'}->{'dns'}->{'forwarding'}->{'blacklist'};
+  return $cfg_ref->{service}->{dns}->{forwarding}->{blacklist};
 }
 
 # Set up command line options
@@ -374,7 +373,7 @@ sub get_options {
     ],
   );
 
-  return \@opts if $input->{'option'};
+  return \@opts if $input->{option};
 
   # Read command line flags and exit with help message if any are unknown
   return GetOptions( map { my $options = $_; (@$options)[ 1 .. $#$options ] }
@@ -390,53 +389,37 @@ sub get_url {
   );
 
 #   $ua->timeout(60);
-  $input->{'prefix'} =~ s/^["](?<UNCMT>.*)["]$/$+{UNCMT}/g;
+  $input->{prefix} =~ s/^["](?<UNCMT>.*)["]$/$+{UNCMT}/g;
   my $re = {
-    REJECT => qr{^#|^$|^\n}o,
-    SELECT => qr{^$input->{'prefix'}.*$}o,
+    REJECT => qr{\A#|\A\z|\A\n}oms,
+    SELECT => qr{\A $input->{prefix} .*\z}xoms,
     SPLIT  => qr{\R|<br \/>}oms,
   };
 
-  my $get = $ua->get( $input->{'url'} );
+  my $get = $ua->get( $input->{url} );
 
-  if ( $get->{'success'} ) {
-    $input->{'data'} = {
+  if ( $get->{success} ) {
+    $input->{data} = {
       map { my $key = $_; lc($key) => 1 }
         grep { $_ =~ /$re->{SELECT}/ } split /$re->{SPLIT}/,
-      $get->{'content'}
+      $get->{content}
     };
     return $input;
   }
   else {
-    $input->{'data'} = {};
+    $input->{data} = {};
     return $input;
   }
 }
 
-# Check to see if blacklist is configured
-sub is_blacklist {
-  my $config = new Vyatta::Config;
-
-  $config->setLevel(q{service dns forwarding});
-  my $blklst_exists
-    = is_configure()
-    ? $config->exists(q{blacklist})
-    : $config->existsOrig(q{blacklist});
-
-  return defined $blklst_exists ? TRUE : FALSE;
-}
-
 # Check to see if we are being run under configure
 sub is_configure {
-
   qx{/bin/cli-shell-api inSession};
-  my $exit_code = $?;
-
-  return $exit_code > 0 ? FALSE : TRUE;
+  return $? >> 8 != 0 ? FALSE : TRUE;
 }
 
 # Make sure script runs as root
-sub is_sudo {
+sub is_admin {
   return TRUE if geteuid() == 0;
   return;
 }
@@ -453,20 +436,18 @@ sub log_msg {
     warning  => LOG_WARNING,
   };
 
-  return
-    unless ( length $msg_ref->{'msg_typ'} . $msg_ref->{'msg_str'} > 2 );
+  return unless ( length $msg_ref->{msg_typ} . $msg_ref->{msg_str} > 2 );
 
-  syslog( $log_msg->{ $msg_ref->{'msg_typ'} }, $msg_ref->{'msg_str'} );
+  syslog( $log_msg->{ $msg_ref->{msg_typ} }, $msg_ref->{msg_str} );
 
-  print $crsr->{'off'}, qq{\r}, q{ } x $cols, qq{\r} if $show;
+  print $crsr->{off}, qq{\r}, q{ } x $cols, qq{\r} if $show;
 
-  if ( $msg_ref->{'msg_typ'} eq q{info} ) {
-    print $crsr->{'off'}, qq{$msg_ref->{'msg_typ'}: $msg_ref->{'msg_str'}}
-      if $show;
+  if ( $msg_ref->{msg_typ} eq q{info} ) {
+    print $crsr->{off}, qq{$msg_ref->{msg_typ}: $msg_ref->{msg_str}} if $show;
   }
   else {
-    print STDERR $crsr->{'off'}, $crsr->{'bright_red'},
-      qq{$msg_ref->{'msg_typ'}: $msg_ref->{'msg_str'}$crsr->{'reset'}}
+    print STDERR $crsr->{off}, $crsr->{bright_red},
+      qq{$msg_ref->{msg_typ}: $msg_ref->{msg_str}$crsr->{reset}}
       if $show;
   }
 
@@ -477,13 +458,13 @@ sub log_msg {
 sub main {
   my $dnsmasq_svc = q{/etc/init.d/dnsmasq};
   my $cfg_ref     = {
-    disabled         => 0,
-    dnsmasq_dir      => q{/etc/dnsmasq.d},
-    flag_dom_level   => 5,
-    flag_dom_file    => q{/var/log/update-dnsmasq_flagged_domains.cmds},
-    log_name         => q{update-dnsmasq},
-    no_op            => q{/tmp/.update-dnsmasq.no-op},
-    domains          => {
+    disabled    => 0,
+    dnsmasq_dir => q{/etc/dnsmasq.d},
+    flag_lvl    => 5,
+    flag_file   => q{/var/log/update-dnsmasq-flagged.cmds},
+    log_name    => q{update-dnsmasq},
+    no_op       => q{/tmp/.update-dnsmasq.no-op},
+    domains     => {
       duplicates => 0,
       icount     => 0,
       records    => 0,
@@ -514,14 +495,14 @@ sub main {
 
   # Find reasons to quit
   # If the no_op file exists, exit.
-  exit 0 if ( -f $cfg_ref->{'no_op'} );
+  exit 0 if ( -f $cfg_ref->{no_op} );
 
-  usage( { option => q{sudo}, exit_code => 1 } ) if not is_sudo();
+  usage( { option => q{sudo}, exit_code => 1 } ) if not is_admin();
   usage( { option => q{cfg_file}, exit_code => 1 } )
     if defined $cfg_file && !-f $cfg_file;
 
   # Start logging
-  openlog( qq{$cfg_ref->{'log_name'}}, q{}, LOG_USER );
+  openlog( qq{$cfg_ref->{log_name}}, q{}, LOG_USER );
   log_msg(
     {
       msg_typ => q{info},
@@ -531,7 +512,7 @@ sub main {
   );
 
   # Make sure localhost is always in the exclusions whitelist
-  $cfg_ref->{'hosts'}->{'exclude'}->{'localhost'} = 1;
+  $cfg_ref->{hosts}->{exclude}->{localhost} = 1;
 
   # Now choose which data set will define the configuration
   my $cfg_type = defined $cfg_file ? q{file} : q{active};
@@ -539,12 +520,12 @@ sub main {
   exit 1 unless get_config( { type => $cfg_type, config => $cfg_ref } );
 
   # Now proceed if blacklist is enabled
-  if ( !$cfg_ref->{'disabled'} ) {
+  if ( !$cfg_ref->{disabled} ) {
     my @areas = ();
 
     # Add areas to process only if they contain sources
     for my $area (qw{domains zones hosts}) {
-      push @areas, $area if scalar keys %{ $cfg_ref->{$area}->{'src'} };
+      push @areas, $area if scalar keys %{ $cfg_ref->{$area}->{src} };
     }
 
     # Process each area
@@ -552,57 +533,59 @@ sub main {
     for my $area (@areas) {
       my ( $prefix, @threads );
       my $max_thrds = 8;
-      my @sources   = keys %{ $cfg_ref->{$area}->{'src'} };
-      $cfg_ref->{$area}->{'icount'}
-        = scalar keys %{ $cfg_ref->{$area}->{'blklst'} } // 0;
-      @{ $cfg_ref->{$area} }{ 'records', 'unique' }
-        = @{ $cfg_ref->{$area} }{ 'icount', 'icount' };
+      my @sources   = keys %{ $cfg_ref->{$area}->{src} };
+      $cfg_ref->{$area}->{icount}
+        = scalar keys %{ $cfg_ref->{$area}->{blklst} } // 0;
+      @{ $cfg_ref->{$area} }{ q{records}, q{unique} }
+        = @{ $cfg_ref->{$area} }{ q{icount}, q{icount} };
 
       # Remove any files that no longer have configured sources
       my $sources_ref = {
         map {
           my $key = $_;
-          qq{$cfg_ref->{'dnsmasq_dir'}/$area.$key.blacklist.conf} => 1;
+          qq{$cfg_ref->{dnsmasq_dir}/$area.$key.blacklist.conf} => 1;
         } @sources
       };
       my $files_ref = { map { my $key = $_; $key => 1; }
-          glob qq{$cfg_ref->{'dnsmasq_dir'}/$area.*blacklist.conf} };
+          glob qq{$cfg_ref->{dnsmasq_dir}/$area.*blacklist.conf} };
 
       for my $file ( keys $files_ref ) {
-        delete_file( { file => $file } ) if !exists $sources_ref->{$file};
+        delete_file( { file => $file } )
+          if !exists $sources_ref->{$file} && $file;
       }
 
-      # write each configured area's includes into individual dnsmasq files
-      if ( $cfg_ref->{$area}->{'icount'} > 0 ) {
+      # write each configured areas includes into individual dnsmasq files
+      if ( $cfg_ref->{$area}->{icount} > 0 ) {
         my $equals = $area ne q{domains} ? q{=/} : q{=/.};
         write_file(
           {
             data => [
               map {
                 my $value = $_;
-                sprintf qq{%s%s%s/%s\n}, $cfg_ref->{$area}->{'target'},
-                  $equals, $value, $cfg_ref->{$area}->{'dns_redirect_ip'};
-              } sort keys %{ $cfg_ref->{$area}->{'blklst'} }
+                sprintf qq{%s%s%s/%s\n}, $cfg_ref->{$area}->{target}, $equals,
+                  $value, $cfg_ref->{$area}->{dns_redirect_ip};
+              } sort keys %{ $cfg_ref->{$area}->{blklst} }
             ],
-            file => qq{$cfg_ref->{'dnsmasq_dir'}/$area.pre-configured.blacklist.conf},
+            file =>
+              qq{$cfg_ref->{dnsmasq_dir}/$area.pre-configured.blacklist.conf},
           }
-        ) or die sprintf qq{Could not open file: s% $!}, $file;
+        );
       }
 
       for my $source (@sources) {
         my ( $file, $url )
-          = @{ $cfg_ref->{$area}->{'src'}->{$source} }{ 'file', 'url' };
+          = @{ $cfg_ref->{$area}->{src}->{$source} }{ q{file}, q{url} };
         my $uri  = new URI($url);
         my $host = $uri->host;
 
-        # Initialize the source's counters
-        @{ $cfg_ref->{$area}->{'src'}->{$source} }
+        # Initialize the sources counters
+        @{ $cfg_ref->{$area}->{src}->{$source} }
           {qw(duplicates icount records unique)} = ( 0, 0, 0, 0 );
 
         $prefix
-          = $cfg_ref->{$area}->{'src'}->{$source}->{'prefix'} ~~ 'http'
-          ? qr{(?:^(?:http:|https:){1}[/]{1,2})}o
-          : $cfg_ref->{$area}->{'src'}->{$source}->{'prefix'};
+          = $cfg_ref->{$area}->{src}->{$source}->{prefix} ~~ q{http}
+          ? qr{(?:\A(?:http:|https:){1}[/]{1,2})}om
+          : $cfg_ref->{$area}->{src}->{$source}->{prefix};
 
         if ( scalar $url ) {
           log_msg(
@@ -635,17 +618,16 @@ sub main {
 
       for my $thread (@threads) {
         my $data_ref = $thread->join();
-        my $rec_count = scalar keys %{ $data_ref->{'data'} } // 0;
+        my $rec_count = scalar keys %{ $data_ref->{data} } // 0;
 
-        $cfg_ref->{$area}->{'src'}->{ $data_ref->{'src'} }->{'records'}
-          += $rec_count;
+        $cfg_ref->{$area}->{src}->{ $data_ref->{src} }->{records} += $rec_count;
 
-        if ( exists $data_ref->{'host'} && scalar $rec_count ) {
+        if ( exists $data_ref->{host} && scalar $rec_count ) {
           log_msg(
             {
               msg_typ => q{info},
               msg_str => sprintf q{%s lines received from: %s },
-              $rec_count, $data_ref->{'host'},
+              $rec_count, $data_ref->{host},
             }
           );
 
@@ -653,58 +635,54 @@ sub main {
           process_data(
             {
               area   => $area,
-              data   => \%{ $data_ref->{'data'} },
+              data   => \%{ $data_ref->{data} },
               config => $cfg_ref,
-              prefix => $data_ref->{'prefix'},
-              src    => $data_ref->{'src'}
+              prefix => $data_ref->{prefix},
+              src    => $data_ref->{src}
             }
           );
 
-          # Delete $data_ref->{'data'} key and data
-          delete $data_ref->{'data'};
+          # Delete $data_ref->{data} key and data
+          delete $data_ref->{data};
 
-          if (
-            $cfg_ref->{$area}->{'src'}->{ $data_ref->{'src'} }->{'icount'} > 0 )
-          {
+          if ( $cfg_ref->{$area}->{src}->{ $data_ref->{src} }->{icount} > 0 ) {
             my $equals = $area ne q{domains} ? q{=/} : q{=/.};
             write_file(
               {
                 data => [
                   map {
                     my $value = $_;
-                    sprintf qq{%s%s%s/%s\n}, $cfg_ref->{$area}->{'target'},
-                      $equals, $value, $cfg_ref->{$area}->{'dns_redirect_ip'};
+                    sprintf qq{%s%s%s/%s\n}, $cfg_ref->{$area}->{target},
+                      $equals, $value, $cfg_ref->{$area}->{dns_redirect_ip};
                     } sort keys %{
-                    $cfg_ref->{$area}->{'src'}->{ $data_ref->{'src'} }
-                      ->{'blklst'}
+                    $cfg_ref->{$area}->{src}->{ $data_ref->{src} }->{blklst}
                     }
                 ],
-                file => qq{$cfg_ref->{'dnsmasq_dir'}/$area.$data_ref->{'src'}.blacklist.conf},
+                file =>
+                  qq{$cfg_ref->{dnsmasq_dir}/$area.$data_ref->{src}.blacklist.conf},
               }
-            ) or die sprintf qq{Could not open file: s% $!}, $file;
+            );
 
 
-            $cfg_ref->{$area}->{'unique'}
-              += scalar keys
-              %{ $cfg_ref->{$area}->{'src'}->{ $data_ref->{'src'} }->{'blklst'}
+            $cfg_ref->{$area}->{unique}
+              += scalar
+              keys %{ $cfg_ref->{$area}->{src}->{ $data_ref->{src} }->{blklst}
               };
-            $cfg_ref->{$area}->{'duplicates'}
-              += $cfg_ref->{$area}->{'src'}->{ $data_ref->{'src'} }
-              ->{'duplicates'};
-            $cfg_ref->{$area}->{'icount'}
-              += $cfg_ref->{$area}->{'src'}->{ $data_ref->{'src'} }->{'icount'};
-            $cfg_ref->{$area}->{'records'}
-              += $cfg_ref->{$area}->{'src'}->{ $data_ref->{'src'} }
-              ->{'records'};
+            $cfg_ref->{$area}->{duplicates}
+              += $cfg_ref->{$area}->{src}->{ $data_ref->{src} }->{duplicates};
+            $cfg_ref->{$area}->{icount}
+              += $cfg_ref->{$area}->{src}->{ $data_ref->{src} }->{icount};
+            $cfg_ref->{$area}->{records}
+              += $cfg_ref->{$area}->{src}->{ $data_ref->{src} }->{records};
 
             # Discard the data now its written to file
-            delete $cfg_ref->{$area}->{'src'}->{ $data_ref->{'src'} };
+            delete $cfg_ref->{$area}->{src}->{ $data_ref->{src} };
           }
           else {
             log_msg(
               {
                 msg_typ => q{warning},
-                msg_str => qq{Zero records processed from $data_ref->{'src'}!},
+                msg_str => qq{Zero records processed from $data_ref->{src}!},
               }
             );
           }
@@ -723,16 +701,16 @@ sub main {
 
       my @flagged_domains = ();
 
- # Now lets report the domains that were seen more than $cfg->{'flag_dom_level'}
+      # Now lets report the domains that were seen more than $cfg->{flag_lvl}
       for my $key (
         sort {
-          $cfg_ref->{'hosts'}->{'exclude'}->{$b}
-            <=> $cfg_ref->{'hosts'}->{'exclude'}->{$a}
-        } keys %{ $cfg_ref->{'hosts'}->{'exclude'} }
+          $cfg_ref->{hosts}->{exclude}->{$b}
+            <=> $cfg_ref->{hosts}->{exclude}->{$a}
+        } keys %{ $cfg_ref->{hosts}->{exclude} }
         )
       {
-        my $value = $cfg_ref->{'hosts'}->{'exclude'}->{$key};
-        if ( $value >= $cfg_ref->{'flag_dom_level'} && length $key > 5 ) {
+        my $value = $cfg_ref->{hosts}->{exclude}->{$key};
+        if ( $value >= $cfg_ref->{flag_lvl} && length $key > 5 ) {
           log_msg(
             {
               msg_typ => q{info},
@@ -755,14 +733,15 @@ sub main {
                   $value;
               } @flagged_domains
             ],
-            file => $cfg_ref->{'flag_dom_file'},
+            file => $cfg_ref->{flag_file},
           }
-        ) or die sprintf qq{Could not open file: s% $!}, $file;
+        );
 
         log_msg(
           {
             msg_typ => q{info},
-            msg_str => qq{Flagged domains command set written to:\n $file},
+            msg_str =>
+              qq{Flagged domains command set written to:\n $cfg_ref->{flag_file}},
           }
         );
       }
@@ -771,11 +750,11 @@ sub main {
       say q{} if $area_count == 1 && $show;    # print a final line feed
     }
   }
-  elsif ( $cfg_ref->{'disabled'} ) {
+  elsif ( $cfg_ref->{disabled} ) {
     for my $file (
-      glob qq{$cfg_ref->{'dnsmasq_dir'}/{domains,hosts,zones}*blacklist.conf} )
+      glob qq{$cfg_ref->{dnsmasq_dir}/{domains,hosts,zones}*blacklist.conf} )
     {
-      delete_file( { file => $file } );
+      delete_file( { file => $file } ) if $file;
     }
   }
 
@@ -786,7 +765,7 @@ sub main {
     : qq{$dnsmasq_svc force-reload > /dev/null 2>1&};
 
   # Clean up the status line
-  print $crsr->{'off'}, qq{\r}, qq{ } x $cols, qq{\r} if $show;
+  print $crsr->{off}, qq{\r}, qq{ } x $cols, qq{\r} if $show;
 
   log_msg(
     { msg_typ => q{info}, msg_str => q{Reloading dnsmasq configuration...}, } );
@@ -815,16 +794,16 @@ sub process_data {
       qr{(\b(?:(?![.]|-)[\w-]{1,63}(?<!-)[.]{1})+(?:[a-zA-Z]{2,63})\b)}o,
     LSPACE => qr{\A\s+}oms,
     RSPACE => qr{\s+\z}oms,
-    PREFIX => qr{\A$input->{'prefix'}}oms,
+    PREFIX => qr{\A $input->{prefix} }xms,
     SUFFIX => qr{(?:#.*\z|\{.*\z|[/[].*\z)}oms,
   };
 
   # Clear the status lines
-  print $crsr->{'off'}, qq{\r}, qq{ } x $cols, qq{\r} if $show;
+  print $crsr->{off}, qq{\r}, qq{ } x $cols, qq{\r} if $show;
 
 # Process the lines we've been given
 LINE:
-  for my $line ( keys %{ $input->{'data'} } ) {
+  for my $line ( keys %{ $input->{data} } ) {
     next LINE if $line eq q{} || !defined $line;
     $line =~ s/$re->{PREFIX}//;
     $line =~ s/$re->{SUFFIX}//;
@@ -837,69 +816,67 @@ LINE:
 
     # We use map to individually pull 1 to N FQDNs or domains from @elements
     for my $element (@elements) {
+
       # Break it down into it components
       my @domain = split /[.]/, $element;
 
       # Create an array of all the subdomains
       my @keys;
       for ( 2 .. @domain ) {
-        push @keys, join q{.}, @domain; shift @domain;
+        push @keys, join q{.}, @domain;
+        shift @domain;
       }
 
       # Have we seen this key before?
       my $key_exists = FALSE;
       for my $key (@keys) {
-        if (
-          exists $input->{'config'}->{ $input->{'area'} }->{'exclude'}->{$key} )
-        {
+        if ( exists $input->{config}->{ $input->{area} }->{exclude}->{$key} ) {
           $key_exists = TRUE;
-          $input->{'config'}->{ $input->{'area'} }->{'exclude'}->{$key}++;
+          $input->{config}->{ $input->{area} }->{exclude}->{$key}++;
         }
       }
 
       # Now add the key, convert to .domain.tld if only two elements
       if ( !$key_exists ) {
-        $input->{'config'}->{ $input->{'area'} }->{'src'}->{ $input->{'src'} }
-          ->{'blklst'}->{$element} = 1;
+        $input->{config}->{ $input->{area} }->{src}->{ $input->{src} }
+          ->{blklst}->{$element} = 1;
       }
       else {
-        $input->{'config'}->{ $input->{'area'} }->{'src'}->{ $input->{'src'} }
-          ->{'duplicates'}++;
+        $input->{config}->{ $input->{area} }->{src}->{ $input->{src} }
+          ->{duplicates}++;
       }
 
-      # Add to the exclude list, so the next source doesn't duplicate values
-      $input->{'config'}->{ $input->{'area'} }->{'exclude'}->{$element} = 1;
+      # Add to the exclude list, so the next source doesnt duplicate values
+      $input->{config}->{ $input->{area} }->{exclude}->{$element} = 1;
     }
 
-    $input->{'config'}->{ $input->{'area'} }->{'src'}->{ $input->{'src'} }
-      ->{'icount'} += scalar @elements;
+    $input->{config}->{ $input->{area} }->{src}->{ $input->{src} }->{icount}
+      += scalar @elements;
 
     printf
-      qq{$crsr->{'off'}%s: $crsr->{'bright_green'}%s$crsr->{'reset'} %s processed, ($crsr->{'bright_red'}%s$crsr->{'reset'} discarded) from $crsr->{'bright_magenta'}%s$crsr->{'reset'} lines\r},
-      $input->{'src'},
-      $input->{'config'}->{ $input->{'area'} }->{'src'}->{ $input->{'src'} }
-      ->{'icount'}, $input->{'config'}->{ $input->{'area'} }->{'type'},
-      @{ $input->{'config'}->{ $input->{'area'} }->{'src'}->{ $input->{'src'} }
-      }{ 'duplicates', 'records' }
+      qq{$crsr->{off}%s: $crsr->{bright_green}%s$crsr->{reset} %s processed, ($crsr->{bright_red}%s$crsr->{reset} discarded) from $crsr->{bright_magenta}%s$crsr->{reset} lines\r},
+      $input->{src},
+      $input->{config}->{ $input->{area} }->{src}->{ $input->{src} }->{icount},
+      $input->{config}->{ $input->{area} }->{type},
+      @{ $input->{config}->{ $input->{area} }->{src}->{ $input->{src} } }
+      { q{duplicates}, q{records} }
       if $show;
   }
 
   if (
-    scalar $input->{'config'}->{ $input->{'area'} }->{'src'}
-    ->{ $input->{'src'} }->{'icount'} )
+    scalar $input->{config}->{ $input->{area} }->{src}->{ $input->{src} }
+    ->{icount} )
   {
     log_msg(
       {
         msg_typ => q{info},
         msg_str => sprintf
           qq{%s: %s %s processed, (%s duplicates) from %s lines\r},
-        $input->{'src'},
-        $input->{'config'}->{ $input->{'area'} }->{'src'}->{ $input->{'src'} }
-          ->{'icount'},
-        $input->{'config'}->{ $input->{'area'} }->{'type'},
-        @{
-          $input->{'config'}->{ $input->{'area'} }->{'src'}->{ $input->{'src'} }
-        }{ 'duplicates', 'records' },
+        $input->{src},
+        $input->{config}->{ $input->{area} }->{src}->{ $input->{src} }
+          ->{icount}, $input->{config}->{ $input->{area} }->{type},
+        @{ $input->{config}->{ $input->{area} }->{src}->{ $input->{src} } }
+          { q{duplicates}, q{records} },
       }
     );
     return TRUE;
@@ -943,25 +920,25 @@ sub usage {
   };
 
   # Process option argument
-  $usage->{ $input->{'option'} }->( $input->{'exit_code'} );
+  $usage->{ $input->{option} }->( $input->{exit_code} );
 }
 
 # Write the data to file
 sub write_file {
   my $input = shift;
 
-  return if !@{ $input->{'data'} };
+  return if !@{ $input->{data} };
 
-  open my $FH, q{>}, $input->{'file'} or return;
+  open my $FH, q{>}, $input->{file} or return;
   log_msg(
     {
       msg_typ => q{info},
       msg_str => sprintf q{Saving %s},
-      basename( $input->{'file'} ),
+      basename( $input->{file} ),
     }
   );
 
-  print {$FH} @{ $input->{'data'} };
+  print {$FH} @{ $input->{data} };
 
   close $FH;
 

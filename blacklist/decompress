@@ -1,0 +1,80 @@
+#!/bin/bash
+echo
+echo 'Self Extracting Installer'
+echo
+
+# Set up the Vyatta environment
+source /opt/vyatta/etc/functions/script-template
+shopt -s expand_aliases
+alias show='_vyatta_op_run show'
+alias run='/opt/vyatta/bin/vyatta-op-cmd-wrapper'
+alias check='/bin/cli-shell-api'
+
+install_menu () {
+	local IFS=' '
+	local PS3='Enter option number and hit return => '
+	local OPTIONS=('INSTALL' 'REMOVE' 'TEST' 'BACKUP' 'QUIT')
+	shopt -s checkwinsize
+	local COLUMNS=$(tput cols)
+
+while true;
+do
+	echo 'Would you like to install, remove, test or backup dnsmasq blacklist functionality (if previously installed)?' | fold -s -w ${COLUMNS}
+	select CHOICE in ${OPTIONS[@]}; do
+		case ${REPLY} in
+			1)		clear console
+					./setup
+					./blacklist.t
+					break
+					;;
+			2)		clear console
+					if /opt/vyatta/bin/yesno -n 'Do you want to completely remove Blacklist? [y/N]: '
+					then
+						./remove
+						break
+					fi
+					;;
+			3)		clear console
+					./blacklist.t
+					break
+					;;
+			4)		check existsActive service dns forwarding blacklist
+					if [[ $? == 0 ]]
+					then
+						RESULT=$(run show configuration commands | grep blacklist > /config/user-data/blacklist.cmds)
+						echo -ne "\ndnsmasq blacklist configuration backed up to /config/user-data/blacklist.cmds.\n\nTo restore, run:\n\tconfigure\n\tsource /config/user-data/blacklist.cmds\n\tcommit\n\tsave\n\texit\n\n" | fold -s -w ${COLUMNS}
+					else
+						echo -ne "\ndnsmasq blacklist isn't configured, nothing to backup!\n\n"
+					fi
+					;;
+			5|*)	return 0
+					;;
+		esac
+	done
+done
+}
+
+CDIR="$(pwd)"
+
+# Make sure script runs as root
+if [[ ${EUID} -eq 0 ]]; then
+	echo 'This script must be run as the admin user, not root!'
+	exit 1
+fi
+
+export TMPDIR=$(mktemp -d /tmp/selfextract.XXXXXX)
+
+ARCHIVE=$(awk '/^__ARCHIVE_BELOW__/ {print NR + 1; exit 0; }' $0)
+
+tail -n+${ARCHIVE} $0 | tar xz -C "${TMPDIR}"
+
+cd "${TMPDIR}"
+
+install_menu
+
+cd "${CDIR}"
+rm -rf "${TMPDIR}"
+
+exit 0
+
+__ARCHIVE_BELOW__
