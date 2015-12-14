@@ -16,6 +16,7 @@ use constant FALSE => 0;
 
 my $version  = q{1.0};
 my $cfg_file = q{/config/config.boot};
+my $t_count  = { tests => 0, failed => 0 };
 my $crsr     = {
   off            => qq{\033[?25l},
   on             => qq{\033[?25h},
@@ -28,7 +29,16 @@ my $crsr     = {
 
 ########## Run main ###########
 &main();
-exit 0;
+if ( $t_count->{failed} == 0 ) {
+  say(  qq{$crsr->{bright_green}All $t_count->{tests} tests passed - dnsmasq }
+      . qq{blacklisting is configured correctly$crsr->{clear}} );
+  exit 0;
+}
+my $t_word = $t_count->{failed} <= 1 ? q{test} : q{tests};
+say(  qq{$crsr->{bright_red} $t_count->{failed} $t_word failed out of }
+    . qq{$t_count->{tests} - dnsmasq blacklisting is not working correctly}
+    . qq{$crsr->{clear}} );
+exit 1;
 ##########   exit   ###########
 
 # Read a file into memory and return the data to the calling function
@@ -87,7 +97,7 @@ sub get_nodes {
     $line =~ s/$re->{LSPC}//;
     $line =~ s/$re->{RSPC}//;
 
-    given ($line) {
+    for ($line) {
       when (/$re->{MULT}/) {
         push @nodes, $+{MULT};
         push @nodes, $+{VALU};
@@ -175,10 +185,8 @@ sub main {
     dnsmasq_dir => q{/etc/dnsmasq.d},
     flag_file   => q{/var/log/update-dnsmasq-flagged.cmds},
     no_op       => q{/tmp/.update-dnsmasq.no-op},
-    tests       => 0,
     testscript  => q{/config/scripts/blacklist.t},
   };
-
 
   # Get command line options or print help if no valid options
   get_options() || usage( { option => q{help}, exit_code => 1 } );
@@ -201,48 +209,71 @@ sub main {
   if ( exists $cfg_ref->{blacklist}->{disabled}
     && $cfg_ref->{blacklist}->{disabled} )
   {
-    $cfg_ref->{tests} += 3;
+    $t_count->{tests} += 3;
     is( -f $cfg_ref->{flag_file},
       TRUE, q{Checking } . basename( $cfg_ref->{flag_file} ) . q{ exists} )
-      or diag(
-      basename( $cfg_ref->{flag_file} ) . qq{ should exist - investigate!} );
+      or diag( qq{$crsr->{bright_red}}
+        . basename( $cfg_ref->{flag_file} )
+        . qq{ should exist - investigate!}
+        . $crsr->{clear} ), $t_count->{failed}++;
     isnt( -f $cfg_ref->{no_op},
       TRUE, q{Checking } . basename( $cfg_ref->{no_op} ) . q{ doesn't exist} )
-      or diag( basename( $cfg_ref->{no_op} ) . qq{ found - investigate!} );
+      or diag( qq{$crsr->{bright_red}}
+        . basename( $cfg_ref->{no_op} )
+        . qq{ found - investigate!}
+        . $crsr->{clear} ), $t_count->{failed}++;
     is( -f $cfg_ref->{testscript},
       TRUE, q{Checking } . basename( $cfg_ref->{testscript} ) . q{ exists} )
-      or diag(
-      basename( $cfg_ref->{testscript} ) . qq{ should exist - investigate!} );
+      or diag( qq{$crsr->{bright_red}}
+        . basename( $cfg_ref->{testscript} )
+        . qq{ should exist - investigate!}
+        . $crsr->{clear} ), $t_count->{failed}++;
   }
   elsif ( exists $cfg_ref->{blacklist}->{disabled}
     && !$cfg_ref->{blacklist}->{disabled} )
   {
-    $cfg_ref->{tests} += 3;
+    $t_count->{tests} += 3;
     is( -f $cfg_ref->{flag_file},
       TRUE, q{Checking } . basename( $cfg_ref->{flag_file} ) . q{ exists} )
-      or diag(
-      basename( $cfg_ref->{flag_file} ) . qq{ should exist - investigate!} );
+      or diag( qq{$crsr->{bright_red}}
+        . basename( $cfg_ref->{flag_file} )
+        . qq{ should exist - investigate!}
+        . $crsr->{clear} ), $t_count->{failed}++;
     isnt( -f $cfg_ref->{no_op},
       TRUE, q{Checking } . basename( $cfg_ref->{no_op} ) . q{ doesn't exist} )
-      or diag( basename( $cfg_ref->{no_op} ) . qq{ found - investigate!} );
+      or diag( qq{$crsr->{bright_red}}
+        . basename( $cfg_ref->{no_op} )
+        . qq{ found - investigate!}
+        . $crsr->{clear} ), $t_count->{failed}++;
     is( -f $cfg_ref->{testscript},
       TRUE, q{Checking } . basename( $cfg_ref->{testscript} ) . q{ exists} )
-      or diag(
-      basename( $cfg_ref->{testscript} ) . qq{ should exist - investigate!} );
+      or diag( qq{$crsr->{bright_red}}
+        . basename( $cfg_ref->{testscript} )
+        . qq{ should exist - investigate!}
+        . $crsr->{clear} ), $t_count->{failed}++;
   }
   else {
-    $cfg_ref->{tests} += 3;
+    $t_count->{tests} += 3;
     isnt( -f $cfg_ref->{flag_file},
       TRUE,
       q{Checking } . basename( $cfg_ref->{flag_file} ) . q{ doesn't exist} )
-      or diag( basename( $cfg_ref->{flag_file} ) . qq{ found - investigate!} );
+      or diag( qq{$crsr->{bright_red}}
+        . basename( $cfg_ref->{flag_file} )
+        . qq{ found - investigate!}
+        . $crsr->{clear} ), $t_count->{failed}++;
     isnt( -f $cfg_ref->{no_op},
       TRUE, q{Checking } . basename( $cfg_ref->{no_op} ) . q{ doesn't exist} )
-      or diag( basename( $cfg_ref->{no_op} ) . qq{ found - investigate!} );
+      or diag( qq{$crsr->{bright_red}}
+        . basename( $cfg_ref->{no_op} )
+        . qq{ found - investigate!}
+        . $crsr->{clear} ), $t_count->{failed}++;
     isnt( -f $cfg_ref->{testscript},
       TRUE,
       q{Checking } . basename( $cfg_ref->{testscript} ) . q{ doesn't exist} )
-      or diag( basename( $cfg_ref->{testscript} ) . qq{ found - investigate!} );
+      or diag( qq{$crsr->{bright_red}}
+        . basename( $cfg_ref->{testscript} )
+        . qq{ found - investigate!}
+        . $crsr->{clear} ), $t_count->{failed}++;
   }
 
   # Add areas to process only if they contain sources
@@ -256,57 +287,104 @@ sub main {
         $cfg_ref->{ $area . q{_f} }
           = [qq{$cfg_ref->{dnsmasq_dir}/$area.$source.blacklist.conf}];
         for my $file ( @{ $cfg_ref->{ $area . q{_f} } } ) {
-          $cfg_ref->{tests}++;
+          $t_count->{tests}++;
           is( -f $file, TRUE, qq{Checking $source has a file} )
-            or
-            diag( basename($file) . qq{ not found for $source - investigate!} );
+            or diag( qq{$crsr->{bright_red}}
+              . basename($file)
+              . qq{ not found for $source - investigate!}
+              . $crsr->{clear} ), $t_count->{failed}++;
         }
 
         # Test global and area exclusions
         for my $file ( @{ $cfg_ref->{ $area . q{_f} } } ) {
           my $content = get_file( { file => $file } );
           for my $host ( @{ $cfg_ref->{global_ex} } ) {
-            my $re = qr{address=[/][.]{0,1}$host[/]$ip};
-            $cfg_ref->{tests}++;
+            my $re = qr{address=[/][.]{0,1}$host[/].*};
+            $t_count->{tests}++;
             is( $re ~~ @{$content},
               q{},
-              qq{Checking 'global exclude' $host not in } . basename($file) )
-              or diag(
-              qq{Found 'global exclude' $host in } . basename($file) . q{ !} );
+              qq{Checking "global exclude" $host not in } . basename($file) )
+              or diag( qq{$crsr->{bright_red}}
+                . qq{Found "global exclude" $host in }
+                . basename($file) . q{!}
+                . $crsr->{clear} ), $t_count->{failed}++;
           }
           for my $host ( @{ $cfg_ref->{ $area . q{_ex} } } ) {
-            my $re = qr{address=[/][.]{0,1}$host[/]$ip};
-            $cfg_ref->{tests}++;
+            my $re = qr{address=[/][.]{0,1}$host[/].*};
+            $t_count->{tests}++;
             is( $re ~~ @{$content},
               q{},
-              qq{Checking '$area exclude' $host not in } . basename($file) )
-              or diag(
-              qq{Found '$area exclude' $host in } . basename($file) . q{ !} );
+              qq{Checking "$area exclude" $host not in } . basename($file) )
+              or diag( qq{$crsr->{bright_red}}
+                . qq{Found "$area exclude" $host in }
+                . basename($file) . q{!}
+                . $crsr->{clear} ), $t_count->{failed}++;
+          }
+          my $re        = qr{(?:address=[/][.]{0,1}.*[/])(?<IP>.*)};
+          my %found_ips = map {
+            my $found_ip = $_;
+            $found_ip =~ s/$re/$+{IP}/ms;
+            $found_ip => 1;
+          } @{$content};
+          for my $found_ip ( keys %found_ips ) {
+            $t_count->{tests}++;
+            cmp_ok( $found_ip, q{eq}, $ip,
+                  qq{IP address $found_ip found in }
+                . basename($file)
+                . qq{ matches configured $ip} )
+              or diag( qq{$crsr->{bright_red}}
+                . qq{IP address $found_ip found in }
+                . basename($file)
+                . qq{ doesn't match configured $ip!}
+                . $crsr->{clear} ), $t_count->{failed}++;
           }
         }
 
         for my $file ( @{ $cfg_ref->{ $area . q{_pre_f} } } ) {
           my $content = get_file( { file => $file } );
           for my $host ( keys %{ $cfg_ref->{blacklist}->{$area}->{blklst} } ) {
-            $cfg_ref->{tests}++;
-            my $re = qr{address=[/][.]{0,1}$host[/]$ip};
-            is(
-              $re ~~ @{$content},
+            $t_count->{tests}++;
+            my $re = qr{address=[/][.]{0,1}$host[/].*};
+            is( $re ~~ @{$content},
               TRUE,
-              qq{Checking '$area include' $host is in }
+              qq{Checking "$area include" $host is in } . basename($file) )
+              or diag( qq{$crsr->{bright_red}}
+                . qq{"$area include" $host not found in }
                 . basename($file)
-                . qq{ with IP: $ip}
-              )
-              or diag( qq{'$area include' $host not found in }
+                . $crsr->{clear} ), $t_count->{failed}++;
+          }
+          $t_count->{tests}++;
+          my $address = $area ne q{domains} ? q{address=/} : q{address=/.};
+          my @includes = map { my $include = $_; qq{$address$include/$ip} }
+            @{ [ sort keys %{ $cfg_ref->{blacklist}->{$area}->{blklst} } ] };
+          my $success = is(
+            @includes ~~ @{$content},
+            TRUE,
+            qq{Checking }
+              . basename($file)
+              . qq{ only contains "$area include" entries}
+          );
+          if ( !$success ) {
+            $t_count->{failed}++;
+            diag( qq{$crsr->{bright_red}}
+                . qq{"$area include" has additional entries in }
                 . basename($file)
-                . qq{ with IP: $ip} );
+                . qq{ investigate the following entries:$crsr->{clear}} );
+            my $re_fqdn = qr{address=[/][.]{0,1}(.*)[/].*}o;
+            my %found   = ();
+            @found{ @{$content} } = ();
+            delete @found{@includes};
+            my @ufo = keys %found;
+            for my $alien (@ufo) {
+              $alien =~ s/$re_fqdn/$1/ms;
+              say(qq{Found: $crsr->{bright_magenta}$alien$crsr->{clear}});
+            }
           }
         }
       }
     }
   }
-  done_testing( $cfg_ref->{tests} );
-  say;
+  done_testing( $t_count->{tests} );
 }
 
 # Process a configuration file in memory after get_file() loads it

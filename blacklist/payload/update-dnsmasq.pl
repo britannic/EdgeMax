@@ -233,7 +233,7 @@ sub delete_file {
 sub get_config {
   my $input = shift;
 
-  given ( $input->{type} ) {
+  for ( $input->{type} ) {
     when (/active/) { return cfg_actv( { config => $input->{config} } ); }
     when (/file/) { return cfg_file( { config => $input->{config} } ); }
   }
@@ -245,7 +245,7 @@ sub get_config {
 sub get_file {
   my $input = shift;
   my @data  = ();
-  if ( exists $input->{file} ) {
+  if ( -f $input->{file} ) {
     open my $CF, q{<}, $input->{file}
       or die qq{error: Unable to open $input->{file}: $!};
     chomp( @data = <$CF> );
@@ -297,7 +297,7 @@ sub get_nodes {
     $line =~ s/$re->{LSPC}//;
     $line =~ s/$re->{RSPC}//;
 
-    given ($line) {
+    for ($line) {
       when (/$re->{MULT}/) {
         push @nodes, $+{MULT};
         push @nodes, $+{VALU};
@@ -515,7 +515,7 @@ sub main {
   $cfg_ref->{hosts}->{exclude}->{localhost} = 1;
 
   # Now choose which data set will define the configuration
-  my $cfg_type = defined $cfg_file ? q{file} : q{active};
+  my $cfg_type = defined $cfg_file ? q{c_file} : q{active};
 
   exit 1 unless get_config( { type => $cfg_type, config => $cfg_ref } );
 
