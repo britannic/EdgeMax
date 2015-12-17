@@ -103,9 +103,9 @@ class Updater:
     """
     #---------------------------------------------------------------
     def __init__(self, url, mode):
-        self.urls              = url                                                     # download url
-        self.oip               = Ipset(mode)                                              # ipset object
-        self.rethreat          = re.compile(r"(^([0-9]{1,3}\.){3}[0-9]{1,3}).*$")    # emerging threats regexp
+        self.urls              = url                                              # download url
+        self.oip               = Ipset(mode)                                      # ipset object
+        self.rethreat          = re.compile(r"(^([0-9]{1,3}\.){3}[0-9]{1,3}).*$") # emerging threats regexp
         self.currentstor       = set()                                            # downloaded ip stor
 
     #---------------------------------------------------------------

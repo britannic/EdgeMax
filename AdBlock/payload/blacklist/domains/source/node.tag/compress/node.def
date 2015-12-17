@@ -1,8 +1,0 @@
-type: bool
-help: Set to true to compress FQDNs in a list, leaving only the domains
-default: false
-comp_help: Set compressed to true and all FQDNs will be compressed into domain names
-val_help: true; All downloaded fully qualified domain names will have the hostnames removed
-val_help: false; Downloaded domain names will not be modified
-
-commit:expression: $VAR(@) in true, false; "Must be true or false!"
