@@ -1,27 +1,54 @@
-# UBNT EdgeMax Blacklist and Adware Server Blocking
-https://community.ubnt.com/t5/EdgeMAX/Self-Installer-to-configure-Ad-Server-and-Blacklist-Blocking/td-p/1337892
+# UBNT EdgeMax dnsmasq Blacklist and Adware Blocking
+[community.ubnt.com](https://community.ubnt.com/t5/EdgeMAX/Self-Installer-to-configure-Ad-Server-and-Blacklist-Blocking/td-p/1337892)
 
 NOTE: THIS IS NOT OFFICIAL UBIQUITI SOFTWARE AND THEREFORE NOT SUPPORTED OR ENDORSED BY Ubiquiti Networks®
 
 ## Overview
-EdgeMax Blacklist and Ad Server Blocking is derived from the received wisdom found at (https://community.ubnt.com/t5/EdgeMAX/bd-p/EdgeMAX)
+EdgeMax dnsmasq Blacklist and Adware Blocking is derived from the received wisdom found at (https://community.ubnt.com/t5/EdgeMAX/bd-p/EdgeMAX)
 
 ## Licenses
 * GNU General Public License, version 3
 * GNU Lesser General Public License, version 3
 
 ## Features
-* Generates a dnsmasq configuration file that can be used directly by dnsmasq
+* Generates configuration files used directly by dnsmasq to redirect dns lookups
 * Integrated with the EdgeMax OS CLI
-* Any FQDN in the blacklist will force dnsmasq to return the configured Blackhole IP address
+* Any FQDN in the blacklist will force dnsmasq to return the configured dns redirect IP address
 
 ## Compatibility
 * update-dnsmasq.pl has been tested on the EdgeRouter Lite family of routers, version v1.6.0-v1.8.0.
-* Since the EdgeOS is a fork and port of Vyatta 6.3, this script could easily be adapted for work on VyOS and Vyatta derived ports
+* Since the EdgeOS is a fork and port of Vyatta 6.3, this script could easily be adapted to work on VyOS and Vyatta derived ports
 
 ## Versions
-* v3.3
-    - What is new:
+* v3.5: Updates/fixes include:
+    - Global exclude is now available ([set service dns forwarding blacklist exclude ...])
+    - Removed --debug option from update-dnsmasq.pl
+    - New validator script (/configure/scripts/blacklist.t) runs a battery of tests on the blacklist configuration to ensure it is working correctly or checks it is removed correctly
+    - Setup/Remove scripts rewritten in Perl
+    - Fixed issue with install that prevented admin user configuration
+    - Installer now runs under admin and only uses sudo where absolutely necessary
+    - Installer checks to see if service dns forwarding is configured and bails it if not with warning/example configuration
+    - Installer includes these new options:
+    - Non-essential functions have been pruned, command line switches reduced to:
+
+            /config/scripts/update-dnsmasq.pl -h
+            usage: update-dnsmasq.pl <options>
+            options:
+                -f <file>   # load a configuration file
+                --help      # show help and usage text
+                -v          # verbose output
+                --version   # show program version number
+
+| # | Option  |                         Function                          |
+|---|---------|-----------------------------------------------------------|
+| 1 | INSTALL |Install dnsmasq blacklist CLI configuration functionality|
+| 2 | REMOVE  |Remove dnsmasq blacklist CLI configuration functionality|
+| 3 | TEST    |Validate dnsmasq blacklist CLI configuration functionality|
+| 4 | BACKUP  |Save blacklist configuration to /config/user-data/blacklist.cmds|
+| 5 | QUIT    |Exit the installer|
+
+---
+* v3.3.2: What is new:
     - Non-essential functions have been pruned, command line switches reduced to:
 
             /config/scripts/update-dnsmasq.pl -h
@@ -32,13 +59,17 @@ EdgeMax Blacklist and Ad Server Blocking is derived from the received wisdom fou
                 --help      # show help and usage text
                 -v          # verbose output
                 --version   # show program version number
+
     - Improved exclusion list rejection
     - Ability to create a domain list from a source that has FQDNs using the new 'compress' switch (note, use with caution, since you may find legit domains getting completely blocked - especially cloud services like amazonaws, in that case you will need to add specific excludes):
+
             set service dns forwarding blacklist domains source FQDNs_Source compress true
+
     - Install/remove scripts rewritten in Perl for better error checking
     - Install/remove logs will be written to /var/log for diagnostics
     - Flagged domain list with optional include commands written to /var/log/update-dnsmasq_flagged_domains.cmds
     - Each source will be written to its own file:
+
             root@ubnt:/etc/dnsmasq.d# ls
             README
             domains.malc0de.com.blacklist.conf
@@ -50,7 +81,9 @@ EdgeMax Blacklist and Ad Server Blocking is derived from the received wisdom fou
             hosts.winhelp2002.mvps.org.blacklist.conf
             hosts.www.malwaredomainlist.com.blacklist.conf
             hosts.yoyo.org.blacklist.conf
+
     - Log file (/var/log/update-dnsmasq.pl) now flags frequently blacklisted domains, so you can optionally decide to add them as an include under domains:
+
             root@ubnt:/etc/dnsmasq.d# tail -n 30 /var/log/update-dnsmasq.log
             Nov 29 09:45:50 2015: INFO: hosts blacklisted: domain loniricarena.ru 4 times
             Nov 29 09:45:50 2015: INFO: hosts blacklisted: domain starwave.com 5 times
@@ -82,11 +115,14 @@ EdgeMax Blacklist and Ad Server Blocking is derived from the received wisdom fou
             Nov 29 09:45:51 2015: INFO: hosts blacklisted: domain llnwd.net 24 times
             Nov 29 09:45:51 2015: INFO: hosts blacklisted: domain thomasadot.com 4 times
             Nov 29 09:45:52 2015: INFO: Reloading dnsmasq configuration...
+
     - Improved memory usage for threads has been implemented
     - Uses HTTP::Tiny for smaller memory footprint with threads
     - Optional -f config.boot parser has been completely rewritten, so that the XorpConfigParser.pm module is no longer required (saves on memory overhead and compilation time)
     - Over 70% of the code has been rewritten or updated
 
+* Version History:
+---
 * v3.24d: Updates include:
     - 'hosts' exclusions now incorporates 'domains' exclusions and blacklists
     - Additional 'good hosts' excluded from blacklisting in the supplied install configuration
@@ -101,7 +137,7 @@ EdgeMax Blacklist and Ad Server Blocking is derived from the received wisdom fou
     - Useragent: HTTP get requests now include browser agent information to prevent website robot rejection
     - Useragent: HTTP/HTTPS handling uses useragent for improved error/timeout control
     - Uses own node.def to maintain configuration changes. This also forces the script to run the dnsmasq configuration update after DNS is up during boot time
-
+---
 * 3.22rc1: Updates include:
     - Fixes excluded FQDNs by using precise matching instead of fuzzy (i.e. 1.domain.tld won't also exclude b1.domain.tld)
     - New --disable switch enables ADBlock by setting [set service dns forwarding blacklist enabled false]
@@ -113,7 +149,7 @@ EdgeMax Blacklist and Ad Server Blocking is derived from the received wisdom fou
     - Useragent: HTTP/HTTPS handling uses useragent for improved error/timeout control
     - Uses own node.def to maintain configuration changes. This also forces the script to run the dnsmasq configuration update after DNS is up during boot time
     - Uses own node.def to maintain configuration changes. This also forces the script to run the dnsmasq configuration update after DNS is up during router boot time
-
+---
 * 3.15: Added features include:
     - Logging to /var/log/update-blacklists-dnsmasq.log
     - --debug option: prints status messages
@@ -121,13 +157,13 @@ EdgeMax Blacklist and Ad Server Blocking is derived from the received wisdom fou
     - Added retry logic for download sources that time out (inspired by @mseeEngineer﻿)
     - Task scheduler update interval is now every 6 hours, as some of the sources change hourly (configure interval using "set system task-scheduler task update_blacklists interval"
     - Status line retains previous downloads for more detail
-
+---
 * Version 3.12: Fixed bug reported by @soehest﻿ where certain FQDNs were being rejected by the stream processor.
-
+---
 * Version 3.10: Now supports https:// source URLs and improved regex handling in the stream processing engine.
-
+---
 * Version 3.00: No longer requires regex strings, just the line prefix/preamble before the hostname in the download. If a version of ADBlock was installed previously, you will need to select option 2 to remove it and then install this version. This is necessary to ensure the configure paths are correctly set up for the new prefix option which replaces the regex string.
-
+---
 ## Installation
 
 To install:
