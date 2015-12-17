@@ -25,7 +25,7 @@
 # **** End License ****
 
 # use Data::Dumper;
-use feature qw{switch};
+# use feature qw(: 5.10);
 use File::Basename;
 use Getopt::Long;
 use HTTP::Tiny;
@@ -42,7 +42,7 @@ use warnings;
 use constant TRUE  => 1;
 use constant FALSE => 0;
 
-my $version = q{3.5};
+my $version = q{3.5.1};
 my $cols    = qx{tput cols};
 my $crsr    = {
   off            => qq{\033[?25l},
@@ -415,13 +415,13 @@ sub log_msg {
     critical => LOG_CRIT,
     debug    => LOG_DEBUG,
     error    => LOG_ERR,
-    info     => LOG_INFO,
+    info     => LOG_NOTICE,
     warning  => LOG_WARNING,
   };
 
   return unless ( length $msg_ref->{msg_typ} . $msg_ref->{msg_str} > 2 );
 
-  syslog( $log_msg->{ $msg_ref->{msg_typ} }, $msg_ref->{msg_str} );
+  syslog( $log_msg->{ $msg_ref->{msg_typ} }, qq{$msg_ref->{msg_typ}: } . $msg_ref->{msg_str} );
 
   print $crsr->{off}, qq{\r}, q{ } x $cols, qq{\r} if $show;
 
@@ -485,7 +485,7 @@ sub main {
     if defined $cfg_file && !-f $cfg_file;
 
   # Start logging
-  openlog( qq{$cfg_ref->{log_name}}, q{}, LOG_USER );
+  openlog( $cfg_ref->{log_name}, q{}, LOG_DAEMON );
   log_msg(
     {
       msg_typ => q{info},

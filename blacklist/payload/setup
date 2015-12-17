@@ -24,7 +24,7 @@
 # Install dnsmasq BLACKLIST and blacklist blocking onto an EdgeMax router
 # Use at your own risk
 #
-use feature qw{switch};
+use feature qw(switch);
 use File::Basename;
 use Getopt::Long;
 use HTTP::Tiny;
@@ -693,13 +693,13 @@ sub log_msg {
     critical => LOG_CRIT,
     debug    => LOG_DEBUG,
     error    => LOG_ERR,
-    info     => LOG_INFO,
+    info     => LOG_NOTICE,
     warning  => LOG_WARNING,
   };
 
   return unless ( length $msg_ref->{msg_typ} . $msg_ref->{msg_str} > 2 );
 
-  syslog( $log_msg->{ $msg_ref->{msg_typ} }, $msg_ref->{msg_str} );
+  syslog( $log_msg->{ $msg_ref->{msg_typ} }, qq{$msg_ref->{msg_typ}: } . $msg_ref->{msg_str} );
 
   if ( $msg_ref->{msg_typ} eq q{info} ) {
     say qq{$msg_ref->{msg_typ}: $msg_ref->{msg_str}};
@@ -720,8 +720,8 @@ sub main {
   }
 
   # Start logging
-  my $log_name = qq{$program: dnsmasq blacklist $version};
-  openlog( qq{$log_name}, q{}, LOG_USER );
+  my $log_name = qq{$program};
+  openlog( $program, q{}, LOG_DAEMON );
 
   log_msg(
     {
