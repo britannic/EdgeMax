@@ -29,6 +29,15 @@ EdgeMax dnsmasq Blacklist and Adware Blocking is derived from the received wisdo
     - Installer now runs under admin and only uses sudo where absolutely necessary
     - Installer checks to see if service dns forwarding is configured and bails it if not with warning/example configuration
     - Installer includes these new options:
+    - Non-essential functions have been pruned, command line switches reduced to:
+
+            /config/scripts/update-dnsmasq.pl -h
+            usage: update-dnsmasq.pl <options>
+            options:
+                -f <file>   # load a configuration file
+                --help      # show help and usage text
+                -v          # verbose output
+                --version   # show program version number
 
 | # | Option  |                         Function                          |
 |---|---------|-----------------------------------------------------------|
