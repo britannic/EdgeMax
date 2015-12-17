@@ -1,5 +1,28 @@
 #!/usr/bin/env perl
 #
+# **** License ****
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# A copy of the GNU General Public License is available as
+# '/usr/share/common-licenses/GPL' in the Debian GNU/Linux distribution
+# or on the World Wide Web at `http://www.gnu.org/copyleft/gpl.html'.
+# You can also obtain it by writing to the Free Software Foundation,
+# Free Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+# MA 02110-1301, USA.
+#
+# Author: Neil Beadle
+# Date:   December 2015
+# Description: Script for creating dnsmasq configuration files to redirect dns
+# look ups to alternative IPs (blackholes, pixel servers etc.)
+#
+# **** End License ****
 
 use File::Basename;
 use feature qw{switch};
@@ -8,8 +31,6 @@ use strict;
 use Test::More;
 use v5.14;
 use warnings;
-
-# no warnings 'experimental::smartmatch';
 
 use constant TRUE  => 1;
 use constant FALSE => 0;
@@ -26,26 +47,40 @@ my $crsr     = {
   bright_magenta => qq{\033[95m},
   bright_red     => qq{\033[91m},
 };
+my $blacklist_removed;
 
 ########## Run main ###########
 &main();
-if ( $t_count->{failed} == 0 ) {
+my $t_word = $t_count->{failed} <= 1 ? q{test} : q{tests};
+if ( $t_count->{failed} == 0 && !$blacklist_removed ) {
   say(  qq{$crsr->{bright_green}All $t_count->{tests} tests passed - dnsmasq }
       . qq{blacklisting is configured correctly$crsr->{clear}} );
   exit 0;
 }
-my $t_word = $t_count->{failed} <= 1 ? q{test} : q{tests};
-say(  qq{$crsr->{bright_red} $t_count->{failed} $t_word failed out of }
-    . qq{$t_count->{tests} - dnsmasq blacklisting is not working correctly}
-    . qq{$crsr->{clear}} );
-exit 1;
-##########   exit   ###########
+elsif ( $blacklist_removed && $t_count->{failed} != 0 ) {
+  say(  qq{$crsr->{bright_red} $t_count->{failed} $t_word failed out of }
+      . qq{$t_count->{tests} - dnsmasq blacklisting has not been removed }
+      . qq{correctly$crsr->{clear}} );
+  exit 1;
+}
+elsif ( $blacklist_removed && $t_count->{failed} == 0 ) {
+  say(  qq{$crsr->{bright_green}All $t_count->{tests} tests passed - dnsmasq }
+      . qq{blacklisting has been completely removed$crsr->{clear}} );
+  exit 0;
+}
+else {
+  say(  qq{$crsr->{bright_red} $t_count->{failed} $t_word failed out of }
+      . qq{$t_count->{tests} - dnsmasq blacklisting is not working correctly}
+      . qq{$crsr->{clear}} );
+  exit 1;
+}
+############ exit #############
 
 # Read a file into memory and return the data to the calling function
 sub get_file {
   my $input = shift;
   my @data  = ();
-  if ( exists $input->{file} ) {
+  if ( -f $input->{file} ) {
     open my $CF, q{<}, $input->{file}
       or die qq{error: Unable to open $input->{file}: $!};
     chomp( @data = <$CF> );
@@ -93,6 +128,7 @@ sub get_nodes {
     RSPC => qr/^\s+/o,
   };
 
+LINE:
   for my $line ( @{ $input->{config_data} } ) {
     $line =~ s/$re->{LSPC}//;
     $line =~ s/$re->{RSPC}//;
@@ -103,9 +139,7 @@ sub get_nodes {
         push @nodes, $+{VALU};
         push @nodes, 1;
         get_hash( { nodes => \@nodes, hash_ref => $cfg_ref } );
-        pop @nodes;
-        pop @nodes;
-        pop @nodes;
+        popx( { array => \@nodes, X => 3 } );
       }
       when (/$re->{NODE}/) {
         push @nodes, $+{NODE};
@@ -119,22 +153,18 @@ sub get_nodes {
         push @nodes, $+{NAME};
         push @nodes, $+{VALU};
         get_hash( { nodes => \@nodes, hash_ref => $cfg_ref } );
-        pop @nodes;
-        pop @nodes;
+        popx( { array => \@nodes, X => 2 } );
       }
       when (/$re->{DESC}/) {
         push @nodes, $+{NAME};
         push @nodes, $+{DESC};
         get_hash( { nodes => \@nodes, hash_ref => $cfg_ref } );
-        pop @nodes;
-        pop @nodes;
+        popx( { array => \@nodes, X => 2 } );
       }
       when (/$re->{MISC}/) {
-        push @nodes, $+{MISC};
-        push @nodes, $+{MISC};
+        pushx( { array => \@nodes, items => \$+{MISC}, X => 2 } );
         get_hash( { nodes => \@nodes, hash_ref => $cfg_ref } );
-        pop @nodes;
-        pop @nodes;
+        popx( { array => \@nodes, X => 2 } );
       }
       when (/$re->{CMNT}/) {
         next;
@@ -147,7 +177,7 @@ sub get_nodes {
         }
       }
       when (/$re->{MPTY}/) {
-        next;
+        next LINE;
       }
       default {
         printf q{Parse error: "%s"}, $line;
@@ -172,7 +202,7 @@ sub get_options {
     ],
   );
 
-  return \@opts if $input->{'option'};
+  return \@opts if $input->{option};
 
   # Read command line flags and exit with help message if any are unknown
   return GetOptions( map { my $options = $_; (@$options)[ 1 .. $#$options ] }
@@ -182,10 +212,11 @@ sub get_options {
 # Main script
 sub main {
   my $cfg_ref = {
-    dnsmasq_dir => q{/etc/dnsmasq.d},
-    flag_file   => q{/var/log/update-dnsmasq-flagged.cmds},
-    no_op       => q{/tmp/.update-dnsmasq.no-op},
-    testscript  => q{/config/scripts/blacklist.t},
+    dnsmasq_dir  => q{/etc/dnsmasq.d},
+    flag_file    => q{/var/log/update-dnsmasq-flagged.cmds},
+    no_op        => q{/tmp/.update-dnsmasq.no-op},
+    testscript   => q{/config/scripts/blacklist.t},
+    updatescript => q{/config/scripts/update-dnsmasq.pl}
   };
 
   # Get command line options or print help if no valid options
@@ -209,7 +240,14 @@ sub main {
   if ( exists $cfg_ref->{blacklist}->{disabled}
     && $cfg_ref->{blacklist}->{disabled} )
   {
-    $t_count->{tests} += 3;
+    $t_count->{tests} += 4;
+    is( -f $cfg_ref->{updatescript},
+      TRUE,
+      q{Checking } . basename( $cfg_ref->{updatescript} ) . q{ exists} )
+      or diag( qq{$crsr->{bright_red}}
+        . basename( $cfg_ref->{updatescript} )
+        . qq{ found - investigate!}
+        . $crsr->{clear} ), $t_count->{failed}++;
     is( -f $cfg_ref->{flag_file},
       TRUE, q{Checking } . basename( $cfg_ref->{flag_file} ) . q{ exists} )
       or diag( qq{$crsr->{bright_red}}
@@ -232,7 +270,14 @@ sub main {
   elsif ( exists $cfg_ref->{blacklist}->{disabled}
     && !$cfg_ref->{blacklist}->{disabled} )
   {
-    $t_count->{tests} += 3;
+    $t_count->{tests} += 4;
+    is( -f $cfg_ref->{updatescript},
+      TRUE,
+      q{Checking } . basename( $cfg_ref->{updatescript} ) . q{ exists} )
+      or diag( qq{$crsr->{bright_red}}
+        . basename( $cfg_ref->{updatescript} )
+        . qq{ found - investigate!}
+        . $crsr->{clear} ), $t_count->{failed}++;
     is( -f $cfg_ref->{flag_file},
       TRUE, q{Checking } . basename( $cfg_ref->{flag_file} ) . q{ exists} )
       or diag( qq{$crsr->{bright_red}}
@@ -253,7 +298,15 @@ sub main {
         . $crsr->{clear} ), $t_count->{failed}++;
   }
   else {
-    $t_count->{tests} += 3;
+    $blacklist_removed = TRUE;
+    $t_count->{tests} += 5;
+    isnt( -f $cfg_ref->{updatescript},
+      TRUE,
+      q{Checking } . basename( $cfg_ref->{updatescript} ) . q{ doesn't exist} )
+      or diag( qq{$crsr->{bright_red}}
+        . basename( $cfg_ref->{updatescript} )
+        . qq{ found - investigate!}
+        . $crsr->{clear} ), $t_count->{failed}++;
     isnt( -f $cfg_ref->{flag_file},
       TRUE,
       q{Checking } . basename( $cfg_ref->{flag_file} ) . q{ doesn't exist} )
@@ -274,6 +327,23 @@ sub main {
         . basename( $cfg_ref->{testscript} )
         . qq{ found - investigate!}
         . $crsr->{clear} ), $t_count->{failed}++;
+
+    # Check for stray files
+    $cfg_ref->{strays} = [
+      glob qq{$cfg_ref->{dnsmasq_dir}/{domains,zones,hosts}*.blacklist.conf} ];
+    my $no_strays = isnt( scalar( @{ $cfg_ref->{strays} } ),
+      TRUE, qq{Checking *.blacklist.conf files not found in /etc/dnsmasq.d/} )
+      or diag( qq{$crsr->{bright_red} Found blacklist configuration files in }
+        . qq{$cfg_ref->{dnsmasq_dir}/ - they should be deleted!}
+        . $crsr->{clear} ), $t_count->{failed}++;
+    if ( !$no_strays ) {
+      say(qq{The following files were found in $cfg_ref->{dnsmasq_dir}/:});
+      for ( @{ $cfg_ref->{strays} } ) {
+        say;
+      }
+    }
+    done_testing( $t_count->{tests} );
+    return TRUE;
   }
 
   # Add areas to process only if they contain sources
@@ -387,6 +457,16 @@ sub main {
   done_testing( $t_count->{tests} );
 }
 
+# pop array x times
+sub popx {
+  my $input = shift;
+  return if !$input->{X};
+  for ( 1 .. $input->{X} ) {
+    pop @{ $input->{array} };
+  }
+  return TRUE;
+}
+
 # Process a configuration file in memory after get_file() loads it
 sub process_cfg {
   my $input = shift;
@@ -423,6 +503,16 @@ sub process_cfg {
     return TRUE;
   }
   return;
+}
+
+# push array x times
+sub pushx {
+  my $input = shift;
+  return if !$input->{X};
+  for ( 1 .. $input->{X} ) {
+    push @{ $input->{array} }, $input->{items};
+  }
+  return TRUE;
 }
 
 # Process command line options and print usage

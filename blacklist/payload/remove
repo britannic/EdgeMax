@@ -83,7 +83,7 @@ my $env_ref = {
 ################################################################################
 
 # Process the active (not committed or saved) configuration
-sub cfg_actv {
+sub get_config {
   my $config       = new Vyatta::Config;
   my $exists       = q{existsOrig};
   my $input        = shift;
@@ -346,7 +346,7 @@ sub get_blacklist {
   # Make sure localhost is always in the exclusions whitelist
   $cfg_ref->{hosts}->{exclude}->{localhost} = 1;
 
-  my $success = get_config( { type => q{active}, config => $cfg_ref } );
+  my $success = get_config( { config => $cfg_ref } );
   $cmdref->{calls}++;
 
   # Now proceed if blacklist is enabled
@@ -606,16 +606,6 @@ sub get_blacklist {
   say q{};
 }
 
-# Determine which type of configuration to get (default, active or saved)
-sub get_config {
-  my $input = shift;
-  given ( $input->{type} ) {
-    when (/active/) { return cfg_actv( { config => $input->{config} } ); }
-    when (/file/) { return cfg_file( { config => $input->{config} } ); }
-    default { return; }
-  }
-}
-
 # Get lists from web servers
 sub get_url {
   my $input = shift;
@@ -723,8 +713,7 @@ sub log_msg {
 
 # Main function
 sub main {
-
-  # Exit if we're not root/sudo
+  # Exit if we're not admin
   if ( is_admin() ) {
     say qq{$name $program must be executed as the admin user - not root!};
     exit 1;
