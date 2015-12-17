@@ -11,7 +11,6 @@ In order to use this script, you must first configure an:
 * Set up a cron job (recent EdgeOS versions have a CLI configurable system task-scheduler)
 * A firewall (at least WAN-Local and WAN-Internal) drop rule that uses the group, i.e.:
 
-```javascript
         network-group ipv4Bogons {
             description "ipv4 BOGON Addresses"
             network 10.0.0.0/8
@@ -38,7 +37,6 @@ In order to use this script, you must first configure an:
                 }
             }
         }
-```
 
 ## Licenses
 * GNU General Public License, version 3
