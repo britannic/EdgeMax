@@ -1,0 +1,6 @@
+Revision history for Perl extension EdgeOS::DNS::Blacklist.
+
+0.01  Thu Dec 17 10:32:30 2015
+	- original version; created by h2xs 1.23 with options
+		-XA -n EdgeOS::DNS::Blacklist
+

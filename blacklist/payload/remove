@@ -32,6 +32,7 @@ use IO::Select;
 use IPC::Open3;
 use lib q{/opt/vyatta/share/perl5/};
 use POSIX qw{geteuid};
+use Term::ReadKey qw(GetTerminalSize);
 use strict;
 use Sys::Syslog qw(:standard :macros);
 use threads;
@@ -44,15 +45,14 @@ use constant TRUE  => 1;
 use constant FALSE => 0;
 
 chomp( my $version = qx{cat version} );
-my $cols = qx{tput cols};
-my $crsr = {
-  off            => qq{\033[?25l},
-  on             => qq{\033[?25h},
-  clear          => qq{\033[0m},
-  reset          => qq{\033[0m},
-  bright_green   => qq{\033[92m},
-  bright_magenta => qq{\033[95m},
-  bright_red     => qq{\033[91m},
+my ($cols) = GetTerminalSize();
+my $c = {
+  off => qq{\033[?25l},
+  on  => qq{\033[?25h},
+  clr => qq{\033[0m},
+  grn => qq{\033[92m},
+  mag => qq{\033[95m},
+  red => qq{\033[91m},
 };
 my $cmdref  = { errors => 0, calls => 0, };
 my $program = basename($0);
@@ -76,6 +76,7 @@ my $env_ref = {
   script_dir => q{/config/scripts},
   tmplates => q{/opt/vyatta/share/vyatta-cfg/templates/service/dns/forwarding},
   testscript => q{blacklist.t},
+  utility    => q{ubnt-cln-cfg-orphans.sh},
 };
 
 ############################### script runs here ###############################
@@ -600,7 +601,7 @@ sub get_blacklist {
   }
 
   # Clean up the status line
-  print $crsr->{off}, qq{\r}, qq{ } x $cols, qq{\r};
+  print $c->{off}, qq{\r}, qq{ } x $cols, qq{\r};
 
   # Finish with a linefeed if '-v' is selected
   say q{};
@@ -699,7 +700,8 @@ sub log_msg {
 
   return unless ( length $msg_ref->{msg_typ} . $msg_ref->{msg_str} > 2 );
 
-  syslog( $log_msg->{ $msg_ref->{msg_typ} }, qq{$msg_ref->{msg_typ}: } . $msg_ref->{msg_str} );
+  syslog( $log_msg->{ $msg_ref->{msg_typ} },
+    qq{$msg_ref->{msg_typ}: } . $msg_ref->{msg_str} );
 
   if ( $msg_ref->{msg_typ} eq q{info} ) {
     say qq{$msg_ref->{msg_typ}: $msg_ref->{msg_str}};
@@ -713,6 +715,7 @@ sub log_msg {
 
 # Main function
 sub main {
+
   # Exit if we're not admin
   if ( is_admin() ) {
     say qq{$name $program must be executed as the admin user - not root!};
@@ -810,7 +813,7 @@ sub main {
     }
   }
 
-  print $crsr->{on};
+  print $c->{on};
 
   closelog();
   if ( $cmdref->{errors} ) {
@@ -834,7 +837,7 @@ sub process_data {
   };
 
   # Clear the status lines
-  print $crsr->{off}, qq{\r}, qq{ } x $cols, qq{\r};
+  print $c->{off}, qq{\r}, qq{ } x $cols, qq{\r};
 
 # Process the lines we've been given
 LINE:
@@ -889,7 +892,7 @@ LINE:
       += scalar @elements;
 
     printf
-      qq{$crsr->{off}%s: $crsr->{bright_green}%s$crsr->{reset} %s processed, ($crsr->{bright_red}%s$crsr->{reset} discarded) from $crsr->{bright_magenta}%s$crsr->{reset} lines\r},
+      qq{$c->{off}%s: $c->{grn}%s$c->{clr} %s processed, ($c->{red}%s$c->{clr} discarded) from $c->{mag}%s$c->{clr} lines\r},
       $input->{src},
       $input->{config}->{ $input->{area} }->{src}->{ $input->{src} }->{icount},
       $input->{config}->{ $input->{area} }->{type},
@@ -1018,6 +1021,7 @@ sub remove {
 
 # Install blacklist support
 sub setup {
+
   # Create a no op file to stop the CLI automatically running update-dnsmasq.pl
   open my $NO_OP, q{>}, qq{$env_ref->{no_op}};
   close $NO_OP;
@@ -1089,8 +1093,7 @@ sub setup {
   log_msg(
     {
       msg_typ => q{info},
-      msg_str =>
-        qq{Creating default $name sources and task scheduler entries},
+      msg_str => qq{Creating default $name sources and task scheduler entries},
     }
   );
 

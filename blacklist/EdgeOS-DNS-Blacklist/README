@@ -1,0 +1,41 @@
+EdgeOS-DNS-Blacklist version 0.01
+=================================
+
+Description: Module provides functions for creating dnsmasq configuration files
+to redirect dns look ups to alternative IPs (blackholes, pixel servers etc.)
+
+INSTALLATION
+
+To install this module type the following:
+
+   perl Makefile.PL
+   make
+   make test
+   make install
+
+DEPENDENCIES
+
+This module requires these other modules and libraries:
+
+use 5.14;
+use File::Basename;
+use Getopt::Long;
+use HTTP::Tiny;
+use lib q{/opt/vyatta/share/perl5/};
+use POSIX qw{geteuid};
+use strict;
+use Sys::Syslog qw(:standard :macros);
+use Term::ReadKey qw(GetTerminalSize);
+use threads;
+use URI;
+use Vyatta::Config;
+
+COPYRIGHT AND LICENCE
+
+Copyright (C) 2016 by Neil Beadle
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself, either Perl version 5.23.4 or,
+at your option, any later version of Perl 5 you may have available.
+
+

@@ -1,22 +1,6 @@
-#!/usr/bin/env perl
-#
-# **** License ****
-# COPYRIGHT AND LICENCE
-#
-# Copyright (C) 2016 by Neil Beadle
-#
-# This library is free software; you can redistribute it and/or modify
-# it under the same terms as Perl itself, either Perl version 5.23.4 or,
-# at your option, any later version of Perl 5 you may have available.
-#
-# Author: Neil Beadle
-# Date:   December 2015
-# Description: Script for creating dnsmasq configuration files to redirect dns
-# look ups to alternative IPs (blackholes, pixel servers etc.)
-#
-# **** End License ****
+package EdgeOS::DNS::Blacklist;
 
-# use Data::Dumper;
+use 5.14;
 use EdgeOS::DNS::Blacklist;
 use File::Basename;
 use Getopt::Long;
@@ -28,16 +12,44 @@ use Sys::Syslog qw(:standard :macros);
 use Term::ReadKey qw(GetTerminalSize);
 use threads;
 use URI;
-use v5.14;
 use Vyatta::Config;
 use warnings;
 
-use constant TRUE  => 1;
-use constant FALSE => 0;
+require Exporter;
 
-my $version = q{3.5.1};
-my ($cols)  = GetTerminalSize();
-my $c       = {
+our @ISA = qw(Exporter);
+
+# Items to export into callers namespace by default. Note: do not export
+# names by default without a very good reason. Use EXPORT_OK instead.
+# Do not simply export all your public functions/methods/constants.
+
+# This allows declaration use EdgeOS::DNS::Blacklist ':all';
+# If you do not need this, moving things directly into @EXPORT or @EXPORT_OK
+# will save memory.
+our %EXPORT_TAGS = ( 'all' => [ qw(
+
+) ] );
+
+our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
+our @EXPORT = qw(
+delete_file
+get_cfg_actv
+get_cfg_file
+get_file
+get_url
+is_admin
+is_configure
+log_msg
+popx
+process_data
+pushx
+usage
+write_file
+);
+our $VERSION = '0.01';
+
+# Preloaded methods go here.
+our $c       = {
   off => qq{\033[?25l},
   on  => qq{\033[?25h},
   clr => qq{\033[0m},
@@ -45,14 +57,6 @@ my $c       = {
   mag => qq{\033[95m},
   red => qq{\033[91m},
 };
-my ( $cfg_file, $show );
-
-############################### script runs here ###############################
-&main();
-
-# Exit normally
-exit 0;
-################################################################################
 
 # Process the active (not committed or saved) configuration
 sub get_cfg_actv {
@@ -332,29 +336,6 @@ LINE:
   return $cfg_ref->{service}->{dns}->{forwarding}->{blacklist};
 }
 
-# Set up command line options
-sub get_options {
-  my $input = shift;
-  my @opts  = (
-    [ q{-f <file> # load a configuration file}, q{f=s} => \$cfg_file ],
-    [
-      q{-help     # show help and usage text},
-      q{help} => sub { usage( { option => q{help}, exit_code => 0 } ) }
-    ],
-    [ q{-v        # verbose output}, q{v} => \$show ],
-    [
-      q{-version  # show program version number},
-      q{version} => sub { usage( { option => q{version}, exit_code => 0 } ) }
-    ],
-  );
-
-  return \@opts if $input->{option};
-
-  # Read command line flags and exit with help message if any are unknown
-  return GetOptions( map { my $options = $_; (@$options)[ 1 .. $#$options ] }
-      @opts );
-}
-
 # Get lists from web servers
 sub get_url {
   my $input = shift;
@@ -429,340 +410,6 @@ sub log_msg {
   return TRUE;
 }
 
-# This is the main function
-sub main {
-  my $dnsmasq_svc = q{/etc/init.d/dnsmasq};
-  my $cfg_ref     = {
-    disabled    => 0,
-    dnsmasq_dir => q{/etc/dnsmasq.d},
-    flag_lvl    => 5,
-    flag_file   => q{/var/log/update-dnsmasq-flagged.cmds},
-    log_name    => q{update-dnsmasq},
-    no_op       => q{/tmp/.update-dnsmasq.no-op},
-    domains     => {
-      duplicates => 0,
-      icount     => 0,
-      records    => 0,
-      target     => q{address},
-      type       => q{domains},
-      unique     => 0,
-    },
-    hosts => {
-      duplicates => 0,
-      icount     => 0,
-      records    => 0,
-      target     => q{address},
-      type       => q{hosts},
-      unique     => 0,
-    },
-    zones => {
-      duplicates => 0,
-      icount     => 0,
-      records    => 0,
-      target     => q{server},
-      type       => q{zones},
-      unique     => 0,
-    },
-  };
-
-  # Get command line options or print help if no valid options
-  get_options() || usage( { option => q{help}, exit_code => 1 } );
-
-  # Find reasons to quit
-  # If the no_op file exists, exit.
-  exit 0 if ( -f $cfg_ref->{no_op} );
-
-  usage( { option => q{sudo}, exit_code => 1 } ) if not is_admin();
-  usage( { option => q{cfg_file}, exit_code => 1 } )
-    if defined $cfg_file && !-f $cfg_file;
-
-  # Start logging
-  openlog( $cfg_ref->{log_name}, q{}, LOG_DAEMON );
-  log_msg(
-    {
-      msg_typ => q{info},
-      msg_str =>,
-      qq{---+++ dnsmasq blacklist $version +++---},
-    }
-  );
-
-  # Make sure localhost is always in the exclusions whitelist
-  $cfg_ref->{hosts}->{exclude}->{localhost} = 1;
-
-  # Now choose which data set will define the configuration
-  my $success
-    = defined $cfg_file
-    ? get_cfg_file( { config => $cfg_ref } )
-    : get_cfg_actv( { config => $cfg_ref } );
-  die qq{FATAL: Unable to get configuration} if !$success;
-
-  # Now proceed if blacklist is enabled
-  if ( !$cfg_ref->{disabled} ) {
-    my @areas = ();
-
-    # Add areas to process only if they contain sources
-    for my $area (qw{domains zones hosts}) {
-      push @areas, $area if scalar keys %{ $cfg_ref->{$area}->{src} };
-    }
-
-    # Process each area
-    my $area_count = (@areas);
-    for my $area (@areas) {
-      my ( $prefix, @threads );
-      my $max_thrds = 8;
-      my @sources   = keys %{ $cfg_ref->{$area}->{src} };
-      $cfg_ref->{$area}->{icount}
-        = scalar keys %{ $cfg_ref->{$area}->{blklst} } // 0;
-      @{ $cfg_ref->{$area} }{ q{records}, q{unique} }
-        = @{ $cfg_ref->{$area} }{ q{icount}, q{icount} };
-
-      # Remove any files that no longer have configured sources
-      my $sources_ref = {
-        map {
-          my $key = $_;
-          qq{$cfg_ref->{dnsmasq_dir}/$area.$key.blacklist.conf} => 1;
-        } @sources
-      };
-      my $files_ref = { map { my $key = $_; $key => 1; }
-          glob qq{$cfg_ref->{dnsmasq_dir}/$area.*blacklist.conf} };
-
-      for my $file ( keys $files_ref ) {
-        delete_file( { file => $file } )
-          if !exists $sources_ref->{$file} && $file;
-      }
-
-      # write each configured areas includes into individual dnsmasq files
-      if ( $cfg_ref->{$area}->{icount} > 0 ) {
-        my $equals = $area ne q{domains} ? q{=/} : q{=/.};
-        write_file(
-          {
-            data => [
-              map {
-                my $value = $_;
-                sprintf qq{%s%s%s/%s\n}, $cfg_ref->{$area}->{target}, $equals,
-                  $value, $cfg_ref->{$area}->{dns_redirect_ip};
-              } sort keys %{ $cfg_ref->{$area}->{blklst} }
-            ],
-            file =>
-              qq{$cfg_ref->{dnsmasq_dir}/$area.pre-configured.blacklist.conf},
-          }
-        );
-      }
-
-      for my $source (@sources) {
-        my ( $file, $url )
-          = @{ $cfg_ref->{$area}->{src}->{$source} }{ q{file}, q{url} };
-        my $uri  = new URI($url);
-        my $host = $uri->host;
-
-        # Initialize the sources counters
-        @{ $cfg_ref->{$area}->{src}->{$source} }
-          {qw(duplicates icount records unique)} = ( 0, 0, 0, 0 );
-
-        $prefix
-          = $cfg_ref->{$area}->{src}->{$source}->{prefix} ~~ q{http}
-          ? qr{(?:\A(?:http:|https:){1}[/]{1,2})}om
-          : $cfg_ref->{$area}->{src}->{$source}->{prefix};
-
-        if ( scalar $url ) {
-          log_msg(
-            {
-              msg_typ => q{info},
-              msg_str => sprintf q{Downloading %s blacklist from %s},
-              $area, $host,
-            }
-          ) if $show;
-          push @threads,
-            threads->create(
-            { context => q{list}, exit => q{thread_only} },
-            \&get_url,
-            {
-              area   => $area,
-              host   => $host,
-              prefix => $prefix,
-              src    => $source,
-              url    => $url
-            }
-            );
-        }
-        elsif ($file) {    # get file data
-          push @threads,
-            threads->create( { context => q{list}, exit => q{thread_only} },
-            \&get_file, { file => $file, src => $source } );
-        }
-        sleep 1 while ( scalar threads->list(threads::running) >= $max_thrds );
-      }
-
-      for my $thread (@threads) {
-        my $data_ref = $thread->join();
-        my $rec_count = scalar keys %{ $data_ref->{data} } // 0;
-
-        $cfg_ref->{$area}->{src}->{ $data_ref->{src} }->{records} += $rec_count;
-
-        if ( exists $data_ref->{host} && scalar $rec_count ) {
-          log_msg(
-            {
-              msg_typ => q{info},
-              msg_str => sprintf q{%s lines received from: %s },
-              $rec_count, $data_ref->{host},
-            }
-          );
-
-          # Now process what we have received from the web host
-          process_data(
-            {
-              area   => $area,
-              data   => \%{ $data_ref->{data} },
-              config => $cfg_ref,
-              prefix => $data_ref->{prefix},
-              src    => $data_ref->{src}
-            }
-          );
-
-          # Delete $data_ref->{data} key and data
-          delete $data_ref->{data};
-
-          if ( $cfg_ref->{$area}->{src}->{ $data_ref->{src} }->{icount} > 0 ) {
-            my $equals = $area ne q{domains} ? q{=/} : q{=/.};
-            write_file(
-              {
-                data => [
-                  map {
-                    my $value = $_;
-                    sprintf qq{%s%s%s/%s\n}, $cfg_ref->{$area}->{target},
-                      $equals, $value, $cfg_ref->{$area}->{dns_redirect_ip};
-                    } sort keys %{
-                    $cfg_ref->{$area}->{src}->{ $data_ref->{src} }->{blklst}
-                    }
-                ],
-                file =>
-                  qq{$cfg_ref->{dnsmasq_dir}/$area.$data_ref->{src}.blacklist.conf},
-              }
-            );
-
-
-            $cfg_ref->{$area}->{unique}
-              += scalar
-              keys %{ $cfg_ref->{$area}->{src}->{ $data_ref->{src} }->{blklst}
-              };
-            $cfg_ref->{$area}->{duplicates}
-              += $cfg_ref->{$area}->{src}->{ $data_ref->{src} }->{duplicates};
-            $cfg_ref->{$area}->{icount}
-              += $cfg_ref->{$area}->{src}->{ $data_ref->{src} }->{icount};
-            $cfg_ref->{$area}->{records}
-              += $cfg_ref->{$area}->{src}->{ $data_ref->{src} }->{records};
-
-            # Discard the data now its written to file
-            delete $cfg_ref->{$area}->{src}->{ $data_ref->{src} };
-          }
-          else {
-            log_msg(
-              {
-                msg_typ => q{warning},
-                msg_str => qq{Zero records processed from $data_ref->{src}!},
-              }
-            );
-          }
-        }
-      }
-
-      log_msg(
-        {
-          msg_typ => q{info},
-          msg_str => sprintf
-            q{Processed %s %s (%s discarded) from %s records (%s orig.)%s},
-          @{ $cfg_ref->{$area} }{qw(unique type duplicates icount records)},
-          qq{\n},
-        }
-      );
-
-      my @flagged_domains = ();
-
-      # Now lets report the domains that were seen more than $cfg->{flag_lvl}
-      for my $key (
-        sort {
-          $cfg_ref->{hosts}->{exclude}->{$b}
-            <=> $cfg_ref->{hosts}->{exclude}->{$a}
-        } keys %{ $cfg_ref->{hosts}->{exclude} }
-        )
-      {
-        my $value = $cfg_ref->{hosts}->{exclude}->{$key};
-        if ( $value >= $cfg_ref->{flag_lvl} && length $key > 5 ) {
-          log_msg(
-            {
-              msg_typ => q{info},
-              msg_str => sprintf qq{$area blacklisted: domain %s %s times},
-              $key, $value,
-            }
-          );
-          push @flagged_domains, qq{$key # $value times};
-        }
-      }
-
-      if (@flagged_domains) {
-        write_file(
-          {
-            data => [
-              map {
-                my $value = $_;
-                sprintf
-                  qq{set service dns forwarding blacklist domains include %s\n},
-                  $value;
-              } @flagged_domains
-            ],
-            file => $cfg_ref->{flag_file},
-          }
-        );
-
-        log_msg(
-          {
-            msg_typ => q{info},
-            msg_str =>
-              qq{Flagged domains command set written to:\n $cfg_ref->{flag_file}},
-          }
-        );
-      }
-
-      $area_count--;
-      say q{} if $area_count == 1 && $show;    # print a final line feed
-    }
-  }
-  elsif ( $cfg_ref->{disabled} ) {
-    for my $file (
-      glob qq{$cfg_ref->{dnsmasq_dir}/{domains,hosts,zones}*blacklist.conf} )
-    {
-      delete_file( { file => $file } ) if $file;
-    }
-  }
-
-  # Select the appropriate dnsmasq restart for CLI configure or bash shell
-  my $cmd
-    = is_configure()
-    ? q{/opt/vyatta/sbin/vyatta-dns-forwarding.pl --update-dnsforwarding}
-    : qq{$dnsmasq_svc force-reload > /dev/null 2>1&};
-
-  # Clean up the status line
-  print $c->{off}, qq{\r}, qq{ } x $cols, qq{\r} if $show;
-
-  log_msg(
-    { msg_typ => q{info}, msg_str => q{Reloading dnsmasq configuration...}, } );
-
-  # Reload updated dnsmasq conf address redirection files
-  qx{$cmd};
-  log_msg(
-    {
-      msg_typ => q{error},
-      msg_str => q{Reloading dnsmasq configuration failed},
-    }
-  ) if ( $? >> 8 != 0 );
-
-  # Close the log
-  closelog();
-
-  # Finish with a linefeed if '-v' is selected
-  say $c->{on}, q{} if $show;
-}
-
 # pop array x times
 sub popx {
   my $input = shift;
@@ -774,7 +421,7 @@ sub popx {
 }
 
 # Crunch the data and throw out anything we don't need
-sub process_data {
+sub process_cfg {
   my $input = shift;
   my $re    = {
     FQDOMN =>
@@ -941,3 +588,56 @@ sub write_file {
 
   return TRUE;
 }
+
+1;
+__END__
+# Below is stub documentation for your module. You'd better edit it!
+
+=head1 NAME
+
+EdgeOS::DNS::Blacklist - Perl extension for blah blah blah
+
+=head1 SYNOPSIS
+
+  use EdgeOS::DNS::Blacklist;
+  blah blah blah
+
+=head1 DESCRIPTION
+
+Stub documentation for EdgeOS::DNS::Blacklist, created by h2xs. It looks like the
+author of the extension was negligent enough to leave the stub
+unedited.
+
+Blah blah blah.
+
+=head2 EXPORT
+
+None by default.
+
+
+
+=head1 SEE ALSO
+
+Mention other useful documentation such as the documentation of
+related modules or operating system documentation (such as man pages
+in UNIX), or any relevant external documentation such as RFCs or
+standards.
+
+If you have a mailing list set up for your module, mention it here.
+
+If you have a web site set up for your module, mention it here.
+
+=head1 AUTHOR
+
+Neil Beadle, E<lt>Neil@ashcreek.homeE<gt>
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (C) 2015 by Neil Beadle
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself, either Perl version 5.23.4 or,
+at your option, any later version of Perl 5 you may have available.
+
+
+=cut
