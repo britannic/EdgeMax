@@ -20,22 +20,23 @@ EdgeMax dnsmasq Blacklist and Adware Blocking is derived from the received wisdo
 * Since the EdgeOS is a fork and port of Vyatta 6.3, this script could easily be adapted to work on VyOS and Vyatta derived ports
 
 ## Versions
-* v3.5: Updates include:
-    -
+* v3.5: Updates/fixes include:
+    - Global exclude is now available ([set service dns forwarding blacklist exclude ...])
     - Removed --debug option from update-dnsmasq.pl
     - New validator script (/configure/scripts/blacklist.t) runs a battery of tests on the blacklist configuration to ensure it is working correctly or checks it is removed correctly
-    - setup and remove scripts rewritten in Perl
+    - Setup/Remove scripts rewritten in Perl
     - Fixed issue with install that prevented admin user configuration
     - Installer now runs under admin and only uses sudo where absolutely necessary
-    - Installer includes new options
+    - Installer checks to see if service dns forwarding is configured and bails it if not with warning/example configuration
+    - Installer includes these new options:
 
 | # | Option  |                         Function                          |
 |---|---------|-----------------------------------------------------------|
-| 1 | INSTALL |Install dnsmasq blacklist CLI configuration functionality |
-| 2 | REMOVE  |Remove dnsmasq blacklist CLI configuration functionality |
-| 3 | TEST    |Test dnsmasq blacklist CLI configuration functionality |
-| 4 | BACKUP  |Backup blacklist configuration to /config/user-data/blacklist.cmds |
-| 5 | QUIT    |Exit the installer                                        |
+| 1 | INSTALL |Install dnsmasq blacklist CLI configuration functionality|
+| 2 | REMOVE  |Remove dnsmasq blacklist CLI configuration functionality|
+| 3 | TEST    |Validate dnsmasq blacklist CLI configuration functionality|
+| 4 | BACKUP  |Save blacklist configuration to /config/user-data/blacklist.cmds|
+| 5 | QUIT    |Exit the installer|
 
 ---
 * v3.3.2: What is new:

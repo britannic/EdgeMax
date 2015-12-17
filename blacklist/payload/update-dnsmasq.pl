@@ -63,7 +63,7 @@ exit 0;
 ################################################################################
 
 # Process the active (not committed or saved) configuration
-sub cfg_actv {
+sub get_cfg_actv {
   my $config       = new Vyatta::Config;
   my $input        = shift;
   my $exists       = q{existsOrig};
@@ -158,7 +158,7 @@ sub cfg_actv {
 }
 
 # Process a configuration file in memory after get_file() loads it
-sub cfg_file {
+sub get_cfg_file {
   my $input = shift;
   my $tmp_ref
     = get_nodes( { config_data => get_file( { file => $cfg_file } ) } );
@@ -183,7 +183,7 @@ sub cfg_file {
       @{ $input->{config}->{$area} }{qw(blklst exclude src)}
         = @{ $tmp_ref->{$area} }{qw(include exclude source)};
 
-      while ( my ( $key, $value ) = each $tmp_ref->{$area}->{exclude} ) {
+      while ( my ( $key, $value ) = each %{ $tmp_ref->{$area}->{exclude} } ) {
         $input->{config}->{$area}->{exclude}->{$key} = $value;
       }
     }
@@ -227,18 +227,6 @@ sub delete_file {
     return;
   }
   return TRUE;
-}
-
-# Determine which type of configuration to get (default, active or saved)
-sub get_config {
-  my $input = shift;
-
-  for ( $input->{type} ) {
-    when (/active/) { return cfg_actv( { config => $input->{config} } ); }
-    when (/file/) { return cfg_file( { config => $input->{config} } ); }
-  }
-
-  return;
 }
 
 # Read a file into memory and return the data to the calling function
@@ -293,6 +281,7 @@ sub get_nodes {
     RSPC => qr/^\s+/o,
   };
 
+LINE:
   for my $line ( @{ $input->{config_data} } ) {
     $line =~ s/$re->{LSPC}//;
     $line =~ s/$re->{RSPC}//;
@@ -303,9 +292,7 @@ sub get_nodes {
         push @nodes, $+{VALU};
         push @nodes, 1;
         get_hash( { nodes => \@nodes, hash_ref => $cfg_ref } );
-        pop @nodes;
-        pop @nodes;
-        pop @nodes;
+        popx( { array => \@nodes, X => 3 } );
       }
       when (/$re->{NODE}/) {
         push @nodes, $+{NODE};
@@ -319,22 +306,18 @@ sub get_nodes {
         push @nodes, $+{NAME};
         push @nodes, $+{VALU};
         get_hash( { nodes => \@nodes, hash_ref => $cfg_ref } );
-        pop @nodes;
-        pop @nodes;
+        popx( { array => \@nodes, X => 2 } );
       }
       when (/$re->{DESC}/) {
         push @nodes, $+{NAME};
         push @nodes, $+{DESC};
         get_hash( { nodes => \@nodes, hash_ref => $cfg_ref } );
-        pop @nodes;
-        pop @nodes;
+        popx( { array => \@nodes, X => 2 } );
       }
       when (/$re->{MISC}/) {
-        push @nodes, $+{MISC};
-        push @nodes, $+{MISC};
+        pushx( { array => \@nodes, items => \$+{MISC}, X => 2 } );
         get_hash( { nodes => \@nodes, hash_ref => $cfg_ref } );
-        pop @nodes;
-        pop @nodes;
+        popx( { array => \@nodes, X => 2 } );
       }
       when (/$re->{CMNT}/) {
         next;
@@ -347,7 +330,7 @@ sub get_nodes {
         }
       }
       when (/$re->{MPTY}/) {
-        next;
+        next LINE;
       }
       default {
         printf q{Parse error: "%s"}, $line;
@@ -515,9 +498,11 @@ sub main {
   $cfg_ref->{hosts}->{exclude}->{localhost} = 1;
 
   # Now choose which data set will define the configuration
-  my $cfg_type = defined $cfg_file ? q{c_file} : q{active};
-
-  exit 1 unless get_config( { type => $cfg_type, config => $cfg_ref } );
+  my $success
+    = defined $cfg_file
+    ? get_cfg_file( { config => $cfg_ref } )
+    : get_cfg_actv( { config => $cfg_ref } );
+  die qq{FATAL: Unable to get configuration} if !$success;
 
   # Now proceed if blacklist is enabled
   if ( !$cfg_ref->{disabled} ) {
@@ -786,6 +771,16 @@ sub main {
   say $crsr->{on}, q{} if $show;
 }
 
+# pop array x times
+sub popx {
+  my $input = shift;
+  return if !$input->{X};
+  for ( 1 .. $input->{X} ) {
+    pop @{ $input->{array} };
+  }
+  return TRUE;
+}
+
 # Crunch the data and throw out anything we don't need
 sub process_data {
   my $input = shift;
@@ -882,6 +877,16 @@ LINE:
     return TRUE;
   }
   return;
+}
+
+# push array x times
+sub pushx {
+  my $input = shift;
+  return if !$input->{X};
+  for ( 1 .. $input->{X} ) {
+    push @{ $input->{array} }, $input->{items};
+  }
+  return TRUE;
 }
 
 # Process command line options and print usage
