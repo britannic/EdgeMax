@@ -1,21 +1,13 @@
 #!/usr/bin/env perl
 #
 # **** License ****
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License version 2 as
-# published by the Free Software Foundation.
+# COPYRIGHT AND LICENCE
 #
-# This program is distributed in the hope that it will be useful, but
-# WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
+# Copyright (C) 2016 by Neil Beadle
 #
-# A copy of the GNU General Public License is available as
-# '/usr/share/common-licenses/GPL' in the Debian GNU/Linux distribution
-# or on the World Wide Web at `http://www.gnu.org/copyleft/gpl.html'.
-# You can also obtain it by writing to the Free Software Foundation,
-# Free Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
-# MA 02110-1301, USA.
+# This library is free software; you can redistribute it and/or modify
+# it under the same terms as Perl itself, either Perl version 5.23.4 or,
+# at your option, any later version of Perl 5 you may have available.
 #
 # Author: Neil Beadle
 # Date:   December 2015
@@ -27,165 +19,57 @@
 use File::Basename;
 use feature qw{switch};
 use Getopt::Long;
-use strict;
+use lib q{/opt/vyatta/share/perl5/};
+use lib q{./lib/};
 use Test::More;
+use EdgeOS::DNS::Blacklist (
+  qw{
+    $c
+    get_cfg_actv
+    get_cfg_file
+    get_file
+    is_configure
+    is_admin
+    log_msg
+    popx
+    pushx
+    }
+);
 use v5.14;
-use warnings;
 
 use constant TRUE  => 1;
 use constant FALSE => 0;
 
-my $version  = q{1.0};
-my $cfg_file = q{/config/config.boot};
-my $t_count  = { tests => 0, failed => 0 };
-my $crsr     = {
-  off            => qq{\033[?25l},
-  on             => qq{\033[?25h},
-  clear          => qq{\033[0m},
-  reset          => qq{\033[0m},
-  bright_green   => qq{\033[92m},
-  bright_magenta => qq{\033[95m},
-  bright_red     => qq{\033[91m},
-};
-my $blacklist_removed;
+my $version = q{1.1};
+my $t_count = { tests => 0, failed => 0 };
+my ( $blacklist_removed, $cfg_file );
 
 ########## Run main ###########
 &main();
 my $t_word = $t_count->{failed} <= 1 ? q{test} : q{tests};
 if ( $t_count->{failed} == 0 && !$blacklist_removed ) {
-  say(  qq{$crsr->{bright_green}All $t_count->{tests} tests passed - dnsmasq }
-      . qq{blacklisting is configured correctly$crsr->{clear}} );
+  say(  qq{$c->{grn}All $t_count->{tests} tests passed - dnsmasq }
+      . qq{blacklisting is configured correctly$c->{clr}} );
   exit 0;
 }
 elsif ( $blacklist_removed && $t_count->{failed} != 0 ) {
-  say(  qq{$crsr->{bright_red} $t_count->{failed} $t_word failed out of }
+  say(  qq{$c->{red} $t_count->{failed} $t_word failed out of }
       . qq{$t_count->{tests} - dnsmasq blacklisting has not been removed }
-      . qq{correctly$crsr->{clear}} );
+      . qq{correctly$c->{clr}} );
   exit 1;
 }
 elsif ( $blacklist_removed && $t_count->{failed} == 0 ) {
-  say(  qq{$crsr->{bright_green}All $t_count->{tests} tests passed - dnsmasq }
-      . qq{blacklisting has been completely removed$crsr->{clear}} );
+  say(  qq{$c->{grn}All $t_count->{tests} tests passed - dnsmasq }
+      . qq{blacklisting has been completely removed$c->{clr}} );
   exit 0;
 }
 else {
-  say(  qq{$crsr->{bright_red} $t_count->{failed} $t_word failed out of }
+  say(  qq{$c->{red} $t_count->{failed} $t_word failed out of }
       . qq{$t_count->{tests} - dnsmasq blacklisting is not working correctly}
-      . qq{$crsr->{clear}} );
+      . qq{$c->{clr}} );
   exit 1;
 }
 ############ exit #############
-
-# Read a file into memory and return the data to the calling function
-sub get_file {
-  my $input = shift;
-  my @data  = ();
-  if ( -f $input->{file} ) {
-    open my $CF, q{<}, $input->{file}
-      or die qq{error: Unable to open $input->{file}: $!};
-    chomp( @data = <$CF> );
-
-    close $CF;
-  }
-  return $input->{data} = \@data;
-}
-
-# Build hashes from the configuration file data (called by get_nodes())
-sub get_hash {
-  my $input    = shift;
-  my $hash     = \$input->{hash_ref};
-  my @nodes    = @{ $input->{nodes} };
-  my $value    = pop @nodes;
-  my $hash_ref = ${$hash};
-
-  for my $key (@nodes) {
-    $hash = \${$hash}->{$key};
-  }
-
-  ${$hash} = $value if $value;
-
-  return $hash_ref;
-}
-
-# Process a configure file and extract the blacklist data set
-sub get_nodes {
-  my $input = shift;
-  my ( @hasher, @nodes );
-  my $cfg_ref = {};
-  my $leaf    = 0;
-  my $level   = 0;
-  my $re      = {
-    BRKT => qr/[}]/o,
-    CMNT => qr/^(?<LCMT>[\/*]+).*(?<RCMT>[*\/]+)$/o,
-    DESC => qr/^(?<NAME>[\w-]+)\s"?(?<DESC>[^"]+)?"?$/o,
-    MPTY => qr/^$/o,
-    LEAF => qr/^(?<LEAF>[\w\-]+)\s(?<NAME>[\S]+)\s[{]{1}$/o,
-    LSPC => qr/\s+$/o,
-    MISC => qr/^(?<MISC>[\w-]+)$/o,
-    MULT => qr/^(?<MULT>(?:include|exclude)+)\s(?<VALU>[\S]+)$/o,
-    NAME => qr/^(?<NAME>[\w\-]+)\s(?<VALU>[\S]+)$/o,
-    NODE => qr/^(?<NODE>[\w-]+)\s[{]{1}$/o,
-    RSPC => qr/^\s+/o,
-  };
-
-LINE:
-  for my $line ( @{ $input->{config_data} } ) {
-    $line =~ s/$re->{LSPC}//;
-    $line =~ s/$re->{RSPC}//;
-
-    for ($line) {
-      when (/$re->{MULT}/) {
-        push @nodes, $+{MULT};
-        push @nodes, $+{VALU};
-        push @nodes, 1;
-        get_hash( { nodes => \@nodes, hash_ref => $cfg_ref } );
-        popx( { array => \@nodes, X => 3 } );
-      }
-      when (/$re->{NODE}/) {
-        push @nodes, $+{NODE};
-      }
-      when (/$re->{LEAF}/) {
-        $level++;
-        push @nodes, $+{LEAF};
-        push @nodes, $+{NAME};
-      }
-      when (/$re->{NAME}/) {
-        push @nodes, $+{NAME};
-        push @nodes, $+{VALU};
-        get_hash( { nodes => \@nodes, hash_ref => $cfg_ref } );
-        popx( { array => \@nodes, X => 2 } );
-      }
-      when (/$re->{DESC}/) {
-        push @nodes, $+{NAME};
-        push @nodes, $+{DESC};
-        get_hash( { nodes => \@nodes, hash_ref => $cfg_ref } );
-        popx( { array => \@nodes, X => 2 } );
-      }
-      when (/$re->{MISC}/) {
-        pushx( { array => \@nodes, items => \$+{MISC}, X => 2 } );
-        get_hash( { nodes => \@nodes, hash_ref => $cfg_ref } );
-        popx( { array => \@nodes, X => 2 } );
-      }
-      when (/$re->{CMNT}/) {
-        next;
-      }
-      when (/$re->{BRKT}/) {
-        pop @nodes;
-        if ( $level > 0 ) {
-          pop @nodes;
-          $level--;
-        }
-      }
-      when (/$re->{MPTY}/) {
-        next LINE;
-      }
-      default {
-        printf q{Parse error: "%s"}, $line;
-      }
-    }
-  }
-  return $cfg_ref->{service}->{dns}->{forwarding};
-}
 
 # Set up command line options
 sub get_options {
@@ -211,7 +95,7 @@ sub get_options {
 
 # Main script
 sub main {
-  my $cfg_ref = {
+  my $cfg = {
     dnsmasq_dir  => q{/etc/dnsmasq.d},
     flag_file    => q{/var/log/update-dnsmasq-flagged.cmds},
     no_op        => q{/tmp/.update-dnsmasq.no-op},
@@ -222,123 +106,119 @@ sub main {
   # Get command line options or print help if no valid options
   get_options() || usage( { option => q{help}, exit_code => 1 } );
 
-  usage( { option => q{cfg_file}, exit_code => 1 } ) if !-f $cfg_file;
+  usage( { option => q{cfg_file}, exit_code => 1 } )
+    if defined $cfg_file && !-f $cfg_file;
 
-  #Process the configuration file into a hash ref
-  process_cfg(
-    { config => $cfg_ref, data => get_file( { file => $cfg_file } ) } );
+  note("Testing dnsmasq blacklist configuration");
 
-  $cfg_ref->{domains_pre_f}
-    = [ glob qq{$cfg_ref->{dnsmasq_dir}/domains.pre*blacklist.conf} ];
-  $cfg_ref->{hosts_pre_f}
-    = [ glob qq{$cfg_ref->{dnsmasq_dir}/hosts.pre*blacklist.conf} ];
-  $cfg_ref->{zones_pre_f}
-    = [ glob qq{$cfg_ref->{dnsmasq_dir}/zones.pre*blacklist.conf} ];
-  $cfg_ref->{global_ex} = [ keys %{ $cfg_ref->{blacklist}->{exclude} } ];
+  # Now choose which data set will define the configuration
+  my $success
+    = defined $cfg_file
+    ? get_cfg_file( { config => $cfg, file => $cfg_file } )
+    : get_cfg_actv( { config => $cfg, show => TRUE } );
+
+  $cfg->{domains_pre_f}
+    = [ glob qq{$cfg->{dnsmasq_dir}/domains.pre*blacklist.conf} ];
+  $cfg->{hosts_pre_f}
+    = [ glob qq{$cfg->{dnsmasq_dir}/hosts.pre*blacklist.conf} ];
+  $cfg->{zones_pre_f}
+    = [ glob qq{$cfg->{dnsmasq_dir}/zones.pre*blacklist.conf} ];
 
   # If blacklist is disabled - check it really is
-  if ( exists $cfg_ref->{blacklist}->{disabled}
-    && $cfg_ref->{blacklist}->{disabled} )
-  {
+  if ( exists $cfg->{disabled} && $cfg->{disabled} ) {
     $t_count->{tests} += 4;
-    is( -f $cfg_ref->{updatescript},
-      TRUE,
-      q{Checking } . basename( $cfg_ref->{updatescript} ) . q{ exists} )
-      or diag( qq{$crsr->{bright_red}}
-        . basename( $cfg_ref->{updatescript} )
+    is( -f $cfg->{updatescript},
+      TRUE, q{Checking } . basename( $cfg->{updatescript} ) . q{ exists} )
+      or diag( qq{$c->{red}}
+        . basename( $cfg->{updatescript} )
         . qq{ found - investigate!}
-        . $crsr->{clear} ), $t_count->{failed}++;
-    is( -f $cfg_ref->{flag_file},
-      TRUE, q{Checking } . basename( $cfg_ref->{flag_file} ) . q{ exists} )
-      or diag( qq{$crsr->{bright_red}}
-        . basename( $cfg_ref->{flag_file} )
+        . $c->{clr} ), $t_count->{failed}++;
+    is( -f $cfg->{flag_file},
+      TRUE, q{Checking } . basename( $cfg->{flag_file} ) . q{ exists} )
+      or diag( qq{$c->{red}}
+        . basename( $cfg->{flag_file} )
         . qq{ should exist - investigate!}
-        . $crsr->{clear} ), $t_count->{failed}++;
-    isnt( -f $cfg_ref->{no_op},
-      TRUE, q{Checking } . basename( $cfg_ref->{no_op} ) . q{ doesn't exist} )
-      or diag( qq{$crsr->{bright_red}}
-        . basename( $cfg_ref->{no_op} )
+        . $c->{clr} ), $t_count->{failed}++;
+    isnt( -f $cfg->{no_op},
+      TRUE, q{Checking } . basename( $cfg->{no_op} ) . q{ doesn't exist} )
+      or diag( qq{$c->{red}}
+        . basename( $cfg->{no_op} )
         . qq{ found - investigate!}
-        . $crsr->{clear} ), $t_count->{failed}++;
-    is( -f $cfg_ref->{testscript},
-      TRUE, q{Checking } . basename( $cfg_ref->{testscript} ) . q{ exists} )
-      or diag( qq{$crsr->{bright_red}}
-        . basename( $cfg_ref->{testscript} )
+        . $c->{clr} ), $t_count->{failed}++;
+    is( -f $cfg->{testscript},
+      TRUE, q{Checking } . basename( $cfg->{testscript} ) . q{ exists} )
+      or diag( qq{$c->{red}}
+        . basename( $cfg->{testscript} )
         . qq{ should exist - investigate!}
-        . $crsr->{clear} ), $t_count->{failed}++;
+        . $c->{clr} ), $t_count->{failed}++;
   }
-  elsif ( exists $cfg_ref->{blacklist}->{disabled}
-    && !$cfg_ref->{blacklist}->{disabled} )
-  {
+  elsif ( exists $cfg->{disabled} && !$cfg->{disabled} ) {
     $t_count->{tests} += 4;
-    is( -f $cfg_ref->{updatescript},
-      TRUE,
-      q{Checking } . basename( $cfg_ref->{updatescript} ) . q{ exists} )
-      or diag( qq{$crsr->{bright_red}}
-        . basename( $cfg_ref->{updatescript} )
+    is( -f $cfg->{updatescript},
+      TRUE, q{Checking } . basename( $cfg->{updatescript} ) . q{ exists} )
+      or diag( qq{$c->{red}}
+        . basename( $cfg->{updatescript} )
         . qq{ found - investigate!}
-        . $crsr->{clear} ), $t_count->{failed}++;
-    is( -f $cfg_ref->{flag_file},
-      TRUE, q{Checking } . basename( $cfg_ref->{flag_file} ) . q{ exists} )
-      or diag( qq{$crsr->{bright_red}}
-        . basename( $cfg_ref->{flag_file} )
+        . $c->{clr} ), $t_count->{failed}++;
+    is( -f $cfg->{flag_file},
+      TRUE, q{Checking } . basename( $cfg->{flag_file} ) . q{ exists} )
+      or diag( qq{$c->{red}}
+        . basename( $cfg->{flag_file} )
         . qq{ should exist - investigate!}
-        . $crsr->{clear} ), $t_count->{failed}++;
-    isnt( -f $cfg_ref->{no_op},
-      TRUE, q{Checking } . basename( $cfg_ref->{no_op} ) . q{ doesn't exist} )
-      or diag( qq{$crsr->{bright_red}}
-        . basename( $cfg_ref->{no_op} )
+        . $c->{clr} ), $t_count->{failed}++;
+    isnt( -f $cfg->{no_op},
+      TRUE, q{Checking } . basename( $cfg->{no_op} ) . q{ doesn't exist} )
+      or diag( qq{$c->{red}}
+        . basename( $cfg->{no_op} )
         . qq{ found - investigate!}
-        . $crsr->{clear} ), $t_count->{failed}++;
-    is( -f $cfg_ref->{testscript},
-      TRUE, q{Checking } . basename( $cfg_ref->{testscript} ) . q{ exists} )
-      or diag( qq{$crsr->{bright_red}}
-        . basename( $cfg_ref->{testscript} )
+        . $c->{clr} ), $t_count->{failed}++;
+    is( -f $cfg->{testscript},
+      TRUE, q{Checking } . basename( $cfg->{testscript} ) . q{ exists} )
+      or diag( qq{$c->{red}}
+        . basename( $cfg->{testscript} )
         . qq{ should exist - investigate!}
-        . $crsr->{clear} ), $t_count->{failed}++;
+        . $c->{clr} ), $t_count->{failed}++;
   }
-  else {
+  elsif ( !$success ) {
     $blacklist_removed = TRUE;
     $t_count->{tests} += 5;
-    isnt( -f $cfg_ref->{updatescript},
+    isnt( -f $cfg->{updatescript},
       TRUE,
-      q{Checking } . basename( $cfg_ref->{updatescript} ) . q{ doesn't exist} )
-      or diag( qq{$crsr->{bright_red}}
-        . basename( $cfg_ref->{updatescript} )
+      q{Checking } . basename( $cfg->{updatescript} ) . q{ doesn't exist} )
+      or diag( qq{$c->{red}}
+        . basename( $cfg->{updatescript} )
         . qq{ found - investigate!}
-        . $crsr->{clear} ), $t_count->{failed}++;
-    isnt( -f $cfg_ref->{flag_file},
-      TRUE,
-      q{Checking } . basename( $cfg_ref->{flag_file} ) . q{ doesn't exist} )
-      or diag( qq{$crsr->{bright_red}}
-        . basename( $cfg_ref->{flag_file} )
+        . $c->{clr} ), $t_count->{failed}++;
+    isnt( -f $cfg->{flag_file},
+      TRUE, q{Checking } . basename( $cfg->{flag_file} ) . q{ doesn't exist} )
+      or diag( qq{$c->{red}}
+        . basename( $cfg->{flag_file} )
         . qq{ found - investigate!}
-        . $crsr->{clear} ), $t_count->{failed}++;
-    isnt( -f $cfg_ref->{no_op},
-      TRUE, q{Checking } . basename( $cfg_ref->{no_op} ) . q{ doesn't exist} )
-      or diag( qq{$crsr->{bright_red}}
-        . basename( $cfg_ref->{no_op} )
+        . $c->{clr} ), $t_count->{failed}++;
+    isnt( -f $cfg->{no_op},
+      TRUE, q{Checking } . basename( $cfg->{no_op} ) . q{ doesn't exist} )
+      or diag( qq{$c->{red}}
+        . basename( $cfg->{no_op} )
         . qq{ found - investigate!}
-        . $crsr->{clear} ), $t_count->{failed}++;
-    isnt( -f $cfg_ref->{testscript},
-      TRUE,
-      q{Checking } . basename( $cfg_ref->{testscript} ) . q{ doesn't exist} )
-      or diag( qq{$crsr->{bright_red}}
-        . basename( $cfg_ref->{testscript} )
+        . $c->{clr} ), $t_count->{failed}++;
+    isnt( -f $cfg->{testscript},
+      TRUE, q{Checking } . basename( $cfg->{testscript} ) . q{ doesn't exist} )
+      or diag( qq{$c->{red}}
+        . basename( $cfg->{testscript} )
         . qq{ found - investigate!}
-        . $crsr->{clear} ), $t_count->{failed}++;
+        . $c->{clr} ), $t_count->{failed}++;
 
     # Check for stray files
-    $cfg_ref->{strays} = [
-      glob qq{$cfg_ref->{dnsmasq_dir}/{domains,zones,hosts}*.blacklist.conf} ];
-    my $no_strays = isnt( scalar( @{ $cfg_ref->{strays} } ),
+    $cfg->{strays}
+      = [ glob qq{$cfg->{dnsmasq_dir}/{domains,zones,hosts}*.blacklist.conf} ];
+    my $no_strays = isnt( scalar( @{ $cfg->{strays} } ),
       TRUE, qq{Checking *.blacklist.conf files not found in /etc/dnsmasq.d/} )
-      or diag( qq{$crsr->{bright_red} Found blacklist configuration files in }
-        . qq{$cfg_ref->{dnsmasq_dir}/ - they should be deleted!}
-        . $crsr->{clear} ), $t_count->{failed}++;
+      or diag( qq{$c->{red} Found blacklist configuration files in }
+        . qq{$cfg->{dnsmasq_dir}/ - they should be deleted!}
+        . $c->{clr} ), $t_count->{failed}++;
     if ( !$no_strays ) {
-      say(qq{The following files were found in $cfg_ref->{dnsmasq_dir}/:});
-      for ( @{ $cfg_ref->{strays} } ) {
+      say(qq{The following files were found in $cfg->{dnsmasq_dir}/:});
+      for ( @{ $cfg->{strays} } ) {
         say;
       }
     }
@@ -347,48 +227,54 @@ sub main {
   }
 
   # Add areas to process only if they contain sources
+  my @areas;
   for my $area (qw{domains zones hosts}) {
-    my $ip = $cfg_ref->{blacklist}->{$area}->{dns_redirect_ip};
-    $cfg_ref->{ $area . q{_ex} }
-      = [ keys %{ $cfg_ref->{blacklist}->{$area}->{exclude} } ];
-    if ( exists $cfg_ref->{blacklist}->{$area}->{src} ) {
-      my @sources = keys %{ $cfg_ref->{blacklist}->{$area}->{src} };
-      for my $source (@sources) {
-        $cfg_ref->{ $area . q{_f} }
-          = [qq{$cfg_ref->{dnsmasq_dir}/$area.$source.blacklist.conf}];
-        for my $file ( @{ $cfg_ref->{ $area . q{_f} } } ) {
-          $t_count->{tests}++;
-          is( -f $file, TRUE, qq{Checking $source has a file} )
-            or diag( qq{$crsr->{bright_red}}
-              . basename($file)
-              . qq{ not found for $source - investigate!}
-              . $crsr->{clear} ), $t_count->{failed}++;
-        }
+    push @areas, $area if scalar keys %{ $cfg->{$area}->{src} };
+  }
 
-        # Test global and area exclusions
-        for my $file ( @{ $cfg_ref->{ $area . q{_f} } } ) {
-          my $content = get_file( { file => $file } );
-          for my $host ( @{ $cfg_ref->{global_ex} } ) {
+  for my $area (@areas) {
+    my @files;
+    my $ip = $cfg->{$area}->{dns_redirect_ip};
+    if ( exists $cfg->{$area}->{src} ) {
+      for my $source ( sort keys %{ $cfg->{$area}->{src} } ) {
+        push @files, [$source, qq{$cfg->{dnsmasq_dir}/$area.$source.blacklist.conf}];
+      }
+      for my $f_ref (@files) {
+        my ($source, $file) = @{$f_ref};
+        $t_count->{tests}++;
+        is( -f $file, TRUE, qq{Checking $source has a file} )
+          or diag( qq{$c->{red}}
+            . basename($file)
+            . qq{ not found for $source - investigate!}
+            . $c->{clr} ), $t_count->{failed}++;
+      }
+
+      # Test global and area exclusions
+      for my $f_ref (@files) {
+        my ($source, $file) = @{$f_ref};
+        my $content = get_file( { file => $file } );
+        if ( @{$content} ) {
+          for my $host ( sort keys %{ $cfg->{exclude} } ) {
             my $re = qr{address=[/][.]{0,1}$host[/].*};
             $t_count->{tests}++;
             is( $re ~~ @{$content},
               q{},
               qq{Checking "global exclude" $host not in } . basename($file) )
-              or diag( qq{$crsr->{bright_red}}
+              or diag( qq{$c->{red}}
                 . qq{Found "global exclude" $host in }
                 . basename($file) . q{!}
-                . $crsr->{clear} ), $t_count->{failed}++;
+                . $c->{clr} ), $t_count->{failed}++;
           }
-          for my $host ( @{ $cfg_ref->{ $area . q{_ex} } } ) {
+          for my $host ( sort keys %{ $cfg->{$area}->{exclude} } ) {
             my $re = qr{address=[/][.]{0,1}$host[/].*};
             $t_count->{tests}++;
             is( $re ~~ @{$content},
               q{},
               qq{Checking "$area exclude" $host not in } . basename($file) )
-              or diag( qq{$crsr->{bright_red}}
+              or diag( qq{$c->{red}}
                 . qq{Found "$area exclude" $host in }
                 . basename($file) . q{!}
-                . $crsr->{clear} ), $t_count->{failed}++;
+                . $c->{clr} ), $t_count->{failed}++;
           }
           my $re        = qr{(?:address=[/][.]{0,1}.*[/])(?<IP>.*)};
           my %found_ips = map {
@@ -396,37 +282,39 @@ sub main {
             $found_ip =~ s/$re/$+{IP}/ms;
             $found_ip => 1;
           } @{$content};
-          for my $found_ip ( keys %found_ips ) {
+          for my $found_ip ( sort keys %found_ips ) {
             $t_count->{tests}++;
             cmp_ok( $found_ip, q{eq}, $ip,
                   qq{IP address $found_ip found in }
                 . basename($file)
                 . qq{ matches configured $ip} )
-              or diag( qq{$crsr->{bright_red}}
+              or diag( qq{$c->{red}}
                 . qq{IP address $found_ip found in }
                 . basename($file)
                 . qq{ doesn't match configured $ip!}
-                . $crsr->{clear} ), $t_count->{failed}++;
+                . $c->{clr} ), $t_count->{failed}++;
           }
         }
+      }
 
-        for my $file ( @{ $cfg_ref->{ $area . q{_pre_f} } } ) {
-          my $content = get_file( { file => $file } );
-          for my $host ( keys %{ $cfg_ref->{blacklist}->{$area}->{blklst} } ) {
+      for my $file ( @{ $cfg->{ $area . q{_pre_f} } } ) {
+        my $content = get_file( { file => $file } );
+        if ( @{$content} ) {
+          for my $host ( sort keys %{ $cfg->{$area}->{blklst} } ) {
             $t_count->{tests}++;
             my $re = qr{address=[/][.]{0,1}$host[/].*};
             is( $re ~~ @{$content},
               TRUE,
               qq{Checking "$area include" $host is in } . basename($file) )
-              or diag( qq{$crsr->{bright_red}}
+              or diag( qq{$c->{red}}
                 . qq{"$area include" $host not found in }
                 . basename($file)
-                . $crsr->{clear} ), $t_count->{failed}++;
+                . $c->{clr} ), $t_count->{failed}++;
           }
           $t_count->{tests}++;
           my $address = $area ne q{domains} ? q{address=/} : q{address=/.};
           my @includes = map { my $include = $_; qq{$address$include/$ip} }
-            @{ [ sort keys %{ $cfg_ref->{blacklist}->{$area}->{blklst} } ] };
+            @{ [ sort keys %{ $cfg->{$area}->{blklst} } ] };
           my $success = is(
             @includes ~~ @{$content},
             TRUE,
@@ -436,18 +324,18 @@ sub main {
           );
           if ( !$success ) {
             $t_count->{failed}++;
-            diag( qq{$crsr->{bright_red}}
+            diag( qq{$c->{red}}
                 . qq{"$area include" has additional entries in }
                 . basename($file)
-                . qq{ investigate the following entries:$crsr->{clear}} );
+                . qq{ investigate the following entries:$c->{clr}} );
             my $re_fqdn = qr{address=[/][.]{0,1}(.*)[/].*}o;
             my %found   = ();
             @found{ @{$content} } = ();
             delete @found{@includes};
-            my @ufo = keys %found;
+            my @ufo = sort keys %found;
             for my $alien (@ufo) {
               $alien =~ s/$re_fqdn/$1/ms;
-              say(qq{Found: $crsr->{bright_magenta}$alien$crsr->{clear}});
+              say(qq{Found: $c->{mag}$alien$c->{clr}});
             }
           }
         }
@@ -455,64 +343,6 @@ sub main {
     }
   }
   done_testing( $t_count->{tests} );
-}
-
-# pop array x times
-sub popx {
-  my $input = shift;
-  return if !$input->{X};
-  for ( 1 .. $input->{X} ) {
-    pop @{ $input->{array} };
-  }
-  return TRUE;
-}
-
-# Process a configuration file in memory after get_file() loads it
-sub process_cfg {
-  my $input = shift;
-  my $tmp_ref = get_nodes( { config_data => $input->{data} } );
-  my $configured
-    = (  $tmp_ref->{blacklist}->{domains}->{source}
-      || $tmp_ref->{blacklist}->{hosts}->{source}
-      || $tmp_ref->{blacklist}->{zones}->{source} ) ? TRUE : FALSE;
-
-  if ($configured) {
-    $input->{config}->{blacklist}->{dns_redirect_ip}
-      = $tmp_ref->{blacklist}->{q{dns-redirect-ip}} // q{0.0.0.0};
-    $input->{config}->{blacklist}->{disabled}
-      = $tmp_ref->{blacklist}->{disabled} eq q{false} ? FALSE : TRUE;
-    $input->{config}->{blacklist}->{exclude}
-      = exists $tmp_ref->{blacklist}->{exclude}
-      ? $tmp_ref->{blacklist}->{exclude}
-      : ();
-
-    for my $area (qw{hosts domains zones}) {
-      $input->{config}->{blacklist}->{$area}->{dns_redirect_ip}
-        = $input->{config}->{blacklist}->{dns_redirect_ip}
-        if !exists( $tmp_ref->{blacklist}->{$area}->{'dns-redirect-ip'} );
-
-      @{ $input->{config}->{blacklist}->{$area} }{qw(blklst exclude src)}
-        = @{ $tmp_ref->{blacklist}->{$area} }{qw(include exclude source)};
-
-      while ( my ( $key, $value )
-        = each %{ $tmp_ref->{blacklist}->{$area}->{exclude} } )
-      {
-        $input->{config}->{blacklist}->{$area}->{exclude}->{$key} = $value;
-      }
-    }
-    return TRUE;
-  }
-  return;
-}
-
-# push array x times
-sub pushx {
-  my $input = shift;
-  return if !$input->{X};
-  for ( 1 .. $input->{X} ) {
-    push @{ $input->{array} }, $input->{items};
-  }
-  return TRUE;
 }
 
 # Process command line options and print usage

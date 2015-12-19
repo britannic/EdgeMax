@@ -39,13 +39,13 @@ system
 install_menu () {
 	local IFS=' '
 	local PS3='Enter option number and hit return => '
-	local OPTIONS=('INSTALL' 'REMOVE' 'TEST' 'BACKUP' 'UTILITY' 'QUIT')
+	local OPTIONS=('INSTALL' 'REMOVE' 'TEST' 'BACKUP' 'PURGE' 'QUIT')
 	shopt -s checkwinsize
 	local COLUMNS=$(tput cols)
 
 while true;
 do
-	echo 'Would you like to INSTALL, REMOVE, TEST or BACKUP dnsmasq blacklist functionality (if previously installed)? Run UTILITY to clean up stale config sessions' | fold -s -w ${COLUMNS}
+	echo -ne "Would you like to INSTALL, REMOVE, TEST or BACKUP dnsmasq blacklist functionality (if previously installed)?\n\nRun PURGE to clean up stale config sessions.\n\n" | fold -s -w ${COLUMNS}
 	select CHOICE in ${OPTIONS[@]}; do
 		case ${REPLY} in
 			1)		clear console
@@ -82,7 +82,7 @@ do
 					then
 						RESULT=$(run show configuration commands | grep blacklist > /config/user-data/blacklist.cmds)
 						tput setaf 2
-						echo -ne "\ndnsmasq blacklist configuration backed up to /config/user-data/blacklist.cmds.\n\n"
+						echo -ne "\ndnsmasq blacklist configuration backed up to /config/user-data/blacklist.cmds\n\n"
 						tput setaf 7
 						echo -ne "To restore, run:\n\tconfigure\n\tsource /config/user-data/blacklist.cmds\n\tcommit\n\tsave\n\texit\n\n" | fold -s -w ${COLUMNS}
 					else
@@ -95,6 +95,7 @@ do
 			5)		clear console
 					sudo ./ubnt-cln-cfg-orphans.sh
 					break
+					;;
 			6|*)	return 0
 					;;
 		esac

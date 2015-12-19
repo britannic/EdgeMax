@@ -8,15 +8,24 @@
 use strict;
 use warnings;
 
-use Test::More tests => last_test_to_print;
-BEGIN { use_ok('EdgeOS::DNS::Blacklist') };
+use Test::More;
+BEGIN { use_ok('EdgeOS::DNS::Blacklist') }
 
 #########################
 
-use 5.14;
+use v5.14;
 use File::Basename;
 use Getopt::Long;
-use EdgeOS::DNS::Blacklist;
+use EdgeOS::DNS::Blacklist (
+  qw{get_file
+    get_hash
+    get_nodes
+    get_options
+    main
+    popx
+    process_cfg
+    pushx}
+);
 use constant TRUE  => 1;
 use constant FALSE => 0;
 
@@ -51,117 +60,6 @@ else {
   exit 1;
 }
 ############ exit #############
-
-# Read a file into memory and return the data to the calling function
-sub get_file {
-  my $input = shift;
-  my @data  = ();
-  if ( -f $input->{file} ) {
-    open my $CF, q{<}, $input->{file}
-      or die qq{error: Unable to open $input->{file}: $!};
-    chomp( @data = <$CF> );
-
-    close $CF;
-  }
-  return $input->{data} = \@data;
-}
-
-# Build hashes from the configuration file data (called by get_nodes())
-sub get_hash {
-  my $input    = shift;
-  my $hash     = \$input->{hash_ref};
-  my @nodes    = @{ $input->{nodes} };
-  my $value    = pop @nodes;
-  my $hash_ref = ${$hash};
-
-  for my $key (@nodes) {
-    $hash = \${$hash}->{$key};
-  }
-
-  ${$hash} = $value if $value;
-
-  return $hash_ref;
-}
-
-# Process a configure file and extract the blacklist data set
-sub get_nodes {
-  my $input = shift;
-  my ( @hasher, @nodes );
-  my $cfg_ref = {};
-  my $leaf    = 0;
-  my $level   = 0;
-  my $re      = {
-    BRKT => qr/[}]/o,
-    CMNT => qr/^(?<LCMT>[\/*]+).*(?<RCMT>[*\/]+)$/o,
-    DESC => qr/^(?<NAME>[\w-]+)\s"?(?<DESC>[^"]+)?"?$/o,
-    MPTY => qr/^$/o,
-    LEAF => qr/^(?<LEAF>[\w\-]+)\s(?<NAME>[\S]+)\s[{]{1}$/o,
-    LSPC => qr/\s+$/o,
-    MISC => qr/^(?<MISC>[\w-]+)$/o,
-    MULT => qr/^(?<MULT>(?:include|exclude)+)\s(?<VALU>[\S]+)$/o,
-    NAME => qr/^(?<NAME>[\w\-]+)\s(?<VALU>[\S]+)$/o,
-    NODE => qr/^(?<NODE>[\w-]+)\s[{]{1}$/o,
-    RSPC => qr/^\s+/o,
-  };
-
-LINE:
-  for my $line ( @{ $input->{config_data} } ) {
-    $line =~ s/$re->{LSPC}//;
-    $line =~ s/$re->{RSPC}//;
-
-    for ($line) {
-      when (/$re->{MULT}/) {
-        push @nodes, $+{MULT};
-        push @nodes, $+{VALU};
-        push @nodes, 1;
-        get_hash( { nodes => \@nodes, hash_ref => $cfg_ref } );
-        popx( { array => \@nodes, X => 3 } );
-      }
-      when (/$re->{NODE}/) {
-        push @nodes, $+{NODE};
-      }
-      when (/$re->{LEAF}/) {
-        $level++;
-        push @nodes, $+{LEAF};
-        push @nodes, $+{NAME};
-      }
-      when (/$re->{NAME}/) {
-        push @nodes, $+{NAME};
-        push @nodes, $+{VALU};
-        get_hash( { nodes => \@nodes, hash_ref => $cfg_ref } );
-        popx( { array => \@nodes, X => 2 } );
-      }
-      when (/$re->{DESC}/) {
-        push @nodes, $+{NAME};
-        push @nodes, $+{DESC};
-        get_hash( { nodes => \@nodes, hash_ref => $cfg_ref } );
-        popx( { array => \@nodes, X => 2 } );
-      }
-      when (/$re->{MISC}/) {
-        pushx( { array => \@nodes, items => \$+{MISC}, X => 2 } );
-        get_hash( { nodes => \@nodes, hash_ref => $cfg_ref } );
-        popx( { array => \@nodes, X => 2 } );
-      }
-      when (/$re->{CMNT}/) {
-        next;
-      }
-      when (/$re->{BRKT}/) {
-        pop @nodes;
-        if ( $level > 0 ) {
-          pop @nodes;
-          $level--;
-        }
-      }
-      when (/$re->{MPTY}/) {
-        next LINE;
-      }
-      default {
-        printf q{Parse error: "%s"}, $line;
-      }
-    }
-  }
-  return $cfg_ref->{service}->{dns}->{forwarding};
-}
 
 # Set up command line options
 sub get_options {
@@ -218,8 +116,7 @@ sub main {
   {
     $t_count->{tests} += 4;
     is( -f $cfg_ref->{updatescript},
-      TRUE,
-      q{Checking } . basename( $cfg_ref->{updatescript} ) . q{ exists} )
+      TRUE, q{Checking } . basename( $cfg_ref->{updatescript} ) . q{ exists} )
       or diag( qq{$c->{red}}
         . basename( $cfg_ref->{updatescript} )
         . qq{ found - investigate!}
@@ -248,8 +145,7 @@ sub main {
   {
     $t_count->{tests} += 4;
     is( -f $cfg_ref->{updatescript},
-      TRUE,
-      q{Checking } . basename( $cfg_ref->{updatescript} ) . q{ exists} )
+      TRUE, q{Checking } . basename( $cfg_ref->{updatescript} ) . q{ exists} )
       or diag( qq{$c->{red}}
         . basename( $cfg_ref->{updatescript} )
         . qq{ found - investigate!}
@@ -431,64 +327,6 @@ sub main {
     }
   }
   done_testing( $t_count->{tests} );
-}
-
-# pop array x times
-sub popx {
-  my $input = shift;
-  return if !$input->{X};
-  for ( 1 .. $input->{X} ) {
-    pop @{ $input->{array} };
-  }
-  return TRUE;
-}
-
-# Process a configuration file in memory after get_file() loads it
-sub process_cfg {
-  my $input = shift;
-  my $tmp_ref = get_nodes( { config_data => $input->{data} } );
-  my $configured
-    = (  $tmp_ref->{blacklist}->{domains}->{source}
-      || $tmp_ref->{blacklist}->{hosts}->{source}
-      || $tmp_ref->{blacklist}->{zones}->{source} ) ? TRUE : FALSE;
-
-  if ($configured) {
-    $input->{config}->{blacklist}->{dns_redirect_ip}
-      = $tmp_ref->{blacklist}->{q{dns-redirect-ip}} // q{0.0.0.0};
-    $input->{config}->{blacklist}->{disabled}
-      = $tmp_ref->{blacklist}->{disabled} eq q{false} ? FALSE : TRUE;
-    $input->{config}->{blacklist}->{exclude}
-      = exists $tmp_ref->{blacklist}->{exclude}
-      ? $tmp_ref->{blacklist}->{exclude}
-      : ();
-
-    for my $area (qw{hosts domains zones}) {
-      $input->{config}->{blacklist}->{$area}->{dns_redirect_ip}
-        = $input->{config}->{blacklist}->{dns_redirect_ip}
-        if !exists( $tmp_ref->{blacklist}->{$area}->{'dns-redirect-ip'} );
-
-      @{ $input->{config}->{blacklist}->{$area} }{qw(blklst exclude src)}
-        = @{ $tmp_ref->{blacklist}->{$area} }{qw(include exclude source)};
-
-      while ( my ( $key, $value )
-        = each %{ $tmp_ref->{blacklist}->{$area}->{exclude} } )
-      {
-        $input->{config}->{blacklist}->{$area}->{exclude}->{$key} = $value;
-      }
-    }
-    return TRUE;
-  }
-  return;
-}
-
-# push array x times
-sub pushx {
-  my $input = shift;
-  return if !$input->{X};
-  for ( 1 .. $input->{X} ) {
-    push @{ $input->{array} }, $input->{items};
-  }
-  return TRUE;
 }
 
 # Process command line options and print usage

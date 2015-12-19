@@ -1,5 +1,4 @@
 package EdgeOS::DNS::Blacklist;
-use parent 'Exporter'; # imports and subclasses Exporter
 
 use v5.14;
 use EdgeOS::DNS::Blacklist;
@@ -10,15 +9,13 @@ use lib q{/opt/vyatta/share/perl5/};
 use POSIX qw{geteuid};
 use strict;
 use Sys::Syslog qw(:standard :macros);
+use Term::ReadKey qw(GetTerminalSize);
 use threads;
 use URI;
 use Vyatta::Config;
 use warnings;
 
-use constant TRUE  => 1;
-use constant FALSE => 0;
-
-# require Exporter;
+require Exporter;
 
 our @ISA = qw(Exporter);
 
@@ -32,16 +29,13 @@ our @ISA = qw(Exporter);
 # our %EXPORT_TAGS = ( 'all' => [qw()] );
 our @EXPORT_OK = (
   qw{
-    $c
     delete_file
     get_cfg_actv
     get_cfg_file
     get_file
     get_url
     is_admin
-    is_build
     is_configure
-    is_version
     log_msg
     popx
     process_data
@@ -50,8 +44,11 @@ our @EXPORT_OK = (
     write_file
     }
 );
-our $VERSION = q{1.0};
-our $c       = {
+our @EXPORT  = ();
+our $VERSION = '1.01';
+
+# Preloaded methods go here.
+our $c = {
   off => qq{\033[?25l},
   on  => qq{\033[?25h},
   clr => qq{\033[0m},
@@ -59,7 +56,6 @@ our $c       = {
   mag => qq{\033[95m},
   red => qq{\033[91m},
 };
-our @EXPORT  = ();
 
 # Process the active (not committed or saved) configuration
 sub get_cfg_actv {
@@ -129,7 +125,7 @@ sub get_cfg_actv {
     }
   }
   else {
-    $input->{show} = TRUE;
+    $show = TRUE;
     log_msg(
       {
         msg_typ => q{error},
@@ -144,7 +140,7 @@ sub get_cfg_actv {
     && ( !scalar keys %{ $input->{config}->{hosts}->{src} } )
     && ( !scalar keys %{ $input->{config}->{zones}->{src} } ) )
   {
-    $input->{show} = TRUE;
+    $show = TRUE;
     log_msg(
       {
         msg_ref => q{error},
@@ -160,7 +156,7 @@ sub get_cfg_actv {
 sub get_cfg_file {
   my $input = shift;
   my $tmp_ref
-    = get_nodes( { config_data => get_file( { file => $input->{file} } ) } );
+    = get_nodes( { config_data => get_file( { file => $cfg_file } ) } );
   my $configured
     = (  $tmp_ref->{domains}->{source}
       || $tmp_ref->{hosts}->{source}
@@ -371,57 +367,21 @@ sub get_url {
   }
 }
 
-# Make sure script runs as root
-sub is_admin {
-  return TRUE if geteuid() == 0;
-  return;
-}
-
-# Get build #
-sub is_build {
-  my $input = is_version();
-
-  # v1.2.0: build 4574253
-  # v1.4.1: build 4648309
-  # v1.5.0: build 4677648
-  # v1.6.0: build 4716006
-  # v1.7.0: build 4783374
-
-  if ( $input->{build} >= 4783374 )    # script tested on os v1.7.0 & above
-  {
-    return TRUE;
-  }
-  elsif ( $input->{build} < 4783374 )    # os must be upgraded
-  {
-    return;
-  }
-}
-
 # Check to see if we are being run under configure
 sub is_configure {
   qx{/bin/cli-shell-api inSession};
   return $? >> 8 != 0 ? FALSE : TRUE;
 }
 
-# get EdgeOS version
-sub is_version {
-  my ( $build, $version ) = ( q{UNKNOWN BUILD}, q{UNKNOWN VERSION} );
-  my $cmd = qq{cat /opt/vyatta/etc/version};
-  chomp( my $edgeOS = qx{$cmd} );
-
-  if ( $edgeOS =~ m/^Version/ ) {
-    if ( $edgeOS =~ s{^Version:\s*(?<VERSION>.*)$}{$+{VERSION}}xms ) {
-      my @ver = split /\./, $edgeOS;
-      $version = join ".", @ver[ 0, 1, 2 ];
-      $build = $ver[3];
-    }
-  }
-  return { version => $version, build => $build };
+# Make sure script runs as root
+sub is_admin {
+  return TRUE if geteuid() == 0;
+  return;
 }
 
 # Log and print (if -v)
 sub log_msg {
-  my $input = shift;
+  my $msg_ref = shift;
   my $log_msg = {
     alert    => LOG_ALERT,
     critical => LOG_CRIT,
@@ -431,20 +391,20 @@ sub log_msg {
     warning  => LOG_WARNING,
   };
 
-  return unless ( length $input->{msg_typ} . $input->{msg_str} > 2 );
+  return unless ( length $msg_ref->{msg_typ} . $msg_ref->{msg_str} > 2 );
 
-  syslog( $log_msg->{ $input->{msg_typ} },
-    qq{$input->{msg_typ}: } . $input->{msg_str} );
+  syslog( $log_msg->{ $msg_ref->{msg_typ} },
+    qq{$msg_ref->{msg_typ}: } . $msg_ref->{msg_str} );
 
-  print $c->{off}, qq{\r}, q{ } x $input->{cols}, qq{\r} if $input->{show};
+  print $c->{off}, qq{\r}, q{ } x $cols, qq{\r} if $show;
 
-  if ( $input->{msg_typ} eq q{info} ) {
-    print $c->{off}, qq{$input->{msg_typ}: $input->{msg_str}} if $input->{show};
+  if ( $msg_ref->{msg_typ} eq q{info} ) {
+    print $c->{off}, qq{$msg_ref->{msg_typ}: $msg_ref->{msg_str}} if $show;
   }
   else {
     print STDERR $c->{off}, $c->{red},
-      qq{$input->{msg_typ}: $input->{msg_str}$c->{clr}}
-      if $input->{show};
+      qq{$msg_ref->{msg_typ}: $msg_ref->{msg_str}$c->{clr}}
+      if $show;
   }
 
   return TRUE;
@@ -461,7 +421,7 @@ sub popx {
 }
 
 # Crunch the data and throw out anything we don't need
-sub process_data {
+sub process_cfg {
   my $input = shift;
   my $re    = {
     FQDOMN =>
@@ -473,7 +433,7 @@ sub process_data {
   };
 
   # Clear the status lines
-  print $c->{off}, qq{\r}, qq{ } x $input->{cols}, qq{\r} if $input->{show};
+  print $c->{off}, qq{\r}, qq{ } x $cols, qq{\r} if $show;
 
 # Process the lines we've been given
 LINE:
@@ -534,7 +494,7 @@ LINE:
       $input->{config}->{ $input->{area} }->{type},
       @{ $input->{config}->{ $input->{area} }->{src}->{ $input->{src} } }
       { q{duplicates}, q{records} }
-      if $input->{show};
+      if $show;
   }
 
   if (
@@ -566,6 +526,45 @@ sub pushx {
     push @{ $input->{array} }, $input->{items};
   }
   return TRUE;
+}
+
+# Process command line options and print usage
+sub usage {
+  my $input    = shift;
+  my $progname = basename($0);
+  my $usage    = {
+    cfg_file => sub {
+      my $exitcode = shift;
+      print STDERR
+        qq{$cfg_file not found, check path and file name is correct\n};
+      exit $exitcode;
+    },
+    help => sub {
+      my $exitcode = shift;
+      local $, = qq{\n};
+      print STDERR @_;
+      print STDERR qq{usage: $progname <options>\n};
+      print STDERR q{options:},
+        map( q{ } x 4 . $_->[0],
+        sort { $a->[1] cmp $b->[1] } grep $_->[0] ne q{},
+        @{ get_options( { option => TRUE } ) } ),
+        qq{\n};
+      $exitcode == 9 ? return TRUE : exit $exitcode;
+    },
+    sudo => sub {
+      my $exitcode = shift;
+      print STDERR qq{This script must be run as root, use: sudo $0.\n};
+      exit $exitcode;
+    },
+    version => sub {
+      my $exitcode = shift;
+      printf STDERR qq{%s version: %s\n}, $progname, $version;
+      exit $exitcode;
+    },
+  };
+
+  # Process option argument
+  $usage->{ $input->{option} }->( $input->{exit_code} );
 }
 
 # Write the data to file
