@@ -8,12 +8,10 @@ use Getopt::Long;
 use HTTP::Tiny;
 use lib q{/opt/vyatta/share/perl5/};
 use POSIX qw{geteuid};
-use strict;
 use Sys::Syslog qw(:standard :macros);
 use threads;
 use URI;
 use Vyatta::Config;
-use warnings;
 
 use constant TRUE  => 1;
 use constant FALSE => 0;

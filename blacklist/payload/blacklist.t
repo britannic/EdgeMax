@@ -15,13 +15,39 @@
 # look ups to alternative IPs (blackholes, pixel servers etc.)
 #
 # **** End License ****
-
-use File::Basename;
 use feature qw{switch};
-use Getopt::Long;
 use lib q{/opt/vyatta/share/perl5/};
-use lib q{./lib/};
 use Test::More;
+
+note("Testing dnsmasq blacklist configuration");
+
+my $t_count = { tests => 22, failed => 0 };
+
+# Check all the required modules can be loaded
+use_ok(q{POSIX}) or $tcount->{failed}++;
+require_ok(q{POSIX}) or $tcount->{failed}++;
+use_ok(q{HTTP::Tiny}) or $tcount->{failed}++;
+require_ok(q{HTTP::Tiny}) or $tcount->{failed}++;
+use_ok(q{IO::Select}) or $tcount->{failed}++;
+require_ok(q{IO::Select}) or $tcount->{failed}++;
+use_ok(q{IPC::Open3}) or $tcount->{failed}++;
+require_ok(q{IPC::Open3}) or $tcount->{failed}++;
+use_ok(q{Term::ReadKey}) or $tcount->{failed}++;
+require_ok(q{Term::ReadKey}) or $tcount->{failed}++;
+use_ok(q{Sys::Syslog}) or $tcount->{failed}++;
+require_ok(q{Sys::Syslog}) or $tcount->{failed}++;
+use_ok(q{threads}) or $tcount->{failed}++;
+require_ok(q{threads}) or $tcount->{failed}++;
+use_ok(q{File::Basename}) or $tcount->{failed}++;
+require_ok(q{File::Basename}) or $tcount->{failed}++;
+use_ok(q{Getopt::Long}) or $tcount->{failed}++;
+require_ok(q{Getopt::Long}) or $tcount->{failed}++;
+use_ok(EdgeOS::DNS::Blacklist) or $tcount->{failed}++;
+require_ok( q{EdgeOS::DNS::Blacklist} ) or $tcount->{failed}++;
+use_ok(q{Vyatta::Config}) or $tcount->{failed}++;
+require_ok(q{Vyatta::Config}) or $tcount->{failed}++;
+use v5.14;
+
 use EdgeOS::DNS::Blacklist (
   qw{
     $c
@@ -35,13 +61,10 @@ use EdgeOS::DNS::Blacklist (
     pushx
     }
 );
-use v5.14;
 
 use constant TRUE  => 1;
 use constant FALSE => 0;
-
 my $version = q{1.1};
-my $t_count = { tests => 0, failed => 0 };
 my ( $blacklist_removed, $cfg_file );
 
 ########## Run main ###########
@@ -108,8 +131,6 @@ sub main {
 
   usage( { option => q{cfg_file}, exit_code => 1 } )
     if defined $cfg_file && !-f $cfg_file;
-
-  note("Testing dnsmasq blacklist configuration");
 
   # Now choose which data set will define the configuration
   my $success
