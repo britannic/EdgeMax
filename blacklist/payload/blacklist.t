@@ -17,6 +17,7 @@
 # **** End License ****
 use feature qw{switch};
 use lib q{/opt/vyatta/share/perl5/};
+use Socket;
 use Test::More;
 
 note("Testing dnsmasq blacklist configuration");
@@ -24,28 +25,28 @@ note("Testing dnsmasq blacklist configuration");
 my $t_count = { tests => 22, failed => 0 };
 
 # Check all the required modules can be loaded
-use_ok(q{POSIX}) or $tcount->{failed}++;
-require_ok(q{POSIX}) or $tcount->{failed}++;
-use_ok(q{HTTP::Tiny}) or $tcount->{failed}++;
-require_ok(q{HTTP::Tiny}) or $tcount->{failed}++;
-use_ok(q{IO::Select}) or $tcount->{failed}++;
-require_ok(q{IO::Select}) or $tcount->{failed}++;
-use_ok(q{IPC::Open3}) or $tcount->{failed}++;
-require_ok(q{IPC::Open3}) or $tcount->{failed}++;
-use_ok(q{Term::ReadKey}) or $tcount->{failed}++;
-require_ok(q{Term::ReadKey}) or $tcount->{failed}++;
-use_ok(q{Sys::Syslog}) or $tcount->{failed}++;
-require_ok(q{Sys::Syslog}) or $tcount->{failed}++;
-use_ok(q{threads}) or $tcount->{failed}++;
-require_ok(q{threads}) or $tcount->{failed}++;
-use_ok(q{File::Basename}) or $tcount->{failed}++;
-require_ok(q{File::Basename}) or $tcount->{failed}++;
-use_ok(q{Getopt::Long}) or $tcount->{failed}++;
-require_ok(q{Getopt::Long}) or $tcount->{failed}++;
-use_ok(EdgeOS::DNS::Blacklist) or $tcount->{failed}++;
-require_ok( q{EdgeOS::DNS::Blacklist} ) or $tcount->{failed}++;
-use_ok(q{Vyatta::Config}) or $tcount->{failed}++;
-require_ok(q{Vyatta::Config}) or $tcount->{failed}++;
+use_ok(q{POSIX})                      or $tcount->{failed}++;
+require_ok(q{POSIX})                  or $tcount->{failed}++;
+use_ok(q{HTTP::Tiny})                 or $tcount->{failed}++;
+require_ok(q{HTTP::Tiny})             or $tcount->{failed}++;
+use_ok(q{IO::Select})                 or $tcount->{failed}++;
+require_ok(q{IO::Select})             or $tcount->{failed}++;
+use_ok(q{IPC::Open3})                 or $tcount->{failed}++;
+require_ok(q{IPC::Open3})             or $tcount->{failed}++;
+use_ok(q{Term::ReadKey})              or $tcount->{failed}++;
+require_ok(q{Term::ReadKey})          or $tcount->{failed}++;
+use_ok(q{Sys::Syslog})                or $tcount->{failed}++;
+require_ok(q{Sys::Syslog})            or $tcount->{failed}++;
+use_ok(q{threads})                    or $tcount->{failed}++;
+require_ok(q{threads})                or $tcount->{failed}++;
+use_ok(q{File::Basename})             or $tcount->{failed}++;
+require_ok(q{File::Basename})         or $tcount->{failed}++;
+use_ok(q{Getopt::Long})               or $tcount->{failed}++;
+require_ok(q{Getopt::Long})           or $tcount->{failed}++;
+use_ok(EdgeOS::DNS::Blacklist)        or $tcount->{failed}++;
+require_ok(q{EdgeOS::DNS::Blacklist}) or $tcount->{failed}++;
+use_ok(q{Vyatta::Config})             or $tcount->{failed}++;
+require_ok(q{Vyatta::Config})         or $tcount->{failed}++;
 use v5.14;
 
 use EdgeOS::DNS::Blacklist (
@@ -256,12 +257,14 @@ sub main {
   for my $area (@areas) {
     my @files;
     my $ip = $cfg->{$area}->{dns_redirect_ip};
+
     if ( exists $cfg->{$area}->{src} ) {
       for my $source ( sort keys %{ $cfg->{$area}->{src} } ) {
-        push @files, [$source, qq{$cfg->{dnsmasq_dir}/$area.$source.blacklist.conf}];
+        push @files,
+          [ $source, qq{$cfg->{dnsmasq_dir}/$area.$source.blacklist.conf} ];
       }
       for my $f_ref (@files) {
-        my ($source, $file) = @{$f_ref};
+        my ( $source, $file ) = @{$f_ref};
         $t_count->{tests}++;
         is( -f $file, TRUE, qq{Checking $source has a file} )
           or diag( qq{$c->{red}}
@@ -272,7 +275,7 @@ sub main {
 
       # Test global and area exclusions
       for my $f_ref (@files) {
-        my ($source, $file) = @{$f_ref};
+        my ( $source, $file ) = @{$f_ref};
         my $content = get_file( { file => $file } );
         if ( @{$content} ) {
           for my $host ( sort keys %{ $cfg->{exclude} } ) {
@@ -324,8 +327,7 @@ sub main {
           for my $host ( sort keys %{ $cfg->{$area}->{blklst} } ) {
             $t_count->{tests}++;
             my $re = qr{address=[/][.]{0,1}$host[/].*};
-            is( $re ~~ @{$content},
-              TRUE,
+            is( $re ~~ @{$content}, TRUE,
               qq{Checking "$area include" $host is in } . basename($file) )
               or diag( qq{$c->{red}}
                 . qq{"$area include" $host not found in }
@@ -335,7 +337,7 @@ sub main {
           $t_count->{tests}++;
           my $address = $area ne q{domains} ? q{address=/} : q{address=/.};
           my @includes = map { my $include = $_; qq{$address$include/$ip} }
-            @{ [ sort keys %{ $cfg->{$area}->{blklst} } ] };
+            sort keys %{ $cfg->{$area}->{blklst} };
           my $success = is(
             @includes ~~ @{$content},
             TRUE,
@@ -361,6 +363,22 @@ sub main {
           }
         }
       }
+    }
+  }
+HOST:
+  for my $area (@areas) {
+    my $ip = $cfg->{$area}->{dns_redirect_ip};
+
+    for my $host ( sort keys %{ $cfg->{$area}->{blklst} } ) {
+      $host = q{www.} . $host if $area eq q{domains};
+      my $resolved_ip = inet_ntoa(inet_aton($host)) or next HOST;
+      $t_count->{tests}++;
+      ok( $ip eq $resolved_ip,
+        qq{Checking $host is redirected by dnsmasq to $ip} )
+        or diag( qq{$c->{red}}
+          . qq{dnsmasq replied with $host = $ip, should have redirected }
+          . $resolved_ip . q{!}
+          . $c->{clr} ), $t_count->{failed}++;
     }
   }
   done_testing( $t_count->{tests} );
