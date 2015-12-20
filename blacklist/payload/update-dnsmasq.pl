@@ -117,8 +117,7 @@ sub main {
   get_options() || usage( { option => q{help}, exit_code => 1 } );
 
   # Find reasons to quit
-  # If the no_op file exists, exit.
-  exit 0 if ( -f $cfg->{no_op} );
+  exit 0 if ( -f $cfg->{no_op} );    # If the no_op file exists, exit.
 
   usage( { option => q{sudo}, exit_code => 1 } ) if not is_admin();
   usage( { option => q{cfg_file}, exit_code => 1 } )
@@ -150,8 +149,8 @@ sub main {
   if ( !$cfg->{disabled} ) {
     my @areas = ();
 
-    # Add areas to process only if they contain sources
-    for my $area (qw{domains zones hosts}) {
+    # Add areas to process only if they contain sources and copy global excludes
+    for my $area (qw{domains hosts zones}) {
       push @areas, $area if scalar keys %{ $cfg->{$area}->{src} };
     }
 
@@ -161,6 +160,9 @@ sub main {
       my ( $prefix, @threads );
       my $max_thrds = 8;
       my @sources   = keys %{ $cfg->{$area}->{src} };
+      while ( my ( $key, $value ) = each %{ $cfg->{exclude} } ) {
+        $cfg->{$area}->{exclude}->{$key} = $value;
+      }
       $cfg->{$area}->{icount} = scalar keys %{ $cfg->{$area}->{blklst} } // 0;
       @{ $cfg->{$area} }{ q{records}, q{unique} }
         = @{ $cfg->{$area} }{ q{icount}, q{icount} };

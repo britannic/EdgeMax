@@ -129,10 +129,6 @@ sub get_cfg_actv {
         $input->{config}->{$area}->{blklst}->{$key} = 1;
       }
 
-      while ( my ( $key, $value ) = each $input->{config}->{exclude} ) {
-        $input->{config}->{$area}->{exclude}->{$key} = $value;
-      }
-
       for my $key ( $config->$returnValues(q{exclude}) ) {
         $input->{config}->{$area}->{exclude}->{$key} = 1;
       }
@@ -207,9 +203,6 @@ sub get_cfg_file {
       @{ $input->{config}->{$area} }{qw(blklst exclude src)}
         = @{ $tmp_ref->{$area} }{qw(include exclude source)};
 
-      while ( my ( $key, $value ) = each %{ $tmp_ref->{exclude} } ) {
-        $input->{config}->{$area}->{exclude}->{$key} = $value;
-      }
     }
   }
   else {

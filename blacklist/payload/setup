@@ -285,9 +285,12 @@ sub get_blacklist {
   if ($success) {
     my @areas = ();
 
-    # Add areas to process only if they contain sources
-    for my $area (qw{domains zones hosts}) {
+    # Add areas to process only if they contain sources and copy global excludes
+    for my $area (qw{domains hosts zones}) {
       push @areas, $area if scalar keys %{ $cfg->{$area}->{src} };
+      while ( my ( $key, $value ) = each %{ $cfg->{exclude} } ) {
+        $cfg->{config}->{$area}->{exclude}->{$key} = $value;
+      }
     }
 
     # Process each area

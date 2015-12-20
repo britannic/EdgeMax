@@ -1,17 +1,13 @@
 #!/usr/bin/env perl
 
 use v5.14;
+use EdgeOS::DNS::Blacklist (qw{ get_cfg_actv });
+use JSON::PP qw(decode_json encode_json);
 use lib q(/opt/vyatta/share/perl5/);
-use JSON qw(decode_json);
-
-# use Data::Dumper;
-use Vyatta::Config;
 
 my $version = 1.1;
 my $action  = $ARGV[0];
 my $file    = $ARGV[1];
-my $cfg_lvl = q(service dns forwarding);
-my $config  = new Vyatta::Config;
 my $name    = q(dnsmasq blacklist);
 my $begin   = q{/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper begin};
 my $commit  = q{/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper commit};
@@ -21,8 +17,8 @@ my $save    = q{/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper save};
 my $set     = q{/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper set};
 
 sub apply {
-  my $json_data = get_file( { file = $file } );
-  my $web = decode_json($json_data);
+  my $json_data     = get_file( { file => $file } );
+  my $web           = decode_json($json_data);
   my $black_hole_ip = $web->{blackholeip};
   my $enable        = $web->{enable};
   my @sources       = @{ $web->{sources} };
@@ -81,10 +77,10 @@ sub apply {
   open( STDERR, q(>&STDERR_ORIG) );
 
   if ( !$err ) {
-    print(q({"success":"1"}));
+    print encode_json({success => 1,});
   }
   else {
-    print( q({"success":"0", "error":") . qx(cat $temp) . q("}) );
+    print encode_json({success => 0, error => qx(cat $temp),});
   }
   close(STDOUT_ORIG);
   close(STDERR_ORIG);
@@ -104,101 +100,20 @@ sub get_file {
   return @data;
 }
 
-sub isblacklist {
-  my $blklst_exists;
-  my $bool = 0;
-
-  $config->setLevel($cfg_lvl);
-  $blklst_exists = $config->exists("blacklist");
-
-  if ( defined($blklst_exists) ) {
-    $bool = 1;
-  }
-  else {
-    $bool = 0;
-  }
-  return $bool;
-}
-
 sub load {
-  if (isblacklist) {
-    $config->setLevel("$cfg_lvl blacklist");
-    my @includes      = $config->returnValues('include');
-    my @excludes      = $config->returnValues('exclude');
-    my @sources       = $config->listNodes('source');
-    my $black_hole_ip = $config->returnValue('blackhole') // '0.0.0.0';
-    my $enable        = $config->returnValue('disabled');
+  my $cfg = { success => 1, data => {}, };
+  my $blacklist = get_cfg_actv( { config => $cfg->{data}, show => 0 } );
 
-    given ($enable) {
-      when (/true/)  { $enable = q(); }
-      when (/false/) { $enable = q(enable); }
-    }
-
-    my $includes = q("includes":[);
-    my $excludes = q("excludes":[);
-    my $sources  = q("sources":[);
-
-    if (@includes) {
-      for my $i ( 0 .. @includes ) {
-        $includes .= q({"include":") . $includes[$i] . q("},);
-      }
-      $includes .= q({"include":") . $includes[$i] if $includes[$i];
-    }
-    $includes .= q("}]);
-
-    if (@excludes) {
-      for my $i ( 0 .. @excludes ) {
-        $excludes .= q({"exclude":") . $excludes[$i] . q("},);
-      }
-      $excludes .= q({"exclude":") . $excludes[$i] if $excludes[$i];
-    }
-    $excludes .= q("}]);
-
-    $cfg_lvl .= q( blacklist);
-
-    if (@sources) {
-      for my $i ( 0 .. @sources ) {
-        $config->setLevel(qq($cfg_lvl source $sources[ $i ]));
-        my $prefix = $config->returnValue(prefix);
-        $prefix = q(None) if !$prefix;
-
-        $sources
-          .= q({"source":")
-          . $sources[$i]
-          . q(","prefix":")
-          . qq($prefix)
-          . q(","url":")
-          . $config->returnValue(url) . q("},);
-      }
-      $config->setLevel(qq($cfg_lvl source $sources[ $i ]));
-      my $prefix = $config->returnValue(prefix);
-      $prefix = q(None) if !$prefix;
-
-      $sources
-        .= q({"source":")
-        . $sources[$i]
-        . q(","prefix":")
-        . qq($prefix)
-        . q(","url":")
-        . $config->returnValue('url')
-        if $sources[$i];
-    }
-    $sources .= q("}]);
-
-    print q({"success":"1","data":{"enable":")
-      . $enable
-      . q(","blackholeip":")
-      . $black_hole_ip . q(",)
-      . $sources . q(,)
-      . $includes . ','
-      . $excludes . '}}';
+  if ($blacklist) {
+    print encode_json($cfg);
   }
   else {
-    print q("{"success":"0","error":"ADBlock not installed!""}");
+    print encode_json({success => 0, error => qq($name not installed!),});
   }
 }
 
 sub remove {
+
 # Save filehandles for STDOUT and STDERR
   open( STDOUT_ORIG, q(>&STDOUT) );
   open( STDERR_ORIG, q(&STDERR) );
@@ -213,7 +128,7 @@ sub remove {
   my $remove_blacklist
     = join( q{;}, $begin, qq{$delete $cfg_lvl}, $commit, $save, $end );
   my $output = system($remove_blacklist);
-  my $err = $?;
+  my $err    = $?;
 
   close(STDOUT);
   close(STDERR);
@@ -221,11 +136,12 @@ sub remove {
   open( STDERR, q{>&STDERR_ORIG} );
 
   if ( !$err ) {
-    print(q({"success":"1"}));
+    print encode_json({success => 1,});
   }
   else {
-    print( q({"success":"0", "error":") . qx(cat $temp) . q("}) );
+    print encode_json({success => 0, error => qx(cat $temp),});
   }
+
   close(STDOUT_ORIG);
   close(STDERR_ORIG);
   unlink($temp);
