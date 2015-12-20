@@ -1,0 +1,240 @@
+#!/usr/bin/env perl
+
+use v5.14;
+use lib q(/opt/vyatta/share/perl5/);
+use JSON qw(decode_json);
+
+# use Data::Dumper;
+use Vyatta::Config;
+
+my $version = 1.1;
+my $action  = $ARGV[0];
+my $file    = $ARGV[1];
+my $cfg_lvl = q(service dns forwarding);
+my $config  = new Vyatta::Config;
+my $name    = q(dnsmasq blacklist);
+my $begin   = q{/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper begin};
+my $commit  = q{/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper commit};
+my $delete  = q{/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper delete};
+my $end     = q{/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper end};
+my $save    = q{/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper save};
+my $set     = q{/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper set};
+
+sub apply {
+  my $json_data = get_file( { file = $file } );
+  my $web = decode_json($json_data);
+  my $black_hole_ip = $web->{blackholeip};
+  my $enable        = $web->{enable};
+  my @sources       = @{ $web->{sources} };
+  my @excludes      = @{ $web->{excludes} };
+  my @includes      = @{ $web->{includes} };
+
+  my $disabled = ( $enable eq q(enable) ) ? q(false) : q(true);
+  $cfg_lvl .= q( blacklist);
+
+  my @apply_blacklist = ( qq($begin), qq($delete $cfg_lvl),
+    qq($set $cfg_lvl disabled $disabled) );
+
+  push( @apply_blacklist, qq($set $cfg_lvl blackhole $black_hole_ip) );
+
+  for my $source (@sources) {
+    my $prefix
+      = ( $source->{prefix} eq 'None' )
+      ? q("")
+      : q(') . $source->{prefix} . q(');
+    push( @apply_blacklist,
+          qq($set $cfg_lvl source $source->{source} url ')
+        . $source->{url}
+        . q(') );
+    push( @apply_blacklist,
+      qq($set $cfg_lvl source $source->{source} prefix $prefix) );
+  }
+
+  for my $exclude (@excludes) {
+    push( @apply_blacklist, qq($set $cfg_lvl exclude $exclude->{exclude}) );
+  }
+
+  for my $include (@includes) {
+    push( @apply_blacklist, qq($set $cfg_lvl include $include->{include}) );
+  }
+
+  push( @apply_blacklist, ( $commit, $save, $end ) );
+
+  @apply_blacklist = map { $_ . q(;) } @apply_blacklist;
+
+# Save filehandles for STDOUT and STDERR
+  open( STDOUT_ORIG, q(>&STDOUT) );
+  open( STDERR_ORIG, q(>&STDERR) );
+
+# Set new filehandles for STDOUT and STDERR
+  my $temp = qq(/tmp/error.$$);
+  open( STDOUT, q(>), $temp ) or die qq($0: cannot open STDOUT: $!);
+  open( STDERR, q(>&STDOUT) ) or die qq($0: cannot open STDERR: $!);
+  print(qq(### Errors reported by $0 version $version ###\n));
+
+  my $output = system(qq(@apply_blacklist));
+  my $err    = $?;
+
+  close(STDOUT);
+  close(STDERR);
+  open( STDOUT, q(>&STDOUT_ORIG) );
+  open( STDERR, q(>&STDERR_ORIG) );
+
+  if ( !$err ) {
+    print(q({"success":"1"}));
+  }
+  else {
+    print( q({"success":"0", "error":") . qx(cat $temp) . q("}) );
+  }
+  close(STDOUT_ORIG);
+  close(STDERR_ORIG);
+  unlink($temp);
+}
+
+# Read a file into memory and return the data to the calling function
+sub get_file {
+  my $input = shift;
+  my @data  = ();
+  if ( -f $input->{file} ) {
+    open my $CF, q{<}, $input->{file}
+      or die qq{error: Unable to open $input->{file}: $!};
+    chomp( @data = <$CF> );
+    close $CF;
+  }
+  return @data;
+}
+
+sub isblacklist {
+  my $blklst_exists;
+  my $bool = 0;
+
+  $config->setLevel($cfg_lvl);
+  $blklst_exists = $config->exists("blacklist");
+
+  if ( defined($blklst_exists) ) {
+    $bool = 1;
+  }
+  else {
+    $bool = 0;
+  }
+  return $bool;
+}
+
+sub load {
+  if (isblacklist) {
+    $config->setLevel("$cfg_lvl blacklist");
+    my @includes      = $config->returnValues('include');
+    my @excludes      = $config->returnValues('exclude');
+    my @sources       = $config->listNodes('source');
+    my $black_hole_ip = $config->returnValue('blackhole') // '0.0.0.0';
+    my $enable        = $config->returnValue('disabled');
+
+    given ($enable) {
+      when (/true/)  { $enable = q(); }
+      when (/false/) { $enable = q(enable); }
+    }
+
+    my $includes = q("includes":[);
+    my $excludes = q("excludes":[);
+    my $sources  = q("sources":[);
+
+    if (@includes) {
+      for my $i ( 0 .. @includes ) {
+        $includes .= q({"include":") . $includes[$i] . q("},);
+      }
+      $includes .= q({"include":") . $includes[$i] if $includes[$i];
+    }
+    $includes .= q("}]);
+
+    if (@excludes) {
+      for my $i ( 0 .. @excludes ) {
+        $excludes .= q({"exclude":") . $excludes[$i] . q("},);
+      }
+      $excludes .= q({"exclude":") . $excludes[$i] if $excludes[$i];
+    }
+    $excludes .= q("}]);
+
+    $cfg_lvl .= q( blacklist);
+
+    if (@sources) {
+      for my $i ( 0 .. @sources ) {
+        $config->setLevel(qq($cfg_lvl source $sources[ $i ]));
+        my $prefix = $config->returnValue(prefix);
+        $prefix = q(None) if !$prefix;
+
+        $sources
+          .= q({"source":")
+          . $sources[$i]
+          . q(","prefix":")
+          . qq($prefix)
+          . q(","url":")
+          . $config->returnValue(url) . q("},);
+      }
+      $config->setLevel(qq($cfg_lvl source $sources[ $i ]));
+      my $prefix = $config->returnValue(prefix);
+      $prefix = q(None) if !$prefix;
+
+      $sources
+        .= q({"source":")
+        . $sources[$i]
+        . q(","prefix":")
+        . qq($prefix)
+        . q(","url":")
+        . $config->returnValue('url')
+        if $sources[$i];
+    }
+    $sources .= q("}]);
+
+    print q({"success":"1","data":{"enable":")
+      . $enable
+      . q(","blackholeip":")
+      . $black_hole_ip . q(",)
+      . $sources . q(,)
+      . $includes . ','
+      . $excludes . '}}';
+  }
+  else {
+    print q("{"success":"0","error":"ADBlock not installed!""}");
+  }
+}
+
+sub remove {
+# Save filehandles for STDOUT and STDERR
+  open( STDOUT_ORIG, q(>&STDOUT) );
+  open( STDERR_ORIG, q(&STDERR) );
+
+# Set new filehandles for STDOUT and STDERR
+  my $temp = qq(/tmp/error.$$);
+  open( STDOUT, q(>), $temp ) or die qq($0: cannot open STDOUT: $!);
+  open( STDERR, q(>&STDOUT) ) or die qq($0: cannot open STDERR: $!);
+  print(qq(### Errors reported by $0 version $version ###\n));
+
+  $cfg_lvl .= q( blacklist);
+  my $remove_blacklist
+    = join( q{;}, $begin, qq{$delete $cfg_lvl}, $commit, $save, $end );
+  my $output = system($remove_blacklist);
+  my $err = $?;
+
+  close(STDOUT);
+  close(STDERR);
+  open( STDOUT, q{>&STDOUT_ORIG} );
+  open( STDERR, q{>&STDERR_ORIG} );
+
+  if ( !$err ) {
+    print(q({"success":"1"}));
+  }
+  else {
+    print( q({"success":"0", "error":") . qx(cat $temp) . q("}) );
+  }
+  close(STDOUT_ORIG);
+  close(STDERR_ORIG);
+  unlink($temp);
+}
+
+given ($action) {
+  when (/apply/)  { apply; }
+  when (/delete/) { remove; }
+  when (/load/)   { load; }
+  default         { die qq{Unknown action: $!}; }
+}
+

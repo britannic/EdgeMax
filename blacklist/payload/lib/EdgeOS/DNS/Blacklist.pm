@@ -58,6 +58,34 @@ our $c       = {
 };
 our @EXPORT = ();
 
+# Remove previous configuration files
+sub delete_file {
+  my $input = shift;
+
+  if ( -f $input->{file} ) {
+    log_msg(
+      {
+        msg_typ => q{info},
+        msg_str => sprintf q{Deleting file %s},
+        $input->{file},
+      }
+    );
+    unlink $input->{file};
+  }
+
+  if ( -f $input->{file} ) {
+    log_msg(
+      {
+        msg_typ => q{warning},
+        msg_str => sprintf q{Unable to delete %s},
+        $input->{file},
+      }
+    );
+    return;
+  }
+  return TRUE;
+}
+
 # Process the active (not committed or saved) configuration
 sub get_cfg_actv {
   my $config       = new Vyatta::Config;
@@ -190,34 +218,6 @@ sub get_cfg_file {
         msg_typ => q{error},
         msg_str =>
           q{[service dns forwarding blacklist] isn't configured, exiting!},
-      }
-    );
-    return;
-  }
-  return TRUE;
-}
-
-# Remove previous configuration files
-sub delete_file {
-  my $input = shift;
-
-  if ( -f $input->{file} ) {
-    log_msg(
-      {
-        msg_typ => q{info},
-        msg_str => sprintf q{Deleting file %s},
-        $input->{file},
-      }
-    );
-    unlink $input->{file};
-  }
-
-  if ( -f $input->{file} ) {
-    log_msg(
-      {
-        msg_typ => q{warning},
-        msg_str => sprintf q{Unable to delete %s},
-        $input->{file},
       }
     );
     return;
