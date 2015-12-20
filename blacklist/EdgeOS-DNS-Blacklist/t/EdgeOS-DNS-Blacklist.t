@@ -5,15 +5,30 @@
 
 # change 'tests => 1' to 'tests => last_test_to_print';
 
-use strict;
-use warnings;
-
+use v5.14;
 use Test::More;
-BEGIN { use_ok('EdgeOS::DNS::Blacklist') }
+BEGIN { use_ok('EdgeOS::DNS::Blacklist', qw{
+    $c
+    delete_file
+    get_cfg_actv
+    get_cfg_file
+    get_file
+    get_url
+    is_admin
+    is_build
+    is_configure
+    is_version
+    log_msg
+    popx
+    process_data
+    pushx
+    usage
+    write_file
+    }) }
 
 #########################
 
-use v5.14;
+
 use File::Basename;
 use Getopt::Long;
 use EdgeOS::DNS::Blacklist (

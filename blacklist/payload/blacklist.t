@@ -23,7 +23,7 @@ use Test::More;
 note("Testing dnsmasq blacklist configuration");
 
 my $t_count = { tests => 22, failed => 0 };
-
+$$Test::Harness::verbose=0;
 # Check all the required modules can be loaded
 use_ok(q{POSIX})                      or $tcount->{failed}++;
 require_ok(q{POSIX})                  or $tcount->{failed}++;
@@ -231,10 +231,11 @@ sub main {
         . $c->{clr} ), $t_count->{failed}++;
 
     # Check for stray files
+    note(qq{Checking for stray files in $cfg->{dnsmasq_dir}/...});
     $cfg->{strays}
       = [ glob qq{$cfg->{dnsmasq_dir}/{domains,zones,hosts}*.blacklist.conf} ];
     my $no_strays = isnt( scalar( @{ $cfg->{strays} } ),
-      TRUE, qq{Checking *.blacklist.conf files not found in /etc/dnsmasq.d/} )
+      TRUE, qq{Checking *.blacklist.conf files don't exist} )
       or diag( qq{$c->{red} Found blacklist configuration files in }
         . qq{$cfg->{dnsmasq_dir}/ - they should be deleted!}
         . $c->{clr} ), $t_count->{failed}++;
@@ -264,9 +265,10 @@ sub main {
           [ $source, qq{$cfg->{dnsmasq_dir}/$area.$source.blacklist.conf} ];
       }
       for my $f_ref (@files) {
+        note(q{Checking sources have files...});
         my ( $source, $file ) = @{$f_ref};
         $t_count->{tests}++;
-        is( -f $file, TRUE, qq{Checking $source has a file} )
+        is( -f $file, TRUE, qq{$source} )
           or diag( qq{$c->{red}}
             . basename($file)
             . qq{ not found for $source - investigate!}

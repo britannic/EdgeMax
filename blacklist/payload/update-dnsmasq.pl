@@ -34,9 +34,7 @@ use EdgeOS::DNS::Blacklist (
     is_admin
     is_configure
     log_msg
-    popx
     process_data
-    pushx
     write_file
     }
 );

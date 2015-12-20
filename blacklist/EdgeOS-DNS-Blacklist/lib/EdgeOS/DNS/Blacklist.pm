@@ -1,5 +1,5 @@
 package EdgeOS::DNS::Blacklist;
-use parent 'Exporter'; # imports and subclasses Exporter
+use parent 'Exporter';    # imports and subclasses Exporter
 
 use v5.14;
 use EdgeOS::DNS::Blacklist;
@@ -17,7 +17,6 @@ use constant TRUE  => 1;
 use constant FALSE => 0;
 
 # require Exporter;
-
 our @ISA = qw(Exporter);
 
 # Items to export into callers namespace by default. Note: do not export
@@ -57,7 +56,7 @@ our $c       = {
   mag => qq{\033[95m},
   red => qq{\033[91m},
 };
-our @EXPORT  = ();
+our @EXPORT = ();
 
 # Process the active (not committed or saved) configuration
 sub get_cfg_actv {
@@ -180,7 +179,7 @@ sub get_cfg_file {
       @{ $input->{config}->{$area} }{qw(blklst exclude src)}
         = @{ $tmp_ref->{$area} }{qw(include exclude source)};
 
-      while ( my ( $key, $value ) = each %{ $tmp_ref->{$area}->{exclude} } ) {
+      while ( my ( $key, $value ) = each %{ $tmp_ref->{exclude} } ) {
         $input->{config}->{$area}->{exclude}->{$key} = $value;
       }
     }
@@ -253,7 +252,6 @@ sub get_hash {
   }
 
   ${$hash} = $value if $value;
-
   return $hash_ref;
 }
 
@@ -285,36 +283,31 @@ LINE:
 
     for ($line) {
       when (/$re->{MULT}/) {
-        push @nodes, $+{MULT};
-        push @nodes, $+{VALU};
-        push @nodes, 1;
+        pushx( \@nodes, [ $+{MULT}, $+{VALU}, 1 ], 3 );
         get_hash( { nodes => \@nodes, hash_ref => $cfg_ref } );
-        popx( { array => \@nodes, X => 3 } );
+        popx( \@nodes, 3 );
       }
       when (/$re->{NODE}/) {
         push @nodes, $+{NODE};
       }
       when (/$re->{LEAF}/) {
         $level++;
-        push @nodes, $+{LEAF};
-        push @nodes, $+{NAME};
+        pushx( \@nodes, [ $+{LEAF}, $+{NAME} ], 2 );
       }
       when (/$re->{NAME}/) {
-        push @nodes, $+{NAME};
-        push @nodes, $+{VALU};
+        pushx( \@nodes, [ $+{NAME}, $+{VALU} ], 2 );
         get_hash( { nodes => \@nodes, hash_ref => $cfg_ref } );
-        popx( { array => \@nodes, X => 2 } );
+        popx( \@nodes, 2 );
       }
       when (/$re->{DESC}/) {
-        push @nodes, $+{NAME};
-        push @nodes, $+{DESC};
+        pushx( \@nodes, [ $+{NAME}, $+{DESC} ], 2 );
         get_hash( { nodes => \@nodes, hash_ref => $cfg_ref } );
-        popx( { array => \@nodes, X => 2 } );
+        popx( \@nodes, 2 );
       }
       when (/$re->{MISC}/) {
-        pushx( { array => \@nodes, items => \$+{MISC}, X => 2 } );
+        pushx( \@nodes, [ $+{MISC} ], 2 );
         get_hash( { nodes => \@nodes, hash_ref => $cfg_ref } );
-        popx( { array => \@nodes, X => 2 } );
+        popx( \@nodes, 2 );
       }
       when (/$re->{CMNT}/) {
         next;
@@ -419,7 +412,7 @@ sub is_version {
 
 # Log and print (if -v)
 sub log_msg {
-  my $input = shift;
+  my $input   = shift;
   my $log_msg = {
     alert    => LOG_ALERT,
     critical => LOG_CRIT,
@@ -450,10 +443,10 @@ sub log_msg {
 
 # pop array x times
 sub popx {
-  my $input = shift;
-  return if !$input->{X};
-  for ( 1 .. $input->{X} ) {
-    pop @{ $input->{array} };
+  my ( $array, $count ) = ( shift, shift );
+  return if !@{$array};
+  for ( 1 .. $count ) {
+    pop @{$array};
   }
   return TRUE;
 }
@@ -558,10 +551,10 @@ LINE:
 
 # push array x times
 sub pushx {
-  my $input = shift;
-  return if !$input->{X};
-  for ( 1 .. $input->{X} ) {
-    push @{ $input->{array} }, $input->{items};
+  my ( $array, $items, $count ) = ( shift, shift, shift );
+  return if !@{$array};
+  for my $i ( 0 .. $count - 1 ) {
+    push @{$array}, $items->[$i];
   }
   return TRUE;
 }
