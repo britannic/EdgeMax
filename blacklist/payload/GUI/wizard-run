@@ -1,9 +1,12 @@
 #!/usr/bin/env perl
 
 use v5.14;
+use lib q(/opt/vyatta/share/perl5/);
 use EdgeOS::DNS::Blacklist (qw{ get_cfg_actv });
 use JSON::PP qw(decode_json encode_json);
-use lib q(/opt/vyatta/share/perl5/);
+
+use constant TRUE  => 1;
+use constant FALSE => 0;
 
 my $version = 1.1;
 my $action  = $ARGV[0];
@@ -17,46 +20,52 @@ my $save    = q{/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper save};
 my $set     = q{/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper set};
 
 sub apply {
-  my $json_data     = get_file( { file => $file } );
-  my $web           = decode_json($json_data);
-  my $black_hole_ip = $web->{blackholeip};
-  my $enable        = $web->{enable};
-  my @sources       = @{ $web->{sources} };
-  my @excludes      = @{ $web->{excludes} };
-  my @includes      = @{ $web->{includes} };
+  my $base_node = q{service dns forwarding blacklist};
+  my $cfg       = {};
+  my @cfg_cmds  = ( $begin . q{;} );
 
-  my $disabled = ( $enable eq q(enable) ) ? q(false) : q(true);
-  $cfg_lvl .= q( blacklist);
+  $cfg = decode_json( &get_file( { file => $file } ) );
 
-  my @apply_blacklist = ( qq($begin), qq($delete $cfg_lvl),
-    qq($set $cfg_lvl disabled $disabled) );
+  if ( keys %{ $cfg->{data} } ) {
+    $cfg->{data}->{disabled}
+      = $cfg->{data}->{disabled} == 0 ? q{false} : q{true};
+    push @cfg_cmds, qq{$set $base_node disabled $cfg->{data}->{disabled};};
+    push @cfg_cmds, qq{$set $base_node dns_redirect_ip }
+      . qq{$cfg->{data}->{dns_redirect_ip};};
 
-  push( @apply_blacklist, qq($set $cfg_lvl blackhole $black_hole_ip) );
+    for my $exclude ( keys %{ $cfg->{data}->{exclude} } ) {
+      push @cfg_cmds, qq{$set $base_node exclude $exclude;};
+    }
 
-  for my $source (@sources) {
-    my $prefix
-      = ( $source->{prefix} eq 'None' )
-      ? q("")
-      : q(') . $source->{prefix} . q(');
-    push( @apply_blacklist,
-          qq($set $cfg_lvl source $source->{source} url ')
-        . $source->{url}
-        . q(') );
-    push( @apply_blacklist,
-      qq($set $cfg_lvl source $source->{source} prefix $prefix) );
+    for my $area (qw{domains hosts zones}) {
+      push @cfg_cmds, qq{$set $base_node $area dns_redirect_ip }
+        . qq{$cfg->{data}->{$area}->{dns_redirect_ip};};
+
+      for my $include ( keys %{ $cfg->{data}->{$area}->{include} } ) {
+        push @cfg_cmds, qq{$set $base_node $area include $include;};
+      }
+
+      for my $exclude ( keys %{ $cfg->{data}->{$area}->{exclude} } ) {
+        push @cfg_cmds, qq{$set $base_node $area exclude $exclude;};
+      }
+
+      for my $source ( keys %{ $cfg->{data}->{$area}->{src} } ) {
+        push @cfg_cmds, qq{$set $base_node $area source $source description }
+          . qq{'$cfg->{data}->{$area}->{src}->{$source}->{description}';};
+        push @cfg_cmds, qq{$set $base_node $area source $source prefix }
+          . qq{'$cfg->{data}->{$area}->{src}->{$source}->{prefix}';};
+        push @cfg_cmds, qq{$set $base_node $area source $source url }
+          . qq{'$cfg->{data}->{$area}->{src}->{$source}->{url}';};
+      }
+    }
+    push @cfg_cmds, $commit. q{;};
+    push @cfg_cmds, $save . q{;};
+    push @cfg_cmds, $end . q{;}
   }
-
-  for my $exclude (@excludes) {
-    push( @apply_blacklist, qq($set $cfg_lvl exclude $exclude->{exclude}) );
+  else {
+    print encode_json( { success => 0, error => qq($name not installed!), } );
+    return;
   }
-
-  for my $include (@includes) {
-    push( @apply_blacklist, qq($set $cfg_lvl include $include->{include}) );
-  }
-
-  push( @apply_blacklist, ( $commit, $save, $end ) );
-
-  @apply_blacklist = map { $_ . q(;) } @apply_blacklist;
 
 # Save filehandles for STDOUT and STDERR
   open( STDOUT_ORIG, q(>&STDOUT) );
@@ -68,8 +77,8 @@ sub apply {
   open( STDERR, q(>&STDOUT) ) or die qq($0: cannot open STDERR: $!);
   print(qq(### Errors reported by $0 version $version ###\n));
 
-  my $output = system(qq(@apply_blacklist));
-  my $err    = $?;
+  my $output = system(qq{@cfg_cmds});
+  my $err = $?;
 
   close(STDOUT);
   close(STDERR);
@@ -77,10 +86,10 @@ sub apply {
   open( STDERR, q(>&STDERR_ORIG) );
 
   if ( !$err ) {
-    print encode_json({success => 1,});
+    print encode_json( { success => 1, } );
   }
   else {
-    print encode_json({success => 0, error => qx(cat $temp),});
+    print encode_json( { success => 0, error => qx(cat $temp), } );
   }
   close(STDOUT_ORIG);
   close(STDERR_ORIG);
@@ -104,11 +113,34 @@ sub load {
   my $cfg = { success => 1, data => {}, };
   my $blacklist = get_cfg_actv( { config => $cfg->{data}, show => 0 } );
 
-  if ($blacklist) {
+  if ( keys %{ $cfg->{data} } ) {
+    $cfg->{data}->{disabled}
+      = $cfg->{data}->{disabled} == 0 ? q{false} : q{true};
+
+#     for my $exclude ( keys %{ $cfg->{data}->{exclude} } ) {
+#     }
+
+    my $area (qw{domains hosts zones}) {
+      while (my ($key, $value) = each %{ $cfg->{data}->{$area}->{include} } ) {
+        $cfg->{data}->{qq{$area_include}}->{$key} = $value;
+        delete $cfg->{data}->{$area}->{include}->{$key};
+      }
+
+      while (my ($key, $value) = each %{ $cfg->{data}->{$area}->{exclude} } ) {
+        $cfg->{data}->{qq{$area_exclude}}->{$key} = $value;
+        delete $cfg->{data}->{$area}->{exclude}->{$key};
+      }
+
+      while (my ($key, $value) = each %{ $cfg->{data}->{$area}->{src} } ) {
+        $cfg->{data}->{qq{$area_src}}->{$key} = $value;
+        delete $cfg->{data}->{$area}->{src}->{$key};
+      }
+    }
     print encode_json($cfg);
   }
   else {
-    print encode_json({success => 0, error => qq($name not installed!),});
+    print encode_json( { success => 0, error => qq($name not installed!), } );
+    return;
   }
 }
 
@@ -124,7 +156,7 @@ sub remove {
   open( STDERR, q(>&STDOUT) ) or die qq($0: cannot open STDERR: $!);
   print(qq(### Errors reported by $0 version $version ###\n));
 
-  $cfg_lvl .= q( blacklist);
+  my $cfg_lvl .= q(service dns forwarding blacklist);
   my $remove_blacklist
     = join( q{;}, $begin, qq{$delete $cfg_lvl}, $commit, $save, $end );
   my $output = system($remove_blacklist);
@@ -136,10 +168,10 @@ sub remove {
   open( STDERR, q{>&STDERR_ORIG} );
 
   if ( !$err ) {
-    print encode_json({success => 1,});
+    print encode_json( { success => 1, } );
   }
   else {
-    print encode_json({success => 0, error => qx(cat $temp),});
+    print encode_json( { success => 0, error => qx(cat $temp), } );
   }
 
   close(STDOUT_ORIG);

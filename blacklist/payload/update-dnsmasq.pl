@@ -19,6 +19,7 @@
 use File::Basename;
 use Getopt::Long;
 use lib q{/opt/vyatta/share/perl5/};
+use lib q{/config/lib/perl/};
 use Sys::Syslog qw(:standard :macros);
 use Term::ReadKey qw(GetTerminalSize);
 use threads;
@@ -43,8 +44,8 @@ use constant TRUE  => 1;
 use constant FALSE => 0;
 
 my ( $cfg_file, $show );
-my $version = q{3.5.1};
-my ($cols) = GetTerminalSize();
+my $version = q{3.5.2};
+my ($cols) = GetTerminalSize() // qx{tput cols};
 
 ############################### script runs here ###############################
 &main();

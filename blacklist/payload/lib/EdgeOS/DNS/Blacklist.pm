@@ -2,11 +2,11 @@ package EdgeOS::DNS::Blacklist;
 use parent 'Exporter';    # imports and subclasses Exporter
 
 use v5.14;
+use lib q{/opt/vyatta/share/perl5/};
 use EdgeOS::DNS::Blacklist;
 use File::Basename;
 use Getopt::Long;
 use HTTP::Tiny;
-use lib q{/opt/vyatta/share/perl5/};
 use POSIX qw{geteuid};
 use Sys::Syslog qw(:standard :macros);
 use threads;
@@ -42,12 +42,10 @@ our @EXPORT_OK = (
     log_msg
     popx
     process_data
-    pushx
-    usage
     write_file
     }
 );
-our $VERSION = q{1.0};
+our $VERSION = q{1.1};
 our $c       = {
   off => qq{\033[?25l},
   on  => qq{\033[?25h},
@@ -276,7 +274,7 @@ LINE:
 
     for ($line) {
       when (/$re->{MULT}/) {
-        pushx( \@nodes, [ $+{MULT}, $+{VALU}, 1 ], 3 );
+        push( @nodes, $+{MULT}, $+{VALU}, 1 );
         get_hash( { nodes => \@nodes, hash_ref => $cfg_ref } );
         popx( \@nodes, 3 );
       }
@@ -285,20 +283,20 @@ LINE:
       }
       when (/$re->{LEAF}/) {
         $level++;
-        pushx( \@nodes, [ $+{LEAF}, $+{NAME} ], 2 );
+        push( @nodes, $+{LEAF}, $+{NAME} );
       }
       when (/$re->{NAME}/) {
-        pushx( \@nodes, [ $+{NAME}, $+{VALU} ], 2 );
+        push( @nodes, $+{NAME}, $+{VALU} );
         get_hash( { nodes => \@nodes, hash_ref => $cfg_ref } );
         popx( \@nodes, 2 );
       }
       when (/$re->{DESC}/) {
-        pushx( \@nodes, [ $+{NAME}, $+{DESC} ], 2 );
+        push( @nodes, $+{NAME}, $+{DESC} );
         get_hash( { nodes => \@nodes, hash_ref => $cfg_ref } );
         popx( \@nodes, 2 );
       }
       when (/$re->{MISC}/) {
-        pushx( \@nodes, [ $+{MISC} ], 2 );
+        push( @nodes, $+{MISC}, $+{MISC} );
         get_hash( { nodes => \@nodes, hash_ref => $cfg_ref } );
         popx( \@nodes, 2 );
       }
@@ -542,16 +540,6 @@ LINE:
   return;
 }
 
-# push array x times
-sub pushx {
-  my ( $array, $items, $count ) = ( shift, shift, shift );
-  return if !@{$array};
-  for my $i ( 0 .. $count - 1 ) {
-    push @{$array}, $items->[$i];
-  }
-  return TRUE;
-}
-
 # Write the data to file
 sub write_file {
   my $input = shift;
@@ -594,7 +582,6 @@ EdgeOS::DNS::Blacklist - Perl extension for EdgeOS dnsmasq blacklist configurati
   log_msg
   popx
   process_data
-  pushx
   usage
   write_file});
 

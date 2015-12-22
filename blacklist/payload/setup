@@ -40,9 +40,7 @@ use EdgeOS::DNS::Blacklist (
     is_configure
     is_version
     log_msg
-    popx
     process_data
-    pushx
     }
 );
 
@@ -50,7 +48,7 @@ use constant TRUE  => 1;
 use constant FALSE => 0;
 
 chomp( my $version = qx{cat version} );
-my ($cols)  = qx{tput cols};
+my ($cols) = qx{tput cols};
 my $prg     = { errors => 0, calls => 0, };
 my $program = basename($0);
 my $edgeOS  = &is_version();
@@ -73,7 +71,7 @@ my $cfg     = {
   no_op    => q{/tmp/.update-dnsmasq.no-op},
   oldconf  => qq{{domai*,hos*,zon*}.blacklist.conf},
   oldscrpt => q{update-blacklists-dnsmasq.pl},
-  perl_lib => q{/opt/vyatta/share/perl5},
+  perl_lib => q{/config/lib/perl},
   script   => q{update-dnsmasq.pl},
   scrpt_d  => q{/config/scripts},
   tmplts   => q{/opt/vyatta/share/vyatta-cfg/templates/service/dns/forwarding},
@@ -166,7 +164,7 @@ sub exec_command {
     }
   );
 
-  qx{sudo $input->{cmd} 2>&1};
+  my $output = qx{sudo $input->{cmd} 2>&1};
 
   if ( !error_handler( { exit_code => $?, cmd => $input->{cmd} } ) ) {
     log_msg(
@@ -174,7 +172,7 @@ sub exec_command {
         cols    => $cols,
         show    => TRUE,
         msg_typ => q{error},
-        msg_str => $input->{fail_msg},
+        msg_str => $input->{fail_msg} . qq{\n$output\n},
       }
     );
     $prg->{fail}->{ $prg->{errors}++ } = $input->{cmd};
@@ -223,7 +221,7 @@ sub exec_shell {
     info => qr{(?:Nothing to delete)},
     warnings =>
       qr{(?:The specified configuration node is not valid\n|Delete failed\n)},
-    errors => qr{(?:aborted|error|failed|failure)},
+    errors => qr{(?:aborted|error|failed|failure)}i,
   };
 
   for my $feed ( \%cmds_out, \%cmd_errs ) {
@@ -288,9 +286,6 @@ sub get_blacklist {
     # Add areas to process only if they contain sources and copy global excludes
     for my $area (qw{domains hosts zones}) {
       push @areas, $area if scalar keys %{ $cfg->{$area}->{src} };
-      while ( my ( $key, $value ) = each %{ $cfg->{exclude} } ) {
-        $cfg->{config}->{$area}->{exclude}->{$key} = $value;
-      }
     }
 
     # Process each area
@@ -299,6 +294,9 @@ sub get_blacklist {
       my ( $prefix, @threads );
       my $max_thrds = 8;
       my @sources   = keys %{ $cfg->{$area}->{src} };
+      while ( my ( $key, $value ) = each %{ $cfg->{exclude} } ) {
+        $cfg->{$area}->{exclude}->{$key} = $value;
+      }
       $cfg->{$area}->{icount} = scalar keys %{ $cfg->{$area}->{blklst} } // 0;
       @{ $cfg->{$area} }{qw{records unique}}
         = @{ $cfg->{$area} }{ q{icount}, q{icount} };
@@ -549,7 +547,7 @@ sub get_blacklist {
 sub main {
 
   # Exit if we're not admin
-  if ( is_admin() ) {
+  if ( is_admin() && $program ne q{remove} ) {
     say qq{$name $program must be executed as the admin user - not root!};
     exit 1;
   }
@@ -854,6 +852,15 @@ sub setup {
       exec_msg => qq{Installing $name configuration templates},
       fail_msg =>
         qq{Unable to install $name configuration templates to $cfg->{tmplts}/blacklist/},
+    }
+  );
+
+  exec_command(
+    {
+      cmd      => qq{install -o root -g root -m 0755 -d "$cfg->{perl_lib}/"},
+      exec_msg => qq{Create $name "$cfg->{perl_lib}/" lib directory},
+      fail_msg =>
+        qq{Unable to create $name "$cfg->{perl_lib}/" lib directory},
     }
   );
 

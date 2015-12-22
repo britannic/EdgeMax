@@ -17,6 +17,7 @@
 # **** End License ****
 use feature qw{switch};
 use lib q{/opt/vyatta/share/perl5/};
+use lib q{./lib/};
 use Socket;
 use Test::More;
 
@@ -59,7 +60,6 @@ use EdgeOS::DNS::Blacklist (
     is_admin
     log_msg
     popx
-    pushx
     }
 );
 
