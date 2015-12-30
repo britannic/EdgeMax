@@ -2,6 +2,7 @@
 
 use v5.14;
 use lib q(/opt/vyatta/share/perl5/);
+use lib q{/config/lib/perl/};
 use EdgeOS::DNS::Blacklist (qw{ get_cfg_actv });
 use JSON::PP qw(decode_json encode_json);
 
@@ -26,41 +27,40 @@ sub apply {
 
   $cfg = decode_json( &get_file( { file => $file } ) );
 
-  if ( keys %{ $cfg->{data} } ) {
-    $cfg->{data}->{disabled}
-      = $cfg->{data}->{disabled} == 0 ? q{false} : q{true};
-    push @cfg_cmds, qq{$set $base_node disabled $cfg->{data}->{disabled};};
-    push @cfg_cmds, qq{$set $base_node dns_redirect_ip }
-      . qq{$cfg->{data}->{dns_redirect_ip};};
+  if ( keys %{$cfg} ) {
+    $cfg->{disabled} = $cfg->{disabled} == 0 ? q{false} : q{true};
+    push @cfg_cmds, qq{$set $base_node disabled $cfg->{disabled};};
+    push @cfg_cmds,
+      qq{$set $base_node dns_redirect_ip } . qq{$cfg->{dns_redirect_ip};};
 
-    for my $exclude ( keys %{ $cfg->{data}->{exclude} } ) {
+    for my $exclude ( keys %{ $cfg->{exclude} } ) {
       push @cfg_cmds, qq{$set $base_node exclude $exclude;};
     }
 
     for my $area (qw{domains hosts zones}) {
       push @cfg_cmds, qq{$set $base_node $area dns_redirect_ip }
-        . qq{$cfg->{data}->{$area}->{dns_redirect_ip};};
+        . qq{$cfg->{$area}->{dns_redirect_ip};};
 
-      for my $include ( keys %{ $cfg->{data}->{$area}->{include} } ) {
+      for my $include ( keys %{ $cfg->{$area}->{include} } ) {
         push @cfg_cmds, qq{$set $base_node $area include $include;};
       }
 
-      for my $exclude ( keys %{ $cfg->{data}->{$area}->{exclude} } ) {
+      for my $exclude ( keys %{ $cfg->{$area}->{exclude} } ) {
         push @cfg_cmds, qq{$set $base_node $area exclude $exclude;};
       }
 
-      for my $source ( keys %{ $cfg->{data}->{$area}->{src} } ) {
+      for my $source ( keys %{ $cfg->{$area}->{src} } ) {
         push @cfg_cmds, qq{$set $base_node $area source $source description }
-          . qq{'$cfg->{data}->{$area}->{src}->{$source}->{description}';};
+          . qq{'$cfg->{$area}->{src}->{$source}->{description}';};
         push @cfg_cmds, qq{$set $base_node $area source $source prefix }
-          . qq{'$cfg->{data}->{$area}->{src}->{$source}->{prefix}';};
+          . qq{'$cfg->{$area}->{src}->{$source}->{prefix}';};
         push @cfg_cmds, qq{$set $base_node $area source $source url }
-          . qq{'$cfg->{data}->{$area}->{src}->{$source}->{url}';};
+          . qq{'$cfg->{$area}->{src}->{$source}->{url}';};
       }
     }
-    push @cfg_cmds, $commit. q{;};
+    push @cfg_cmds, $commit . q{;};
     push @cfg_cmds, $save . q{;};
-    push @cfg_cmds, $end . q{;}
+    push @cfg_cmds, $end . q{;};
   }
   else {
     print encode_json( { success => 0, error => qq($name not installed!), } );
@@ -78,7 +78,7 @@ sub apply {
   print(qq(### Errors reported by $0 version $version ###\n));
 
   my $output = system(qq{@cfg_cmds});
-  my $err = $?;
+  my $err    = $?;
 
   close(STDOUT);
   close(STDERR);
@@ -110,32 +110,57 @@ sub get_file {
 }
 
 sub load {
-  my $cfg = { success => 1, data => {}, };
-  my $blacklist = get_cfg_actv( { config => $cfg->{data}, show => 0 } );
+  my $cfg = { success => 1, data => {}, tmp => {}, };
+  my $blacklist = get_cfg_actv( { config => $cfg->{tmp}, show => 0 } );
 
-  if ( keys %{ $cfg->{data} } ) {
-    $cfg->{data}->{disabled}
-      = $cfg->{data}->{disabled} == 0 ? q{false} : q{true};
+  if ($blacklist) {
+    $cfg->{tmp}->{disabled}
+      = $cfg->{tmp}->{disabled} == 0 ? qq{false} : qq{true};
 
-#     for my $exclude ( keys %{ $cfg->{data}->{exclude} } ) {
-#     }
+    $cfg->{tmp}->{global} = {
+      dns_redirect_ip => $cfg->{tmp}->{dns_redirect_ip},
+      disabled        => $cfg->{tmp}->{disabled},
+    };
 
-    my $area (qw{domains hosts zones}) {
-      while (my ($key, $value) = each %{ $cfg->{data}->{$area}->{include} } ) {
-        $cfg->{data}->{qq{$area_include}}->{$key} = $value;
-        delete $cfg->{data}->{$area}->{include}->{$key};
-      }
+    $cfg->{tmp}->{global}->{excludes}
+      = [ map { { exclude => $_ } } sort keys %{ $cfg->{tmp}->{exclude} } ]
+      if exists $cfg->{tmp}->{exclude};
 
-      while (my ($key, $value) = each %{ $cfg->{data}->{$area}->{exclude} } ) {
-        $cfg->{data}->{qq{$area_exclude}}->{$key} = $value;
-        delete $cfg->{data}->{$area}->{exclude}->{$key};
-      }
+    $cfg->{data}->{global} = [ $cfg->{tmp}->{global} ];
 
-      while (my ($key, $value) = each %{ $cfg->{data}->{$area}->{src} } ) {
-        $cfg->{data}->{qq{$area_src}}->{$key} = $value;
-        delete $cfg->{data}->{$area}->{src}->{$key};
-      }
+    # Add areas to process only if they contain sources
+    my @areas;
+    for my $area (qw{domains hosts zones}) {
+      push @areas, $area if scalar keys %{ $cfg->{tmp}->{$area}->{src} };
     }
+
+    # Rename root keys, so that the Feature Wizard gets unique field names
+    for my $area (@areas) {
+
+      my @includes
+        = map { { include => $_ } }
+        sort keys %{ $cfg->{tmp}->{$area}->{blklst} }
+        if exists $cfg->{tmp}->{$area}->{blklst};
+
+      my @excludes
+        = map { { exclude => $_ } }
+        sort keys %{ $cfg->{tmp}->{$area}->{exclude} }
+        if exists $cfg->{tmp}->{$area}->{exclude};
+
+      my @sources = map {
+        my $key = $_;
+        { source => [ %{ $cfg->{tmp}->{$area}->{src}->{$key} } ] }
+        } sort keys %{ $cfg->{tmp}->{$area}->{src} }
+        if exists $cfg->{tmp}->{$area}->{src};
+
+      $cfg->{data}->{$area} = {
+        dns_redirect_ip => $cfg->{tmp}->{dns_redirect_ip},
+        includes        => \@includes,
+        excludes        => \@excludes,
+        sources         => \@sources,
+      };
+    }
+    delete $cfg->{tmp};
     print encode_json($cfg);
   }
   else {

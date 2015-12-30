@@ -1,0 +1,588 @@
+<div id="Qos" class="main-section" style="display: block;">
+<div class="section-tabs ui-tabs ui-widget ui-widget-content">
+	<ul class="ui-tabs-nav ui-helper-reset ui-helper-clearfix ui-widget-header ui-corner-all">
+		<li class="ui-state-default ui-corner-top">Blacklist
+			<a href="#Blacklist/Global" data-container="Global">
+				DNS Blacklist Global settings
+			</a>
+		</li>
+		<li class="ui-state-default ui-corner-top ui-tabs-selected ui-state-active">
+			<a href="#Blacklist/Hosts" data-container="Hosts">
+				DNS blacklist Hosts settings
+			</a>
+		</li>
+		<li class="ui-state-default ui-corner-top ui-tabs-selected ui-state-active">
+			<a href="#Blacklist/Domains" data-container="Domains">
+				DNS blacklist Domains settings
+			</a>
+		</li>
+	</ul>
+</div>
+<div class="section-container tall tabbed">
+	<div id="Global" class="wide tall ui-layout-pane" style="display:inline;">
+		<div class="loading" style="display: none;">
+		</div>
+		<div class="section-container service-form">
+			<form method="post" class="ui-form" novalidate="novalidate">
+				<fieldset name="Global" class="primary expanded">
+					<legend class="blacklist hidden">
+						Global
+					</legend>
+					<label class="label-blacklist-enabled">
+						<input type="checkbox" class="blacklist-enabled" name="blacklist-enabled">
+						<span>
+							Enable Blacklist
+						</span>
+					</label>
+					<div class="addable" data-name="global" data-level="0" data-min="0" data-object="global" data-objectify="1">
+					<legend class="section">
+						DNS Blacklist Global Settings
+					</legend>
+					<div class="addable-container" data-parent="global" data-level="0">
+<!-- the addables will be inserted here -->
+						<div class="addable-template" data-parent="global" data-level="0">
+							<div class="multi">
+								<label>
+									<span class="text">
+										Exclude
+									</span>
+								</label>
+								<div>
+									<input type="text" name="protocol">
+								</div>
+								<div class="clear">
+								</div>
+								<div class="level1">
+									<label>
+										<span class="text">
+											WAN Interface
+										</span>
+									</label>
+									<div>
+										<span>
+										</span>
+									</div>
+<!-- Upload Section -->
+									<label>
+										<span class="text">
+											Upload
+										</span>
+									</label>
+									<div>
+										<input type="checkbox" name="up" value="true" checked="">Apply to upload traffic
+									</div>
+									<div class="level1">
+										<label>
+											<span class="text">
+												Rate
+											</span>
+										</label>
+										<div style="display:inline;">
+											<input type="text" name="rate-up">
+										</div>
+										<div style="display:inline;">
+											<select name="suffix-rate-up" data-infotip="Bandwidth limit">
+												<option value="bit">
+													bits/sec
+												</option>
+												<option value="kbit">
+													Kbits/sec
+												</option>
+												<option value="mbit" selected="">
+													Mbits/sec
+												</option>
+											</select>
+											<span class="ui-icon ui-icon-muted ui-icon-info" style="left: 159px; top: 8px;">
+											</span>
+										</div>
+										<div class="advance-container">
+											<label>
+												<span class="text">
+													Burst
+												</span>
+											</label>
+											<div style="display:inline;">
+												<input name="burst-up" type="text">
+											</div>
+											<div style="display:inline;">
+												<select class="suffix" name="suffix-burst-up" data-infotip="Amount of bytes that can be burst at best-effort. &lt;br &gt;&lt;/select&gt;Allowed burst range: 1500bytes - 10Mbytes">
+													<option value="b">
+														bytes
+													</option>
+													<option value="kb">
+														Kbytes
+													</option>
+													<option value="mb">
+														Mbytes
+													</option>
+													<option value="gb">
+														Gbytes
+													</option>
+												</select>
+												<span class="ui-icon ui-icon-muted ui-icon-info" style="left: 159px; top: 8px;">
+												</span>
+											</div>
+											<label>
+												<span class="text">
+													Target
+												</span>
+											</label>
+											<div style="display:inline;">
+												<input name="target-up" type="text">
+											</div>
+											<div style="display:inline;">
+												<select class="suffix" name="suffix-target-up" data-infotip="Acceptable minimum queue delay.&lt;br &gt;&lt;/select&gt;Allowed target range: 10us - 10s.&lt;br /&gt;Default value: 5ms.">
+													<option value="us">
+														microseconds (us)
+													</option>
+													<option value="ms" selected="">
+														milliseconds (ms)
+													</option>
+													<option value="secs">
+														seconds
+													</option>
+												</select>
+												<span class="ui-icon ui-icon-muted ui-icon-info" style="left: 159px; top: 8px;">
+												</span>
+											</div>
+											<label>
+												<span class="text">
+													Interval
+												</span>
+											</label>
+											<div style="display:inline;">
+												<input name="interval-up" type="text">
+											</div>
+											<div style="display:inline;">
+												<select class="suffix" name="suffix-interval-up" data-infotip="Enter dropping mode when the minimum queue delay has exceeded target for a time greater than configured interval.&lt;br &gt;&lt;/select&gt;Allowed interval range: 1ms - 20s.&lt;br /&gt;Default value: 100ms.">
+													<option value="us">
+														microseconds (us)
+													</option>
+													<option value="ms" selected="">
+														milliseconds (ms)
+													</option>
+													<option value="secs">
+														seconds
+													</option>
+												</select>
+												<span class="ui-icon ui-icon-muted ui-icon-info" style="left: 159px; top: 8px;">
+												</span>
+											</div>
+											<label>
+												<span class="text">
+													ECN
+												</span>
+											</label>
+											<div>
+												<input type="checkbox" name="ecn-up" value="enable" checked="">Enable (Mark packets instead of dropping them)
+											</div>
+											<label>
+												<span class="text">
+													Flows
+												</span>
+											</label>
+											<div>
+												<input name="flows-up" type="text" value="1024" data-infotip="number of flows into which the incoming packets are classified.&lt;br /&gt;Range: 1-65535">
+												<span class="ui-icon ui-icon-muted ui-icon-info" style="left: 143px; top: 8px;">
+												</span>
+											</div>
+											<label>
+												<span class="text">
+													Limit
+												</span>
+											</label>
+											<div>
+												<input name="limit-up" type="text" value="10240" data-infotip="Hard limit on the real queue size. &lt;br /&gt;Queue size in packets: 1-1000000">
+												<span class="ui-icon ui-icon-muted ui-icon-info" style="left: 143px; top: 8px;">
+												</span>
+											</div>
+											<label>
+												<span class="text">
+													FQ_CODEL Quantum
+												</span>
+											</label>
+											<div style="display:inline;">
+												<input name="fq-up" type="text" value="1514">
+											</div>
+											<div style="display:inline;">
+												<span data-infotip="Packet scheduling quantum for FQ_CODEL.&lt;br &gt;&lt;/span&gt;Packet scheduling quantum (bytes): 256-65535">
+													bytes
+												</span>
+												<span class="ui-icon ui-icon-muted ui-icon-info" style="left: 35px; top: 8px;">
+												</span>
+											</div>
+											<label>
+												<span class="text">
+													HTB Quantum
+												</span>
+											</label>
+											<div style="display:inline;">
+												<input name="htb-up" type="text">
+											</div>
+											<div style="display:inline;">
+												<span data-infotip="Packet scheduling quantum for HTB.&lt;br &gt;&lt;/span&gt;Packet scheduling quantum (bytes): 1-65535">
+													bytes
+												</span>
+												<span class="ui-icon ui-icon-muted ui-icon-info" style="left: 35px; top: 8px;">
+												</span>
+											</div>
+										</div>
+									</div>
+<!-- Download Section -->
+									<label>
+										<span class="text">
+											Download
+										</span>
+									</label>
+									<div>
+										<input type="checkbox" name="down" value="true" checked="">Apply to download traffic
+									</div>
+									<div class="level1">
+										<label>
+											<span class="text">
+												Rate
+											</span>
+										</label>
+										<div style="display:inline;">
+											<input type="text" name="rate-down">
+										</div>
+										<div style="display:inline;">
+											<select name="suffix-rate-down" data-infotip="Bandwidth limit">
+												<option value="bit">
+													bits/sec
+												</option>
+												<option value="kbit">
+													Kbits/sec
+												</option>
+												<option value="mbit" selected="">
+													Mbits/sec
+												</option>
+											</select>
+											<span class="ui-icon ui-icon-muted ui-icon-info" style="left: 159px; top: 8px;">
+											</span>
+										</div>
+										<div class="advance-container">
+											<label>
+												<span class="text">
+													Burst
+												</span>
+											</label>
+											<div style="display:inline;">
+												<input name="burst-down" type="text">
+											</div>
+											<div style="display:inline;">
+												<select class="suffix" name="suffix-burst-down" data-infotip="Amount of bytes that can be burst at best-effort. &lt;br &gt;&lt;/select&gt;Allowed burst range: 1500bytes - 10Mbytes">
+													<option value="b">
+														bytes
+													</option>
+													<option value="kb">
+														Kbytes
+													</option>
+													<option value="mb">
+														Mbytes
+													</option>
+													<option value="gb">
+														Gbytes
+													</option>
+												</select>
+												<span class="ui-icon ui-icon-muted ui-icon-info" style="left: 159px; top: 8px;">
+												</span>
+											</div>
+											<label>
+												<span class="text">
+													Target
+												</span>
+											</label>
+											<div style="display:inline;">
+												<input name="target-down" type="text">
+											</div>
+											<div style="display:inline;">
+												<select class="suffix" name="suffix-target-down" data-infotip="Acceptable minimum queue delay.&lt;br &gt;&lt;/select&gt;Allowed target range: 10us - 10s.&lt;Br /&gt;Default value: 5ms.">
+													<option value="us">
+														microseconds (us)
+													</option>
+													<option value="ms" selected="">
+														milliseconds (ms)
+													</option>
+													<option value="secs">
+														seconds
+													</option>
+												</select>
+												<span class="ui-icon ui-icon-muted ui-icon-info" style="left: 159px; top: 8px;">
+												</span>
+											</div>
+											<label>
+												<span class="text">
+													Interval
+												</span>
+											</label>
+											<div style="display:inline;">
+												<input name="interval-down" type="text">
+											</div>
+											<div style="display:inline;">
+												<select class="suffix" name="suffix-interval-down" data-infotip="Enter dropping mode when the minimum queue delay has exceeded target for a time greater than configured interval.&lt;br &gt;&lt;/select&gt;Allowed interval range: 1ms - 20s.&lt;br /&gt;Default value: 100ms.">
+													<option value="us">
+														microseconds (us)
+													</option>
+													<option value="ms" selected="">
+														milliseconds (ms)
+													</option>
+													<option value="secs">
+														seconds
+													</option>
+												</select>
+												<span class="ui-icon ui-icon-muted ui-icon-info" style="left: 159px; top: 8px;">
+												</span>
+											</div>
+											<label>
+												<span class="text">
+													ECN
+												</span>
+											</label>
+											<div>
+												<input type="checkbox" name="ecn-down" value="enable" checked="">Enable (Mark packets instead of dropping them)
+											</div>
+											<label>
+												<span class="text">
+													Flows
+												</span>
+											</label>
+											<div>
+												<input name="flows-down" type="text" value="1024" data-infotip="number of flows into which the incoming packets are classified.&lt;br /&gt;Range: 1-65535">
+												<span class="ui-icon ui-icon-muted ui-icon-info" style="left: 143px; top: 8px;">
+												</span>
+											</div>
+											<label>
+												<span class="text">
+													Limit
+												</span>
+											</label>
+											<div>
+												<input name="limit-down" type="text" value="10240" data-infotip="Hard limit on the real queue size. &lt;br /&gt;Queue size in packets: 1-1000000">
+												<span class="ui-icon ui-icon-muted ui-icon-info" style="left: 143px; top: 8px;">
+												</span>
+											</div>
+											<label>
+												<span class="text">
+													FQ_CODEL Quantum
+												</span>
+											</label>
+											<div style="display:inline;">
+												<input name="fq-down" type="text" value="1514">
+											</div>
+											<div style="display:inline;">
+												<span data-infotip="Packet scheduling quantum for FQ_CODEL.&lt;br &gt;&lt;/span&gt;Packet scheduling quantum (bytes): 256-65535">
+													bytes
+												</span>
+												<span class="ui-icon ui-icon-muted ui-icon-info" style="left: 35px; top: 8px;">
+												</span>
+											</div>
+											<label>
+												<span class="text">
+													HTB Quantum
+												</span>
+											</label>
+											<div style="display:inline;">
+												<input name="htb-down" type="text">
+											</div>
+											<div style="display:inline;">
+												<span data-infotip="Packet scheduling quantum for HTB.&lt;br &gt;&lt;/span&gt;Packet scheduling quantum (bytes): 1-65535">
+													bytes
+												</span>
+												<span class="ui-icon ui-icon-muted ui-icon-info" style="left: 35px; top: 8px;">
+												</span>
+											</div>
+										</div>
+									</div>
+<!-- End of Download Section -->
+									<div class="clear">
+									</div>
+									<button type="button" class="addable-remove ui-button ui-widget ui-state-default ui-corner-all ui-button-text-icon-primary" data-level="0" data-parent="global" role="button" aria-disabled="false">
+										<span class="ui-button-icon-primary ui-icon ui-icon-minus">
+										</span>
+										<span class="ui-button-text">
+											Remove
+										</span>
+									</button>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="clear">
+					</div>
+				</div>
+			</fieldset>
+			<fieldset class="actions">
+				<div>
+					<button type="button" class="delete ui-button ui-widget ui-state-default ui-corner-all ui-button-text-icon-primary" role="button" aria-disabled="false">
+						<span class="ui-button-icon-primary ui-icon ui-icon-close">
+						</span>
+						<span class="ui-button-text">
+							Delete
+						</span>
+					</button>
+					<button type="button" class="cancel ui-button ui-widget ui-state-default ui-corner-all ui-button-text-icon-primary" role="button" aria-disabled="false">
+						<span class="ui-button-icon-primary ui-icon ui-icon-cancel">
+						</span>
+						<span class="ui-button-text">
+							Cancel
+						</span>
+					</button>
+					<button type="submit" class="apply ui-button ui-widget ui-state-default ui-corner-all ui-button-text-icon-primary" role="button" aria-disabled="false">
+						<span class="ui-button-icon-primary ui-icon ui-icon-disk">
+						</span>
+						<span class="ui-button-text">
+							Apply
+						</span>
+					</button>
+					<button type="button" class="remove hidden">
+						Delete From List
+					</button>
+				</div>
+			</fieldset>
+		</form>
+	</div>
+</div>
+<div id="Hosts" class="wide tall ui-layout-pane ui-layout-container" style="display: block; overflow: hidden; position: relative;">
+	<div class="ui-layout-center ui-layout-pane ui-layout-pane-center" id="HostsCanvas" style="position: absolute; margin: 0px; left: 0px; right: 305px; top: 0px; bottom: 0px; height: 475px; width: 991px; z-index: 0; display: block; visibility: visible;">
+		<div class="canvas tall">
+			<svg height="455" width="991">
+				<g transform="translate(495.5,20)">
+					<g class="node config" transform="translate(0,207.5)">
+						<circle r="4.5" class="">
+						</circle>
+						<text x="10" dy=".35em" text-anchor="start">
+							<tspan x="10" dy="0.35em">
+								config
+							</tspan>
+						</text>
+						<circle class="ghostCircle" r="30" opacity="0" pointer-events="" style="fill: #ff0000;">
+						</circle>
+					</g>
+				</g>
+			</svg>
+		</div>
+		<div id="HostsConfig">
+			<div class="drop-down-button">
+				<ul class="action-list" style="left: 505.5px; top: 235.5px;">
+					<li>
+						<a class="action-add-root" data-type="root">
+							Add Root
+						</a>
+					</li>
+				</ul>
+			</div>
+		</div>
+	</div>
+	<div class="ui-layout-east ui-layout-pane ui-layout-pane-east" id="HostsTypes" style="position: absolute; margin: 0px; left: auto; right: 0px; top: 0px; bottom: 0px; height: 475px; z-index: 0; width: 300px; display: block; visibility: visible;">
+		<div class="section-container">
+			<div class="table-container">
+				<div id="HostsTypeAdd" class="add">
+					<div class="drop-down-button">
+						<button type="button" class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-icon-secondary" role="button" aria-disabled="false">
+							<span class="ui-button-text">
+								Add Queue Type
+							</span>
+							<span class="ui-button-icon-secondary ui-icon ui-icon-triangle-1-s">
+							</span>
+						</button>
+						<ul class="action-list">
+							<li>
+								<a class="add-fq-codel">
+									Add FQ_CODEL
+								</a>
+							</li>
+							<li>
+								<a class="add-hfq">
+									Add HFQ
+								</a>
+							</li>
+							<li>
+								<a class="add-sfq">
+									Add SFQ
+								</a>
+							</li>
+							<li>
+								<a class="add-pfifo">
+									Add PFIFO
+								</a>
+							</li>
+						</ul>
+					</div>
+				</div>
+				<div id="DataTables_Table_2_wrapper" class="dataTables_wrapper onepage" role="grid">
+					<div class="fg-toolbar ui-toolbar ui-widget-header ui-corner-tl ui-corner-tr ui-helper-clearfix">
+						<div class="dataTables_filter" id="DataTables_Table_2_filter">
+							<label>
+								<input type="text" aria-controls="DataTables_Table_2" id="qos_advanced_queue_types_table_search_box" placeholder="Search queue types">
+							</label>
+						</div>
+					</div>
+					<div class="dataTables_scroll">
+						<div class="dataTables_scrollHead ui-state-default" style="overflow: hidden; position: relative; border: 0px; width: 100%;">
+							<div class="dataTables_scrollHeadInner" style="width: 300px; padding-right: 0px;">
+								<table class="data-table ip-table dataTable" style="margin-left: 0px; width: 300px;">
+									<thead>
+										<tr role="row">
+											<th class="name ui-state-default" role="columnheader" tabindex="0" aria-controls="DataTables_Table_2" rowspan="1" colspan="1" style="width: 88px;" aria-sort="ascending" aria-label="Name: activate to sort column descending">
+												<div class="DataTables_sort_wrapper">
+													Name
+													<span class="DataTables_sort_icon css_right ui-icon ui-icon-triangle-1-n">
+													</span>
+												</div>
+											</th>
+											<th class="type ui-state-default" role="columnheader" tabindex="0" aria-controls="DataTables_Table_2" rowspan="1" colspan="1" style="width: 80px;" aria-label="Type: activate to sort column ascending">
+												<div class="DataTables_sort_wrapper">
+													Type
+													<span class="DataTables_sort_icon css_right ui-icon ui-icon-carat-2-n-s">
+													</span>
+												</div>
+											</th>
+											<th class="ui-state-default buttons" role="columnheader" rowspan="1" colspan="1" style="width: 50px;" aria-label="">
+												<div class="DataTables_sort_wrapper">
+													<span class="DataTables_sort_icon">
+													</span>
+												</div>
+											</th>
+										</tr>
+									</thead>
+								</table>
+							</div>
+						</div>
+						<div class="dataTables_scrollBody" style="overflow: auto; height: 32px; width: 100%;">
+							<table class="data-table ip-table dataTable" id="DataTables_Table_2" aria-describedby="DataTables_Table_2_info" style="margin-left: 0px; width: 100%;">
+								<thead>
+									<tr role="row" style="height: 0px;">
+										<th class="name ui-state-default" role="columnheader" tabindex="0" aria-controls="DataTables_Table_2" rowspan="1" colspan="1" style="padding-top: 0px; padding-bottom: 0px; border-top-width: 0px; border-bottom-width: 0px; height: 0px; width: 88px;" aria-sort="ascending" aria-label="Name: activate to sort column descending">
+										</th>
+										<th class="type ui-state-default" role="columnheader" tabindex="0" aria-controls="DataTables_Table_2" rowspan="1" colspan="1" style="padding-top: 0px; padding-bottom: 0px; border-top-width: 0px; border-bottom-width: 0px; height: 0px; width: 80px;" aria-label="Type: activate to sort column ascending">
+										</th>
+										<th class="ui-state-default buttons" role="columnheader" rowspan="1" colspan="1" style="width: 50px; padding-top: 0px; padding-bottom: 0px; border-top-width: 0px; border-bottom-width: 0px; height: 0px;" aria-label="">
+										</th>
+									</tr>
+								</thead>
+								<tbody role="alert" aria-live="polite" aria-relevant="all">
+									<tr class="odd">
+										<td valign="top" colspan="3" class="dataTables_empty">
+											No queue type found.
+										</td>
+									</tr>
+								</tbody>
+							</table>
+						</div>
+					</div>
+					<div class="fg-toolbar ui-toolbar ui-widget-header ui-corner-bl ui-corner-br ui-helper-clearfix">
+						<div class="dataTables_info" id="DataTables_Table_2_info">
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	<div id="" class="ui-layout-resizer ui-layout-resizer-east ui-layout-resizer-open ui-layout-resizer-east-open" title="Resize" aria-disabled="false" style="position: absolute; padding: 0px; margin: 0px; font-size: 1px; text-align: left; overflow: hidden; z-index: 2; cursor: e-resize; right: 300px; height: 475px; width: 5px; top: 0px;">
+		<div id="" class="ui-layout-toggler ui-layout-toggler-east ui-layout-toggler-open ui-layout-toggler-east-open" title="Close" style="position: absolute; display: block; padding: 0px; margin: 0px; overflow: hidden; text-align: center; font-size: 1px; cursor: pointer; z-index: 1; visibility: visible; height: 48px; width: 5px; top: 212px; left: 0px;">
+		</div>
+	</div>
+</div>
+</div>
+</div>

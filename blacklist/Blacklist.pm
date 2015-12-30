@@ -1,15 +1,14 @@
 package EdgeOS::DNS::Blacklist;
-use parent 'Exporter';    # imports and subclasses Exporter
+use parent 'Exporter'; # imports and subclasses Exporter
 
 use v5.14;
-use lib q{/opt/vyatta/share/perl5/};
 use EdgeOS::DNS::Blacklist;
 use File::Basename;
 use Getopt::Long;
 use HTTP::Tiny;
+use lib q{/opt/vyatta/share/perl5/};
 use POSIX qw{geteuid};
 use Sys::Syslog qw(:standard :macros);
-use Term::ReadKey qw(GetTerminalSize);
 use threads;
 use URI;
 use Vyatta::Config;
@@ -18,6 +17,7 @@ use constant TRUE  => 1;
 use constant FALSE => 0;
 
 # require Exporter;
+
 our @ISA = qw(Exporter);
 
 # Items to export into callers namespace by default. Note: do not export
@@ -34,7 +34,6 @@ our @EXPORT_OK = (
     delete_file
     get_cfg_actv
     get_cfg_file
-    get_cols
     get_file
     get_url
     is_admin
@@ -44,10 +43,12 @@ our @EXPORT_OK = (
     log_msg
     popx
     process_data
+    pushx
+    usage
     write_file
     }
 );
-our $VERSION = q{1.1};
+our $VERSION = q{1.0};
 our $c       = {
   off => qq{\033[?25l},
   on  => qq{\033[?25h},
@@ -56,35 +57,7 @@ our $c       = {
   mag => qq{\033[95m},
   red => qq{\033[91m},
 };
-our @EXPORT = ();
-
-# Remove previous configuration files
-sub delete_file {
-  my $input = shift;
-
-  if ( -f $input->{file} ) {
-    log_msg(
-      {
-        msg_typ => q{info},
-        msg_str => sprintf q{Deleting file %s},
-        $input->{file},
-      }
-    );
-    unlink $input->{file};
-  }
-
-  if ( -f $input->{file} ) {
-    log_msg(
-      {
-        msg_typ => q{warning},
-        msg_str => sprintf q{Unable to delete %s},
-        $input->{file},
-      }
-    );
-    return;
-  }
-  return TRUE;
-}
+our @EXPORT  = ();
 
 # Process the active (not committed or saved) configuration
 sub get_cfg_actv {
@@ -129,6 +102,10 @@ sub get_cfg_actv {
         $input->{config}->{$area}->{blklst}->{$key} = 1;
       }
 
+      while ( my ( $key, $value ) = each $input->{config}->{exclude} ) {
+        $input->{config}->{$area}->{exclude}->{$key} = $value;
+      }
+
       for my $key ( $config->$returnValues(q{exclude}) ) {
         $input->{config}->{$area}->{exclude}->{$key} = 1;
       }
@@ -144,8 +121,8 @@ sub get_cfg_actv {
       for my $source ( $config->$listNodes(q{source}) ) {
         $config->setLevel(
           qq{service dns forwarding blacklist $area source $source});
-        @{ $input->{config}->{$area}->{src}->{$source} }{qw(description prefix url)}
-          = ( $config->$returnValue(q{description}), $config->$returnValue(q{prefix}), $config->$returnValue(q{url}) );
+        @{ $input->{config}->{$area}->{src}->{$source} }{qw(prefix url)}
+          = ( $config->$returnValue(q{prefix}), $config->$returnValue(q{url}) );
       }
     }
   }
@@ -203,6 +180,9 @@ sub get_cfg_file {
       @{ $input->{config}->{$area} }{qw(blklst exclude src)}
         = @{ $tmp_ref->{$area} }{qw(include exclude source)};
 
+      while ( my ( $key, $value ) = each %{ $tmp_ref->{$area}->{exclude} } ) {
+        $input->{config}->{$area}->{exclude}->{$key} = $value;
+      }
     }
   }
   else {
@@ -218,12 +198,32 @@ sub get_cfg_file {
   return TRUE;
 }
 
-sub get_cols {
-  local $SIG{__WARN__} = sub {TRUE};
-  return ( ( GetTerminalSize( \*STDOUT ) )[0]
-      || $ENV{COLUMNS}
-      || qx{tput cols}
-      || 80 );
+# Remove previous configuration files
+sub delete_file {
+  my $input = shift;
+
+  if ( -f $input->{file} ) {
+    log_msg(
+      {
+        msg_typ => q{info},
+        msg_str => sprintf q{Deleting file %s},
+        $input->{file},
+      }
+    );
+    unlink $input->{file};
+  }
+
+  if ( -f $input->{file} ) {
+    log_msg(
+      {
+        msg_typ => q{warning},
+        msg_str => sprintf q{Unable to delete %s},
+        $input->{file},
+      }
+    );
+    return;
+  }
+  return TRUE;
 }
 
 # Read a file into memory and return the data to the calling function
@@ -253,6 +253,7 @@ sub get_hash {
   }
 
   ${$hash} = $value if $value;
+
   return $hash_ref;
 }
 
@@ -284,31 +285,36 @@ LINE:
 
     for ($line) {
       when (/$re->{MULT}/) {
-        push( @nodes, $+{MULT}, $+{VALU}, 1 );
+        push @nodes, $+{MULT};
+        push @nodes, $+{VALU};
+        push @nodes, 1;
         get_hash( { nodes => \@nodes, hash_ref => $cfg_ref } );
-        popx( \@nodes, 3 );
+        popx( { array => \@nodes, X => 3 } );
       }
       when (/$re->{NODE}/) {
         push @nodes, $+{NODE};
       }
       when (/$re->{LEAF}/) {
         $level++;
-        push( @nodes, $+{LEAF}, $+{NAME} );
+        push @nodes, $+{LEAF};
+        push @nodes, $+{NAME};
       }
       when (/$re->{NAME}/) {
-        push( @nodes, $+{NAME}, $+{VALU} );
+        push @nodes, $+{NAME};
+        push @nodes, $+{VALU};
         get_hash( { nodes => \@nodes, hash_ref => $cfg_ref } );
-        popx( \@nodes, 2 );
+        popx( { array => \@nodes, X => 2 } );
       }
       when (/$re->{DESC}/) {
-        push( @nodes, $+{NAME}, $+{DESC} );
+        push @nodes, $+{NAME};
+        push @nodes, $+{DESC};
         get_hash( { nodes => \@nodes, hash_ref => $cfg_ref } );
-        popx( \@nodes, 2 );
+        popx( { array => \@nodes, X => 2 } );
       }
       when (/$re->{MISC}/) {
-        push( @nodes, $+{MISC}, $+{MISC} );
+        pushx( { array => \@nodes, items => \$+{MISC}, X => 2 } );
         get_hash( { nodes => \@nodes, hash_ref => $cfg_ref } );
-        popx( \@nodes, 2 );
+        popx( { array => \@nodes, X => 2 } );
       }
       when (/$re->{CMNT}/) {
         next;
@@ -413,7 +419,7 @@ sub is_version {
 
 # Log and print (if -v)
 sub log_msg {
-  my $input   = shift;
+  my $input = shift;
   my $log_msg = {
     alert    => LOG_ALERT,
     critical => LOG_CRIT,
@@ -444,10 +450,10 @@ sub log_msg {
 
 # pop array x times
 sub popx {
-  my ( $array, $count ) = ( shift, shift );
-  return if !@{$array};
-  for ( 1 .. $count ) {
-    pop @{$array};
+  my $input = shift;
+  return if !$input->{X};
+  for ( 1 .. $input->{X} ) {
+    pop @{ $input->{array} };
   }
   return TRUE;
 }
@@ -461,7 +467,7 @@ sub process_data {
     LSPACE => qr{\A\s+}oms,
     RSPACE => qr{\s+\z}oms,
     PREFIX => qr{\A $input->{prefix} }xms,
-    SUFFIX => qr{(?:#.*|\{.*|[/[].*)\z}oms,
+    SUFFIX => qr{(?:#.*\z|\{.*\z|[/[].*\z)}oms,
   };
 
   # Clear the status lines
@@ -471,8 +477,10 @@ sub process_data {
 LINE:
   for my $line ( keys %{ $input->{data} } ) {
     next LINE if $line eq q{} || !defined $line;
-    $line =~ s/$re->{PREFIX}|$re->{SUFFIX}//g;
-    $line =~ s/$re->{LSPACE}|$re->{RSPACE}//g;
+    $line =~ s/$re->{PREFIX}//;
+    $line =~ s/$re->{SUFFIX}//;
+    $line =~ s/$re->{LSPACE}//;
+    $line =~ s/$re->{RSPACE}//;
 
     # Get all of the FQDNs or domains in the line
     my @elements = $line =~ m/$re->{FQDOMN}/gc;
@@ -548,6 +556,16 @@ LINE:
   return;
 }
 
+# push array x times
+sub pushx {
+  my $input = shift;
+  return if !$input->{X};
+  for ( 1 .. $input->{X} ) {
+    push @{ $input->{array} }, $input->{items};
+  }
+  return TRUE;
+}
+
 # Write the data to file
 sub write_file {
   my $input = shift;
@@ -590,6 +608,7 @@ EdgeOS::DNS::Blacklist - Perl extension for EdgeOS dnsmasq blacklist configurati
   log_msg
   popx
   process_data
+  pushx
   usage
   write_file});
 

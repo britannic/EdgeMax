@@ -1,24 +1,40 @@
 {
   "rules": {
-    "blackholeip": {
+    "dns_redirect_ip": {
       "ipv4": 1,
       "required": true
     },
-    "exclude": {
-      "required": false
+    "hosts": {
+      "dns_redirect_ip": {
+        "ipv4": 1,
+        "required": true
+      },
+      "excludes": {
+        "exclude": {
+          "required": false
+        }
+      },
+      "includes": {
+        "include": {
+          "required": false
+        }
+      },
+      "sources": {
+        "prefix": {
+          "required": true
+        },
+        "source": {
+          "required": true
+        },
+        "url": {
+          "required": true
+        }
+      }
     },
-    "include": {
-      "required": false
-    },
-    "prefix": {
-      "required": true
-    },
-    "source": {
-      "required": true
-    },
-    "url": {
-      "required": true
+    "includes": {
+      "include": {
+        "required": false
+      }
     }
   }
 }
-

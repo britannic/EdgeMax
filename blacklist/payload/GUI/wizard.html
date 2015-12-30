@@ -1,180 +1,286 @@
 <div class="instructions">
 	dnsmasq Blacklist DNS Redirection
 </div>
-<fieldset name="blacklist-setup" class="primary expanded">
+<fieldset name="global" class="primary expanded">
 	<legend>
 		<b>
 			Blacklist
 		</b>
 	</legend>
-	<div class="clear">
-	</div>
-	<div style="position: relative; left: 35 px; right: 0px; top: 0px;">
+	<div class="addable" data-min="0" data-object="global" data-objectify="1">
+	<div class="addable" data-min="0" data-object="excludes" data-objectify="1">
+
 		<span class="text">
 			<b>
 				Enable Blacklist
 			</b>
 		</span>
-	</div>
-	<div class="checkbox-toggle">
-		<div align="left" style="position: relative; left: 5px; right: 20px; top: 0px;">
-			<span data-infotip="Blacklist updates will run if a task has been added to the task scheduler.">
-				<input name="disabled" type="checkbox" value="disabled" />
-			</span>
-		</div>
-		<div class="toggled hidden">
-			<div class="toggled hidden" align="right" style="position: relative; left: 25px; right: 20px; top: 0px;">
-				<span class="text">
-					<b>
-						DNS Redirect IP
-					</b>
-				</span> </div>
-			<div style="position: relative; left: 30px; right: 20px; top: 0px;">
-				<span>
-					<input type="text" name="dns_redirect_ip" data-default="0.0.0.0" style="width:140px;margin-right:5px" data-infotip="IP address to redirect blacklisted hosts to." />
-				</div>
-			</span>
-			<div class="clear">
+		<div class="addable-template">
+			<div>
+				<input type="text" class="" name="exclude" style="width:160px;margin-right:25px" data-infotip="Enter a unique host name&lt;br&gt;This field is mandatory, for example:&lt;br&gt;&lt;b&gt;firstname&lt;/b&gt;" />
 			</div>
-		</div>
-		<div class="toggled hidden">
-		</div>
-		<div class="instructions">
-			Configure a source description, URL and prefix. The source will provide a list of hostnames to block and the prefix contains all of the text that must be stripped to leave the hostname.
-		</div>
-		<div class="addable" data-min="0" data-object="sources" data-objectify="1">
-			<div class="addable-template">
-				<div>
-					<input type="text" name="src" style="width:100px;margin-right:25px" data-infotip="Unique name for the downloadable source." />
-				</div>
-				<div>
-					<input type="text" name="description" style="width:120px;margin-right:25px" data-infotip="Brief source description." />
-				</div>
-
-				<div>
-					<input type="text" name="prefix" style="width:150px;margin-right:25px" data-infotip="The prefix must include everything (spaces, text, numbers etc.) before the hostname." />
-				</div>
-				<div>
-					<input type="text" name="url" value="http://" style="width:300px;margin-right:25px" data-infotip="Source URL providing a downloadable list of blacklisted hosts." />
-				</div>
-				<div>
-					<button type="button" class="addable-remove">
-						Remove
-					</button>
-				</div>
+			<div>
+				<input type="text" class="text" name="alias" style="width:200px;margin-right:25px" data-infotip="Enter one or more alias names, separated by comma&lt;br&gt;This field is optional, for example:&lt;br&gt;&lt;b&gt;secondname,thirdname&lt;/b&gt;" />
 			</div>
-			<table class="addable-container">
-				<tr>
-					<th>
-						<b>
-							Source Name
-						</b>
-					</th>
-					<th>
-						<b>
-							Description
-						</b>
-					</th>
-					<th>
-						<b>
-							Prefix
-						</b>
-					</th>
-					<th>
-						<b>
-							Source URL
-						</b>
-					</th>
-					<th>
-					</th>
-<!-- source and prefix pairs will be inserted here -->
-				</table>
-				<button type="button" class="addable-add">
-					Add New
+			<div>
+				<input type="text" class="address" name="inet" style="width:110px;margin-right:25px" data-infotip="Enter the corresponding IP address&lt;br&gt;This field is mandatory, for example:&lt;br&gt;&lt;b&gt;192.168.1.100&lt;/b&gt;" />
+			</div>
+			<div>
+				<button type="button" class="addable-remove">
+					Remove
 				</button>
 			</div>
 		</div>
+		<table class="addable-container">
+			<tr>
+				<th>
+					Host Name
+				</th>
+				<th>
+					Alias
+				</th>
+				<th>
+					IP Address
+				</th>
+				<th>
+				</th>
+			</tr>
+<!-- static mappings will be inserted here -->
+		</table>
+		<button type="button" class="addable-add">
+			Add New
+		</button>
+	</div></div>
+</div>
+<div class="addable" data-object="dns-options" style="float:right;margin-right:15px">
+	<label data-infotip="Blacklist updates will run if a task has been added to the task scheduler.">
+		<input type="checkbox" name="disabled" value="false" />Enable Blacklist
+	</label>
+</div>
+</fieldset>
+<fieldset name="dynamic-mapping" class="primary">
+	<legend>
+		Dynamic host names
+	</legend>
+	<div class="addable" data-object="dynamic-mapping" data-objectify="1">
+		<div class="addable-template">
+			<div>
+				<input disabled type="text" name="dname" style="border:none;background:none;color:dimgray;padding:0;width:180px;" />
+			</div>
+			<div>
+				<input disabled type="text" name="dpool" style="border:none;background:none;color:dimgray;padding:0;width:120px;" />
+			</div>
+			<div>
+				<input disabled type="text" name="dinet" style="border:none;background:none;color:dimgray;padding:0;width:110px;" />
+			</div>
+			<div>
+				<input disabled type="text" name="dinfo" style="border:none;background:none;color:dimgray;padding:0;" />
+			</div>
+		</div>
+		<table class="addable-container">
+			<tr style="border-bottom:1px solid #d0d0d0;">
+				<th>
+					Host Name
+				</th>
+				<th>
+					Pool
+				</th>
+				<th>
+					IP Address
+				</th>
+				<th>
+				</th>
+			</tr>
+<!-- dynamic mappings will be inserted here -->
+		</table>
+		<button disabled type="button" class="addable-add hidden">
+		</button>
 	</div>
 </fieldset>
-<fieldset name="included-hosts" class="primary expanded toggled hidden">
-	<div class="checkbox-toggle">
-		<legend>
-			<b>
-				Include Additional Blacklisted Hosts
-			</b>
-		</legend>
-		<div class="instructions">
-			Add hostnames to the blacklist that aren't in the downloaded source lists.
-		</div>
-		<div class="addable" data-min="0" data-object="includes" data-objectify="1">
-			<div class="addable-template">
-				<div class="multi">
-					<div>
-						<span class="text">
-							<b>
-								Include
-							</b>
-						</span>
-					</div>
-					<div>
-						<span>
-							<input type="text" name="include" style="width:260px;margin-right:25px" data-infotip="Hostname to include in the blacklist, that isn't in the source download." />
-						</span>
-					</div>
-					<div>
-						<button type="button" class="addable-remove">
-							Remove
-						</button>
-					</div>
-				</div>
-			</div>
-			<div class="addable-container">
-<!-- included blacklist hosts will be inserted here -->
-			</div>
-			<button type="button" class="addable-add">
+<!--
+
+<FIELDSET NAME="global" CLASS="primary expanded">
+	<LEGEND>
+		<B>
+			Blacklist
+		</B>
+	</LEGEND>
+	<DIV CLASS="clear">
+	</DIV>
+	<DIV STYLE="position: relative; left: 35 px; right: 0px; top: 0px;">
+		<SPAN CLASS="text">
+			<B>
+				Enable Blacklist
+			</B>
+		</SPAN>
+	</DIV>
+	<DIV CLASS="checkbox-toggle">
+		<DIV CLASS="checkbox-toggle" DATA-MIN="0" DATA-OBJECT="global" DATA-OBJECTIFY="1">
+			<DIV ALIGN="left" STYLE="position: relative; left: 5px; right: 20px; top: 0px;">
+				<SPAN DATA-INFOTIP="Blacklist updates will run if a task has been added to the task scheduler.">
+					<INPUT NAME="disabled" TYPE="checkbox" VALUE="disabled" />
+				</SPAN>
+			</DIV>
+			<DIV CLASS="toggled hidden">
+				<DIV CLASS="toggled hidden" ALIGN="right" STYLE="position: relative; left: 25px; right: 20px; top: 0px;">
+					<SPAN CLASS="text">
+						<B>
+							DNS Redirect IP
+						</B>
+					</SPAN>
+				</DIV>
+				<DIV STYLE="position: relative; left: 30px; right: 20px; top: 0px;">
+					<SPAN>
+						<INPUT TYPE="text" NAME="dns_redirect_ip" DATA-DEFAULT="0.0.0.0" STYLE="width:140px;margin-right:5px" DATA-INFOTIP="Blacklisted hosts will be redirected to this IP." />
+					</DIV>
+				</SPAN>
+				<DIV CLASS="clear">
+				</DIV>
+			</DIV>
+		</DIV>
+	</DIV>
+</DIV>
+<DIV CLASS="checkbox-toggle">
+	<LEGEND>
+		<B>
+			Exclude Additional Blacklisted Hosts
+		</B>
+	</LEGEND>
+	<DIV CLASS="instructions">
+		Whitelist hosts that you want to exclude from the downloaded source lists.
+	</DIV>
+	<DIV CLASS="addable" DATA-MIN="0" DATA-OBJECT="excludes" DATA-OBJECTIFY="1">
+		<DIV CLASS="addable-template">
+			<DIV CLASS="multi">
+				<DIV>
+					<SPAN CLASS="text">
+						<B>
+							Exclude
+						</B>
+					</SPAN>
+				</DIV>
+				<DIV>
+					<SPAN>
+						<INPUT TYPE="text" NAME="exclude" STYLE="width:260px;margin-right:25px" DATA-INFOTIP="Hostname to exclude from the blacklist, that is already in the source download." />
+					</SPAN>
+				</DIV>
+				<DIV>
+					<BUTTON TYPE="button" CLASS="addable-remove">
+						Remove
+					</BUTTON>
+				</DIV>
+			</DIV>
+		</DIV>
+		<DIV CLASS="addable-container">
+<!~~ excluded blacklist hosts will be inserted here ~~>
+		</DIV>
+		<BUTTON TYPE="button" CLASS="addable-add">
+			Add New
+		</BUTTON>
+	</DIV>
+</DIV>
+</FIELDSET>
+<FIELDSET NAME="hosts" CLASS="primary expanded toggled expanded">
+	<DIV CLASS="addable" DATA-OBJECT="hosts" DATA-OBJECTIFY="1">
+		<DIV>
+			<DIV ALIGN="right" STYLE="position: relative; left: 5px;">
+				<SPAN CLASS="text">
+					<B>
+						DNS Redirect IP
+					</B>
+				</SPAN>
+			</DIV>
+			<DIV>
+				<SPAN>
+					<INPUT TYPE="text" NAME="hosts_dns_redirect_ip" DATA-DEFAULT="0.0.0.0" STYLE="width:140px; margin-left: 30px; margin-right:5px" DATA-INFOTIP="Blacklisted hosts will be redirected to this IP." />
+				</DIV>
+			</SPAN>
+			<DIV CLASS="clear">
+			</DIV>
+		</DIV>
+	</DIV>
+	<DIV CLASS="instructions">
+		Configure a source description, URL and prefix. The source will provide a list of hostnames to block and the prefix contains all of the text that must be stripped to leave the hostname.
+	</DIV>
+	<DIV CLASS="addable" DATA-MIN="0" DATA-OBJECT="excludes" DATA-OBJECTIFY="1">
+		<DIV CLASS="addable-template">
+			<DIV CLASS="multi">
+				<DIV>
+					<SPAN CLASS="text">
+						<B>
+							Exclude
+						</B>
+					</SPAN>
+				</DIV>
+				<DIV>
+					<SPAN>
+						<INPUT TYPE="text" NAME="exclude" STYLE="width:260px;margin-right:25px" DATA-INFOTIP="Hostname to exclude from the blacklist." />
+					</SPAN>
+				</DIV>
+				<DIV>
+					<BUTTON TYPE="button" CLASS="addable-remove">
+						Remove
+					</BUTTON>
+				</DIV>
+			</DIV>
+		</DIV>
+		<DIV CLASS="addable-container">
+<!~~ excluded blacklist hosts will be inserted here ~~>
+		</DIV>
+		<BUTTON TYPE="button" CLASS="addable-add">
+			Add New
+		</BUTTON>
+	</DIV>
+	<DIV CLASS="addable" DATA-MIN="0" DATA-OBJECT="sources" DATA-OBJECTIFY="1">
+		<DIV CLASS="addable-template">
+			<DIV>
+				<INPUT TYPE="text" NAME="source" STYLE="width:100px;margin-right:25px" DATA-INFOTIP="Unique name for the downloadable source." />
+			</DIV>
+			<DIV>
+				<INPUT TYPE="text" NAME="desc" STYLE="width:120px;margin-right:25px" DATA-INFOTIP="Brief source description." />
+			</DIV>
+			<DIV>
+				<INPUT TYPE="text" NAME="prefix" STYLE="width:150px;margin-right:25px" DATA-INFOTIP="The prefix must include everything (spaces, text, numbers etc.) before the hostname." />
+			</DIV>
+			<DIV>
+				<INPUT TYPE="text" NAME="url" VALUE="http://" STYLE="width:300px;margin-right:25px" DATA-INFOTIP="Source URL providing a downloadable list of blacklisted hosts." />
+			</DIV>
+			<DIV>
+				<BUTTON TYPE="button" CLASS="addable-remove">
+					Remove
+				</BUTTON>
+			</DIV>
+		</DIV>
+		<TABLE CLASS="addable-container">
+			<TR>
+				<TH>
+					<B>
+						Source Name
+					</B>
+				</TH>
+				<TH>
+					<B>
+						Description
+					</B>
+				</TH>
+				<TH>
+					<B>
+						Prefix
+					</B>
+				</TH>
+				<TH>
+					<B>
+						Source URL
+					</B>
+				</TH>
+				<TH>
+				</TH>
+<!~~ source and prefix pairs will be inserted here ~~>
+			</TABLE>
+			<BUTTON TYPE="button" CLASS="addable-add">
 				Add New
-			</button>
-		</div>
-	</div>
-</fieldset>
-<fieldset name="globally-excluded-hosts" class="primary expanded toggled hidden">
-	<div class="checkbox-toggle">
-		<legend>
-			<b>
-				Exclude Additional Blacklisted Hosts
-			</b>
-		</legend>
-		<div class="instructions">
-			Add hostnames to the whitelist that you want to exclude from the downloaded source lists.
-		</div>
-		<div class="addable" data-min="0" data-object="excludes" data-objectify="1">
-			<div class="addable-template">
-				<div class="multi">
-					<div>
-						<span class="text">
-							<b>
-								Exclude
-							</b>
-						</span>
-					</div>
-					<div>
-						<span>
-							<input type="text" name="exclude" style="width:260px;margin-right:25px" data-infotip="Hostname to exclude from the blacklist, that is already in the source download." />
-						</span>
-					</div>
-					<div>
-						<button type="button" class="addable-remove">
-							Remove
-						</button>
-					</div>
-				</div>
-			</div>
-			<div class="addable-container">
-<!-- excluded blacklist hosts will be inserted here -->
-			</div>
-			<button type="button" class="addable-add">
-				Add New
-			</button>
-		</div>
-	</div>
-</fieldset>
+			</BUTTON>
+		</DIV>
+	</DIV>
+</FIELDSET>
+ -->

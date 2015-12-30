@@ -21,13 +21,13 @@ use Getopt::Long;
 use lib q{/opt/vyatta/share/perl5/};
 use lib q{/config/lib/perl/};
 use Sys::Syslog qw(:standard :macros);
-use Term::ReadKey qw(GetTerminalSize);
 use threads;
 use v5.14;
 use EdgeOS::DNS::Blacklist (
   qw{
     $c
     delete_file
+    get_cols
     get_cfg_actv
     get_cfg_file
     get_file
@@ -45,7 +45,7 @@ use constant FALSE => 0;
 
 my ( $cfg_file, $show );
 my $version = q{3.5.2};
-my ($cols) = GetTerminalSize() // qx{tput cols};
+my $cols    = get_cols();
 
 ############################### script runs here ###############################
 &main();
@@ -276,9 +276,10 @@ sub main {
             }
           );
 
-          # Delete $data->{data} key and data
+          # Delete $data->{data}
           delete $data->{data};
 
+          # Write blacklist to file, change to domain format if area = domains
           if ( $cfg->{$area}->{src}->{ $data->{src} }->{icount} > 0 ) {
             my $equals = $area ne q{domains} ? q{=/} : q{=/.};
             write_file(
@@ -296,7 +297,7 @@ sub main {
               }
             );
 
-
+            # Compute statistics
             $cfg->{$area}->{unique} += scalar
               keys %{ $cfg->{$area}->{src}->{ $data->{src} }->{blklst} };
             $cfg->{$area}->{duplicates}
@@ -333,7 +334,7 @@ sub main {
         }
       );
 
-      my @flagged_domains = ();
+      my @flagged_domains;
 
       # Now lets report the domains that were seen more than $cfg->{flag_lvl}
       for my $key (
@@ -395,12 +396,6 @@ sub main {
     }
   }
 
-  # Select the appropriate dnsmasq restart for CLI configure or bash shell
-  my $cmd
-    = is_configure()
-    ? q{/opt/vyatta/sbin/vyatta-dns-forwarding.pl --update-dnsforwarding}
-    : qq{$dnsmasq_svc force-reload > /dev/null 2>1&};
-
   # Clean up the status line
   print $c->{off}, qq{\r}, qq{ } x $cols, qq{\r} if $show;
 
@@ -414,7 +409,7 @@ sub main {
   );
 
   # Reload updated dnsmasq conf address redirection files
-  qx{$cmd};
+  qx{$dnsmasq_svc force-reload > /dev/null 2>1&};
   log_msg(
     {
       cols    => $cols,

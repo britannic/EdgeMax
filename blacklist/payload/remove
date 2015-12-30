@@ -228,7 +228,7 @@ sub exec_shell {
     while ( my ( $cli_out, $cli_err ) = each %{$feed} ) {
       $prg->{calls}++;
       if ($cli_out) {
-        given ($cli_out) {
+        for ($cli_out) {
           when (/$re->{warnings}/) { }
           when (/$re->{info}/)     { }
           when (/$re->{errors}/) {
@@ -246,7 +246,7 @@ sub exec_shell {
         }
       }
       elsif ($cli_err) {
-        given ($cli_err) {
+        for ($cli_err) {
           when (/$re->{warnings}/) { }
           when (/$re->{info}/)     { }
           when (/$re->{errors}/) {
@@ -565,7 +565,7 @@ sub main {
     }
   );
 
-  given ($program) {
+  for ($program) {
     when (m/setup/) {
       if ( is_build() ) {
         log_msg(
@@ -890,7 +890,7 @@ sub setup {
 LINE:
   while ( my $line = <$CF> ) {
     chomp $line;
-    given ($line) {
+    for ($line) {
       when (/^set/) { $line =~ s/\Aset(?<SET>.*)\z/$set$+{SET}/ms; }
       when (/^del/) {
         $line =~ s/\Adelete(?<DEL>.*)\z/$delete$+{DEL}/ms;

@@ -74,7 +74,7 @@ do
 					fi
 					;;
 			3)		clear console
-					./blacklist.t
+					perl -MTest::Harness -e 'runtests @ARGV' ./blacklist.t
 					break
 					;;
 			4)		check existsActive service dns forwarding blacklist
