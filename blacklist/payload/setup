@@ -23,12 +23,14 @@ use File::Basename;
 use Getopt::Long;
 use IO::Select;
 use IPC::Open3;
-use lib q{/opt/vyatta/share/perl5/};
-use lib q{./lib/};
+use lib q{/opt/vyatta/share/perl5};
+use lib q{./lib};
 use Term::ReadKey qw(GetTerminalSize);
 use Sys::Syslog qw(:standard :macros);
 use threads;
 use v5.14;
+use strict;
+use warnings;
 use EdgeOS::DNS::Blacklist (
   qw{
     $c
@@ -51,7 +53,7 @@ chomp( my $version = qx{cat version} );
 my ($cols) = qx{tput cols};
 my $prg     = { errors => 0, calls => 0, };
 my $program = basename($0);
-my $edgeOS  = &is_version();
+my $edgeOS  = is_version();
 my $name    = q{dnsmasq blacklist};
 my $begin   = q{/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper begin};
 my $commit  = q{/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper commit};
@@ -71,7 +73,8 @@ my $cfg     = {
   no_op    => q{/tmp/.update-dnsmasq.no-op},
   oldconf  => qq{{domai*,hos*,zon*}.blacklist.conf},
   oldscrpt => q{update-blacklists-dnsmasq.pl},
-  perl_lib => q{/config/lib/perl},
+  old_lib  => q{/opt/vyatta/share/perl5},
+  lib      => q{/config/lib/perl},
   script   => q{update-dnsmasq.pl},
   scrpt_d  => q{/config/scripts},
   tmplts   => q{/opt/vyatta/share/vyatta-cfg/templates/service/dns/forwarding},
@@ -103,7 +106,7 @@ my $cfg     = {
   },
 };
 ############################### script runs here ###############################
-&main();
+exit if &main();
 ################################################################################
 
 # Remove previous configuration files
@@ -711,18 +714,19 @@ sub remove {
   );
 
   my @commands = (
-    qq{$begin\n},
-    qq{$delete service dns forwarding blacklist\n},
-    qq{$delete system task-scheduler task update_blacklists\n},
-    qq{$commit\n},
-    qq{$save\n},
-    qq{$end\n},
+    qq{sudo $begin\n},
+    qq{sudo $delete service dns forwarding blacklist\n},
+    qq{sudo $delete system task-scheduler task update_blacklists\n},
+    qq{sudo $commit\n},
+    qq{sudo $save\n},
+    qq{sudo $end\n},
   );
 
   # Run configure and execute the commands
   exec_shell( { commands => \@commands } )
     or die qq{Unable to execute removal commands!};
 
+  # Remove configuration templates
   if ( -d qq{$cfg->{tmplts}/blacklist/} ) {
     exec_command(
       {
@@ -745,17 +749,18 @@ sub remove {
     }
   }
 
-  if ( -d qq{$cfg->{perl_lib}/$cfg->{EdgeOS}/} ) {
+  # Remove Blacklist.pm module and lib directories
+  if ( -d qq{$cfg->{lib}/$cfg->{EdgeOS}/} ) {
     exec_command(
       {
-        cmd      => qq{rm -rf "$cfg->{perl_lib}/$cfg->{EdgeOS}/"},
+        cmd      => qq{rm -rf "$cfg->{lib}/$cfg->{EdgeOS}/"},
         exec_msg => qq{Removing $name perl library},
         fail_msg => qq{Unable to remove $name perl library},
       }
     );
-    if ( -d qq{$cfg->{perl_lib}/$cfg->{EdgeOS}/} ) {
+    if ( -d qq{$cfg->{lib}/$cfg->{EdgeOS}/} ) {
       $prg->{fail}->{ $prg->{errors}++ }
-        = qq{rm -rf "$cfg->{perl_lib}/$cfg->{EdgeOS}/"};
+        = qq{rm -rf "$cfg->{lib}/$cfg->{EdgeOS}/"};
       log_msg(
         {
           cols    => $cols,
@@ -767,6 +772,30 @@ sub remove {
     }
   }
 
+  # Remove old version Blacklist.pm module and lib directories
+  if ( -d qq{$cfg->{old_lib}/$cfg->{EdgeOS}/} ) {
+    exec_command(
+      {
+        cmd      => qq{rm -rf "$cfg->{old_lib}/$cfg->{EdgeOS}/"},
+        exec_msg => qq{Removing $name perl library},
+        fail_msg => qq{Unable to remove $name perl library},
+      }
+    );
+    if ( -d qq{$cfg->{old_lib}/$cfg->{EdgeOS}/} ) {
+      $prg->{fail}->{ $prg->{errors}++ }
+        = qq{rm -rf "$cfg->{old_lib}/$cfg->{EdgeOS}/"};
+      log_msg(
+        {
+          cols    => $cols,
+          show    => TRUE,
+          msg_typ => q{error},
+          msg_str => qq{Unable to remove $name perl library},
+        }
+      );
+    }
+  }
+
+  # Restart dnsmasq
   exec_command(
     {
       cmd      => qq{service dnsmasq restart},
@@ -792,6 +821,7 @@ sub setup {
 
   my @directory = glob qq{$cfg->{dmasq_d}/$cfg->{oldconf}};
 
+  # Remove previous version files
   if (@directory) {
     log_msg(
       {
@@ -814,6 +844,7 @@ sub setup {
     delete_file( { file => qq{$cfg->{scrpt_d}/$cfg->{oldscrpt}} } );
   }
 
+  # Create script directory in upgrade persistent /config/scripts
   if ( !-d $cfg->{scrpt_d} ) {
     exec_command(
       {
@@ -824,6 +855,7 @@ sub setup {
     );
   }
 
+  # Install update-dnsmasq.pl script
   exec_command(
     {
       cmd =>
@@ -835,6 +867,7 @@ sub setup {
     }
   );
 
+  # Install blacklist.t test script
   exec_command(
     {
       cmd =>
@@ -846,6 +879,7 @@ sub setup {
     }
   );
 
+  # Copy the template directories and files to /opt/vyatta/share/vyatta-cfg/
   exec_command(
     {
       cmd      => qq{cp -rf blacklist/ "$cfg->{tmplts}/"},
@@ -855,21 +889,21 @@ sub setup {
     }
   );
 
+  # Install lib directory and Blacklist.pm module
   exec_command(
     {
-      cmd      => qq{install -o root -g root -m 0755 -d "$cfg->{perl_lib}/"},
-      exec_msg => qq{Create $name "$cfg->{perl_lib}/" lib directory},
-      fail_msg =>
-        qq{Unable to create $name "$cfg->{perl_lib}/" lib directory},
+      cmd      => qq{install -o root -g root -m 0755 -d "$cfg->{lib}/"},
+      exec_msg => qq{Create $name "$cfg->{lib}/" lib directory},
+      fail_msg => qq{Unable to create $name "$cfg->{lib}/" lib directory},
     }
   );
 
   exec_command(
     {
-      cmd      => qq{cp -rf "lib/$cfg->{EdgeOS}" "$cfg->{perl_lib}/"},
-      exec_msg => qq{Installing $name configuration templates},
+      cmd      => qq{cp -rf "lib/$cfg->{EdgeOS}" "$cfg->{lib}/"},
+      exec_msg => qq{Installing Blacklist.pm module},
       fail_msg =>
-        qq{Unable to install $name configuration templates to $cfg->{tmplts}/blacklist/},
+        qq{Unable to install Blacklist.pm module to $cfg->{lib}/$cfg->{EdgeOS}},
     }
   );
 

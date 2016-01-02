@@ -21,7 +21,7 @@ set service dns forwarding blacklist exclude 122.2o7.net
 set service dns forwarding blacklist exclude 1e100.net
 set service dns forwarding blacklist exclude adobedtm.com
 set service dns forwarding blacklist exclude akamai.net
-set service dns forwarding blacklist exclude images-amazon.com
+set service dns forwarding blacklist exclude amazon.com
 set service dns forwarding blacklist exclude amazonaws.com
 set service dns forwarding blacklist exclude apple.com
 set service dns forwarding blacklist exclude ask.com
@@ -40,11 +40,14 @@ set service dns forwarding blacklist exclude gstatic.com
 set service dns forwarding blacklist exclude gvt1.com
 set service dns forwarding blacklist exclude gvt1.net
 set service dns forwarding blacklist exclude hb.disney.go.com
+set service dns forwarding blacklist exclude hp.com
 set service dns forwarding blacklist exclude hulu.com
+set service dns forwarding blacklist exclude images-amazon.com
 set service dns forwarding blacklist exclude msdn.com
 set service dns forwarding blacklist exclude paypal.com
-set service dns forwarding blacklist exclude skype.com
+set service dns forwarding blacklist exclude rackcdn.com
 set service dns forwarding blacklist exclude schema.org
+set service dns forwarding blacklist exclude skype.com
 set service dns forwarding blacklist exclude smacargo.com
 set service dns forwarding blacklist exclude ssl-on9.com
 set service dns forwarding blacklist exclude ssl-on9.net

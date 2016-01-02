@@ -16,28 +16,28 @@
 #
 # **** End License ****
 use feature qw{switch};
-use lib q{/opt/vyatta/share/perl5/};
-use lib q{/config/lib/perl/};
-use lib q{./lib/};
+use lib q{/opt/vyatta/share/perl5};
+use lib q{/config/lib/perl};
+use lib q{./lib};
 use Socket;
 use Test::More;
-
-# $$Test::Harness::verbose = 0;
-
 use File::Basename;
 use Getopt::Long;
 use HTTP::Tiny;
 use IO::Select;
 use IPC::Open3;
 use POSIX;
+use strict;
 use Sys::Syslog;
 use Term::ReadKey;
 use threads;
 use Vyatta::Config;
 use v5.14;
+use warnings;
 use EdgeOS::DNS::Blacklist (
   qw{
     $c
+    append_spaces
     get_cfg_actv
     get_cfg_file
     get_cols
@@ -51,22 +51,12 @@ use EdgeOS::DNS::Blacklist (
 
 use constant TRUE  => 1;
 use constant FALSE => 0;
-my $version = q{1.1};
+my $version = q{1.2};
 my ( $blacklist_removed, $cfg_file, $spoke );
 
 ########## Run main ###########
 exit 0 if &main();
 ############ exit #############
-
-sub append_spaces {
-  my $str    = shift;
-  my $tmp    = $str =~ s/.*[^[:print:]]+//r;
-  my $spaces = q{ } x ( get_cols() - length $tmp );
-
-  return if not $spaces;
-
-  return $str . $spaces;
-}
 
 sub exec_test {
   my $input = shift;
@@ -123,9 +113,18 @@ sub exec_test {
       }
       return $rslt;
     },
-    ok => sub {
-      return ok( $input->{run}->{lval}, $input->{run}->{comment} )
-        or diag( $input->{run}->{diag} );
+    isnt_dir => sub {
+      my $rslt = isnt(
+        -d $input->{run}->{lval},
+        $input->{run}->{result},
+        $input->{run}->{comment}
+      );
+      if ( !$rslt ) {
+        diag( $input->{run}->{diag} );
+        $input->{run}->{run_sub}->() if defined $input->{run}->{run_sub};
+        return;
+      }
+      return $rslt;
     },
     cmp_ok => sub {
       return cmp_ok(
@@ -264,11 +263,17 @@ sub get_tests {
       result => TRUE,
       test   => q{is_file},
     };
+
+    if ( $input->{cfg}->{disabled} ) {
+      print append_spaces( pinwheel()
+          . q{ Blacklist is disabled, no further testing required...} );
+      return;
+    }
   }
   else {
     $blacklist_removed = TRUE;
     print append_spaces( pinwheel()
-        . qq{ Blacklist is removed, so adding tests for clean removal...} );
+        . qq{ Blacklist is removed - testing to check its cleanly removed...} );
 
     # Check for stray files
     $input->{cfg}->{strays}
@@ -281,14 +286,14 @@ sub get_tests {
     $tests->{ $ikey++ } = {
       comment => q{Checking }
         . basename( $input->{cfg}->{testscript} )
-        . q{ exists},
+        . q{ removed},
       diag => qq{$c->{red}}
         . basename( $input->{cfg}->{testscript} )
-        . qq{ should exist - investigate!}
+        . qq{ shouldn't exist - investigate!}
         . $c->{clr},
       lval   => qq{$input->{cfg}->{testscript}},
-      result => TRUE,
-      test   => q{is_file},
+      result => FALSE,
+      test   => q{isnt_file},
     };
 
     print pinwheel();
@@ -300,6 +305,27 @@ sub get_tests {
       lval   => scalar( @{ $input->{cfg}->{strays} } ),
       result => TRUE,
       test   => q{isnt},
+    };
+
+    print pinwheel();
+    $tests->{ $ikey++ } = {
+      comment => qq{Checking blacklist configure templates don't exist},
+      diag =>
+        qq{$c->{red} Found $input->{cfg}->{tmplts} - it should be removed!}
+        . $c->{clr},
+      lval   => $input->{cfg}->{tmplts},
+      result => FALSE,
+      test   => q{isnt_dir},
+    };
+
+    print pinwheel();
+    $tests->{ $ikey++ } = {
+      comment => qq{Checking Blacklist.pm perl module doesn't exist},
+      diag => qq{$c->{red} Found $input->{cfg}->{lib} - it should be removed!}
+        . $c->{clr},
+      lval   => $input->{cfg}->{lib},
+      result => FALSE,
+      test   => q{isnt_dir},
     };
   }
 
@@ -342,9 +368,8 @@ sub get_tests {
         if ( keys %content ) {
           for my $host ( sort keys %{ $input->{cfg}->{exclude} } ) {
             my @keys = ( qq{address=/.$host/$ip}, qq{address=/$host/$ip} );
-            print append_spaces( pinwheel()
-                . qq{ Adding global $area $host exclusion tests...}
-            );
+            print append_spaces(
+              pinwheel() . qq{ Adding global $area $host exclusion tests...} );
 
             $tests->{ $ikey++ } = {
               comment => qq{Checking "global exclude" $host not in }
@@ -483,26 +508,31 @@ HOST:
       $tests->{ $ikey++ } = {
         comment => qq{Checking $host is redirected by dnsmasq to $ip},
         diag    => qq{$c->{red}}
-          . qq{dnsmasq replied with $host = $ip, should have redirected }
-          . $resolved_ip . q{!}
+          . qq{dnsmasq replied with $host = $resolved_ip, should have been }
+          . $ip . q{!}
           . $c->{clr},
-        lval   => $ip eq $resolved_ip,
+        lval   => $resolved_ip,
+        op     => q{eq},
         result => TRUE,
-        test   => q{ok},
+        rval   => $ip,
+        test   => q{cmp_ok},
       };
     }
   }
-  say();
+  say q{};
   return $tests;
 }
 
 sub main {
   my $t_count = { tests => 0, failed => 0 };
   my $cfg = {
-    dnsmasq_dir  => q{/etc/dnsmasq.d},
-    failed       => 0,
-    flag_file    => q{/var/log/update-dnsmasq-flagged.cmds},
-    no_op        => q{/tmp/.update-dnsmasq.no-op},
+    dnsmasq_dir => q{/etc/dnsmasq.d},
+    failed      => 0,
+    flag_file   => q{/var/log/update-dnsmasq-flagged.cmds},
+    lib         => q{/config/lib/perl/},
+    no_op       => q{/tmp/.update-dnsmasq.no-op},
+    tmplts      => q{/opt/vyatta/share/vyatta-cfg/templates/service/dns/}
+      . q{forwarding/blacklist/},
     testscript   => q{/config/scripts/blacklist.t},
     updatescript => q{/config/scripts/update-dnsmasq.pl}
   };
@@ -555,7 +585,7 @@ sub pinwheel {
   my %wheel = ( q{|} => q{/}, q{/} => q{-}, q{-} => q{\\}, q{\\} => q{|}, );
 
   $spoke = ( not defined $spoke ) ? q{|} : $wheel{$spoke};
-  return qq{\r[$spoke]};
+  return qq{\r[$c->{ylw}$spoke$c->{clr}]};
 }
 
 sub usage {

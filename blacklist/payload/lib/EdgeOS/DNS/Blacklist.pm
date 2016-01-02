@@ -2,8 +2,9 @@ package EdgeOS::DNS::Blacklist;
 use parent 'Exporter';    # imports and subclasses Exporter
 
 use v5.14;
+use strict;
+use warnings;
 use lib q{/opt/vyatta/share/perl5/};
-use EdgeOS::DNS::Blacklist;
 use File::Basename;
 use Getopt::Long;
 use HTTP::Tiny;
@@ -31,6 +32,7 @@ our @ISA = qw(Exporter);
 our @EXPORT_OK = (
   qw{
     $c
+    append_spaces
     delete_file
     get_cfg_actv
     get_cfg_file
@@ -47,18 +49,36 @@ our @EXPORT_OK = (
     write_file
     }
 );
-our $VERSION = q{1.1};
+our $VERSION = q{1.3};
 our $c       = {
-  off => qq{\033[?25l},
-  on  => qq{\033[?25h},
-  clr => qq{\033[0m},
-  grn => qq{\033[92m},
-  mag => qq{\033[95m},
-  red => qq{\033[91m},
+  blk        => qq{\033[30m},
+  blink      => qq{\033[5m},
+  blu        => qq{\033[34m},
+  clr        => qq{\033[0m},
+  grn        => qq{\033[92m},
+  mag        => qq{\033[95m},
+  off        => qq{\033[?25l},
+  on         => qq{\033[?25h},
+  red        => qq{\033[91m},
+  reverse    => qq{\033[7m},
+  underline  => qq{\033[4m},
+  underscore => qq{\033[4m},
+  wyt        => qq{\033[37m},
+  ylw        => qq{\033[93m},
 };
+
 our @EXPORT = ();
 
-# Remove previous configuration files
+sub append_spaces {
+  my $str    = shift;
+  my $tmp    = $str =~ s/.*[^[:print:]]+//r;
+  my $spaces = q{ } x ( get_cols() - length $tmp );
+
+  return if not $spaces;
+
+  return $str . $spaces;
+}
+
 sub delete_file {
   my $input = shift;
 
@@ -144,8 +164,12 @@ sub get_cfg_actv {
       for my $source ( $config->$listNodes(q{source}) ) {
         $config->setLevel(
           qq{service dns forwarding blacklist $area source $source});
-        @{ $input->{config}->{$area}->{src}->{$source} }{qw(description prefix url)}
-          = ( $config->$returnValue(q{description}), $config->$returnValue(q{prefix}), $config->$returnValue(q{url}) );
+        @{ $input->{config}->{$area}->{src}->{$source} }
+          {qw(description prefix url)} = (
+          $config->$returnValue(q{description}),
+          $config->$returnValue(q{prefix}),
+          $config->$returnValue(q{url})
+          );
       }
     }
   }
@@ -339,11 +363,10 @@ sub get_url {
     q{Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11) AppleWebKit/601.1.56 (KHTML, like Gecko) Version/9.0 Safari/601.1.56}
   );
 
-#   $ua->timeout(60);
   $input->{prefix} =~ s/^["](?<UNCMT>.*)["]$/$+{UNCMT}/g;
   my $re = {
     REJECT => qr{\A#|\A\z|\A\n}oms,
-    SELECT => qr{\A $input->{prefix} .*\z}xoms,
+    SELECT => qr{\A $input->{prefix} .*\z}xms,
     SPLIT  => qr{\R|<br \/>}oms,
   };
 
@@ -425,8 +448,11 @@ sub log_msg {
 
   return unless ( length $input->{msg_typ} . $input->{msg_str} > 2 );
 
-  syslog( $log_msg->{ $input->{msg_typ} },
-    qq{$input->{msg_typ}: } . $input->{msg_str} );
+  syslog(
+    $log_msg->{ $input->{msg_typ} },
+    qq{$input->{msg_typ}: } . $input->{msg_str}
+      =~ s/\e[[][?]{0,1}\d+(?>(;\d+)*)[lm]//gr
+  );
 
   print $c->{off}, qq{\r}, q{ } x $input->{cols}, qq{\r} if $input->{show};
 
@@ -535,7 +561,7 @@ LINE:
       {
         msg_typ => q{info},
         msg_str => sprintf
-          qq{%s: %s %s processed, (%s duplicates) from %s lines\r},
+          qq{$c->{off}%s: $c->{grn}%s$c->{clr} %s processed, ($c->{red}%s$c->{clr} discarded) from $c->{mag}%s$c->{clr} lines\r},
         $input->{src},
         $input->{config}->{ $input->{area} }->{src}->{ $input->{src} }
           ->{icount}, $input->{config}->{ $input->{area} }->{type},

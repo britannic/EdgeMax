@@ -18,11 +18,13 @@
 
 use File::Basename;
 use Getopt::Long;
-use lib q{/opt/vyatta/share/perl5/};
-use lib q{/config/lib/perl/};
+use lib q{/opt/vyatta/share/perl5};
+use lib q{/config/lib/perl};
 use Sys::Syslog qw(:standard :macros);
 use threads;
 use v5.14;
+use strict;
+use warnings;
 use EdgeOS::DNS::Blacklist (
   qw{
     $c
@@ -44,14 +46,11 @@ use constant TRUE  => 1;
 use constant FALSE => 0;
 
 my ( $cfg_file, $show );
-my $version = q{3.5.2};
+my $version = q{3.5.3};
 my $cols    = get_cols();
 
 ############################### script runs here ###############################
-&main();
-
-# Exit normally
-exit 0;
+exit 0 if &main();
 ################################################################################
 
 # Set up command line options
@@ -115,7 +114,7 @@ sub main {
   };
 
   # Get command line options or print help if no valid options
-  get_options() || usage( { option => q{help}, exit_code => 1 } );
+  get_options() or usage( { option => q{help}, exit_code => 1 } );
 
   # Find reasons to quit
   exit 0 if ( -f $cfg->{no_op} );    # If the no_op file exists, exit.
@@ -144,7 +143,16 @@ sub main {
     = defined $cfg_file
     ? get_cfg_file( { config => $cfg, file => $cfg_file } )
     : get_cfg_actv( { config => $cfg, show => $show } );
-  die qq{FATAL: Unable to get configuration} if !$success;
+
+    log_msg(
+    {
+      cols    => $cols,
+      show    => $show,
+      msg_typ => q{error},
+      msg_str =>,
+      qq{Cannot load dnsmasq blacklist configuration - exiting},
+    }
+  ), return if !$success;
 
   # Now proceed if blacklist is enabled
   if ( !$cfg->{disabled} ) {
@@ -175,6 +183,7 @@ sub main {
           qq{$cfg->{dnsmasq_dir}/$area.$key.blacklist.conf} => 1;
         } @sources
       };
+
       my $files_ref = { map { my $key = $_; $key => 1; }
           glob qq{$cfg->{dnsmasq_dir}/$area.*blacklist.conf} };
 
@@ -215,7 +224,7 @@ sub main {
           ? qr{(?:\A(?:http:|https:){1}[/]{1,2})}om
           : $cfg->{$area}->{src}->{$source}->{prefix};
 
-        if ( scalar $url ) {
+        if ( $url ) {
           log_msg(
             {
               cols    => $cols,
@@ -276,7 +285,6 @@ sub main {
             }
           );
 
-          # Delete $data->{data}
           delete $data->{data};
 
           # Write blacklist to file, change to domain format if area = domains
@@ -329,7 +337,8 @@ sub main {
           show    => $show,
           msg_typ => q{info},
           msg_str => sprintf
-            q{Processed %s %s (%s discarded) from %s records (%s orig.)%s},
+            qq{Processed $c->{grn}%s$c->{clr} %s ($c->{red}%s$c->{clr} }
+            . qq{discarded) from $c->{mag}%s$c->{clr} records (%s orig.)%s},
           @{ $cfg->{$area} }{qw(unique type duplicates icount records)}, qq{\n},
         }
       );
@@ -340,7 +349,7 @@ sub main {
       for my $key (
         sort {
           $cfg->{hosts}->{exclude}->{$b} <=> $cfg->{hosts}->{exclude}->{$a}
-        } keys %{ $cfg->{hosts}->{exclude} }
+        } sort keys %{ $cfg->{hosts}->{exclude} }
         )
       {
         my $value = $cfg->{hosts}->{exclude}->{$key};
@@ -379,7 +388,7 @@ sub main {
             show    => $show,
             msg_typ => q{info},
             msg_str =>
-              qq{Flagged domains command set written to:\n $cfg->{flag_file}},
+              qq{Flagged domains command set written to: $cfg->{flag_file}},
           }
         );
       }
