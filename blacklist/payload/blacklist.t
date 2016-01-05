@@ -266,14 +266,14 @@ sub get_tests {
 
     if ( $input->{cfg}->{disabled} ) {
       print append_spaces( pinwheel()
-          . q{ Blacklist is disabled, no further testing required...} );
+          . qq{ Blacklist is disabled, no further testing required...\n} );
       return;
     }
   }
   else {
     $blacklist_removed = TRUE;
     print append_spaces( pinwheel()
-        . qq{ Blacklist is removed - testing to check its cleanly removed...} );
+        . q{ Blacklist is removed - testing to check its cleanly removed...} );
 
     # Check for stray files
     $input->{cfg}->{strays}

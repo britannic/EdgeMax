@@ -28,6 +28,7 @@ use warnings;
 use EdgeOS::DNS::Blacklist (
   qw{
     $c
+    append_spaces
     delete_file
     get_cols
     get_cfg_actv
@@ -336,10 +337,10 @@ sub main {
           cols    => $cols,
           show    => $show,
           msg_typ => q{info},
-          msg_str => sprintf
+          msg_str => sprintf(
             qq{Processed $c->{grn}%s$c->{clr} %s ($c->{red}%s$c->{clr} }
             . qq{discarded) from $c->{mag}%s$c->{clr} records (%s orig.)%s},
-          @{ $cfg->{$area} }{qw(unique type duplicates icount records)}, qq{\n},
+          @{ $cfg->{$area} }{qw(unique type duplicates icount records)}, qq{\n}),
         }
       );
 
@@ -406,7 +407,7 @@ sub main {
   }
 
   # Clean up the status line
-  print $c->{off}, qq{\r}, qq{ } x $cols, qq{\r} if $show;
+  print $c->{off}, qq{\r}, append_spaces(), qq{\r} if $show;
 
   log_msg(
     {

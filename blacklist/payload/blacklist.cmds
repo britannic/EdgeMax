@@ -25,6 +25,7 @@ set service dns forwarding blacklist exclude amazon.com
 set service dns forwarding blacklist exclude amazonaws.com
 set service dns forwarding blacklist exclude apple.com
 set service dns forwarding blacklist exclude ask.com
+set service dns forwarding blacklist exclude bitdefender.com
 set service dns forwarding blacklist exclude cdn.visiblemeasures.com
 set service dns forwarding blacklist exclude cloudfront.net
 set service dns forwarding blacklist exclude coremetrics.com
@@ -53,6 +54,7 @@ set service dns forwarding blacklist exclude ssl-on9.com
 set service dns forwarding blacklist exclude ssl-on9.net
 set service dns forwarding blacklist exclude static.chartbeat.com
 set service dns forwarding blacklist exclude storage.googleapis.com
+set service dns forwarding blacklist exclude windows.net
 set service dns forwarding blacklist exclude yimg.com
 set service dns forwarding blacklist exclude ytimg.com
 set service dns forwarding blacklist hosts include beap.gemini.yahoo.com

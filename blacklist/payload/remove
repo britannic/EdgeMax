@@ -117,6 +117,9 @@ sub delete_file {
   if ( -f $input->{file} ) {
     log_msg(
       {
+        show    => TRUE,
+        cols    => $cols,
+        eof     => qq{\n},
         msg_typ => q{info},
         msg_str => sprintf q{Deleting file %s},
         $input->{file},
@@ -130,9 +133,11 @@ sub delete_file {
     $prg->{fail}->{ $prg->{errors}++ } = $cmd;
     log_msg(
       {
+        cols    => $cols,
+        eof     => qq{\n},
+        msg_str => sprintf( q{Unable to delete %s}, $input->{file} ),
         msg_typ => q{warning},
-        msg_str => sprintf q{Unable to delete %s},
-        $input->{file},
+        show    => TRUE,
       }
     );
     return;
@@ -161,9 +166,10 @@ sub exec_command {
   log_msg(
     {
       cols    => $cols,
-      show    => TRUE,
-      msg_typ => q{info},
+      eof     => qq{\n},
       msg_str => $input->{exec_msg},
+      msg_typ => q{info},
+      show    => TRUE,
     }
   );
 
@@ -173,9 +179,10 @@ sub exec_command {
     log_msg(
       {
         cols    => $cols,
-        show    => TRUE,
-        msg_typ => q{error},
+        eof     => qq{\n},
         msg_str => $input->{fail_msg} . qq{\n$output\n},
+        msg_typ => q{error},
+        show    => TRUE,
       }
     );
     $prg->{fail}->{ $prg->{errors}++ } = $input->{cmd};
@@ -239,9 +246,10 @@ sub exec_shell {
             log_msg(
               {
                 cols    => $cols,
-                show    => TRUE,
-                msg_typ => q{error},
+                eof     => qq{\n},
                 msg_str => $cli_out,
+                msg_typ => q{error},
+                show    => TRUE,
               }
             );
           }
@@ -257,9 +265,10 @@ sub exec_shell {
             log_msg(
               {
                 cols    => $cols,
-                show    => TRUE,
-                msg_typ => q{error},
+                eof     => qq{\n},
                 msg_str => $cli_err,
+                msg_typ => q{error},
+                show    => TRUE,
               }
             );
           }
@@ -352,11 +361,12 @@ sub get_blacklist {
         if ( scalar $url ) {
           log_msg(
             {
-              cols    => $cols,
-              show    => TRUE,
+              cols => $cols,
+              eof  => qq{\n},
+              msg_str =>
+                sprintf( q{Downloading %s blacklist from %s}, $area, $host ),
               msg_typ => q{info},
-              msg_str => sprintf q{Downloading %s blacklist from %s},
-              $area, $host,
+              show    => TRUE,
             }
           );
           push @threads,
@@ -390,10 +400,13 @@ sub get_blacklist {
           log_msg(
             {
               cols    => $cols,
-              show    => TRUE,
+              eof     => qq{\n},
+              msg_str => sprintf(
+                q{%s lines received from: %s },
+                $rec_count, $data->{host}
+              ),
               msg_typ => q{info},
-              msg_str => sprintf q{%s lines received from: %s },
-              $rec_count, $data->{host},
+              show    => TRUE,
             }
           );
 
@@ -450,9 +463,10 @@ sub get_blacklist {
             log_msg(
               {
                 cols    => $cols,
-                show    => TRUE,
-                msg_typ => q{warning},
+                eof     => qq{\n},
                 msg_str => qq{Zero records processed from $data->{src}!},
+                msg_typ => q{warning},
+                show    => TRUE,
               }
             );
           }
@@ -462,21 +476,24 @@ sub get_blacklist {
       log_msg(
         {
           cols    => $cols,
-          show    => TRUE,
+          eof     => qq{\n},
+          msg_str => sprintf(
+            qq{Processed $c->{grn}%s$c->{clr} %s ($c->{red}%s$c->{clr} }
+              . qq{discarded) from $c->{mag}%s$c->{clr} records (%s orig.)%s},
+            @{ $cfg->{$area} }{qw(unique type duplicates icount records)},
+            qq{\n}
+          ),
           msg_typ => q{info},
-          msg_str => sprintf
-            q{Processed %s %s (%s discarded) from %s records (%s orig.)%s},
-          @{ $cfg->{$area} }{qw(unique type duplicates icount records)}, qq{\n},
+          show    => TRUE,
         }
       );
 
-      my @flagged_domains = ();
-
       # Now lets report the domains that were seen more than $cfg->{'flg_lvl'}
+      my @flagged_domains;
       for my $key (
         sort {
           $cfg->{hosts}->{exclude}->{$b} <=> $cfg->{hosts}->{exclude}->{$a}
-        } keys %{ $cfg->{hosts}->{exclude} }
+        } sort keys %{ $cfg->{hosts}->{exclude} }
         )
       {
         my $value = $cfg->{hosts}->{exclude}->{$key};
@@ -484,10 +501,13 @@ sub get_blacklist {
           log_msg(
             {
               cols    => $cols,
-              show    => TRUE,
+              eof     => qq{\n},
+              msg_str => sprintf(
+                qq{$area blacklisted: domain %s %s times},
+                $key, $value
+              ),
               msg_typ => q{info},
-              msg_str => sprintf qq{$area blacklisted: domain %s %s times},
-              $key, $value,
+              show    => TRUE,
             }
           );
           push @flagged_domains, qq{$key # $value times};
@@ -515,11 +535,12 @@ sub get_blacklist {
 
         log_msg(
           {
-            cols    => $cols,
-            show    => TRUE,
-            msg_typ => q{info},
+            cols => $cols,
+            eof  => qq{\n},
             msg_str =>
               qq{Flagged domains command set written to:\n $cfg->{flg_file}},
+            msg_typ => q{info},
+            show    => TRUE,
           }
         );
       }
@@ -540,10 +561,7 @@ sub get_blacklist {
   }
 
   # Clean up the status line
-  print $c->{off}, qq{\r}, qq{ } x $cols, qq{\r};
-
-  # Finish with a linefeed if '-v' is selected
-  say q{};
+  say $c->{off}, qq{\r}, qq{ } x $cols, qq{\r};
 }
 
 # Main function
@@ -562,9 +580,10 @@ sub main {
   log_msg(
     {
       cols    => $cols,
-      show    => TRUE,
-      msg_typ => q{info},
+      eof     => qq{\n},
       msg_str => qq{---+++ $name $program $version +++--- },
+      msg_typ => q{info},
+      show    => TRUE,
     }
   );
 
@@ -573,20 +592,22 @@ sub main {
       if ( is_build() ) {
         log_msg(
           {
-            cols    => $cols,
-            show    => TRUE,
-            msg_typ => q{info},
+            cols => $cols,
+            eof  => qq{\n},
             msg_str =>
               qq{Installing $name version $version blocking dnsmasq support},
+            msg_typ => q{info},
+            show    => TRUE,
           }
         );
         if ( setup() ) {
           log_msg(
             {
               cols    => $cols,
-              show    => TRUE,
-              msg_typ => q{info},
+              eof     => qq{\n},
               msg_str => qq{$name version $version installation successful},
+              msg_typ => q{info},
+              show    => TRUE,
             }
           );
         }
@@ -595,20 +616,22 @@ sub main {
             log_msg(
               {
                 cols    => $cols,
-                show    => TRUE,
-                msg_typ => q{error},
+                eof     => qq{\n},
                 msg_str => qq{$prg->{fail}->{$key} failed!},
+                msg_typ => q{error},
+                show    => TRUE,
               }
             );
           }
           log_msg(
             {
               cols    => $cols,
-              show    => TRUE,
-              msg_typ => q{error},
+              eof     => qq{\n},
               msg_str => qq{$name version $version installation failed!}
                 . qq{\nReview /var/log/messages\n}
                 . qq{$prg->{errors}/$prg->{errors} calls failed},
+              msg_typ => q{error},
+              show    => TRUE,
             }
           );
           say q{};
@@ -618,11 +641,12 @@ sub main {
       else {
         log_msg(
           {
-            cols    => $cols,
-            show    => TRUE,
-            msg_typ => q{error},
+            cols => $cols,
+            eof  => qq{\n},
             msg_str =>
               qq{Edgemax $edgeOS->{version} is not supported, upgrade!},
+            msg_typ => q{error},
+            show    => TRUE,
           }
         );
         say q{};
@@ -634,9 +658,10 @@ sub main {
         log_msg(
           {
             cols    => $cols,
-            show    => TRUE,
-            msg_typ => q{info},
+            eof     => qq{\n},
             msg_str => qq{$name version $version removal successful},
+            msg_typ => q{info},
+            show    => TRUE,
           }
         );
       }
@@ -645,20 +670,22 @@ sub main {
           log_msg(
             {
               cols    => $cols,
-              show    => TRUE,
-              msg_typ => q{error},
+              eof     => qq{\n},
               msg_str => qq{$prg->{fail}->{$key} failed!},
+              msg_typ => q{error},
+              show    => TRUE,
             }
           );
         }
         log_msg(
           {
             cols    => $cols,
-            show    => TRUE,
-            msg_typ => q{error},
+            eof     => qq{\n},
             msg_str => qq{$name version $version removal failed!}
               . qq{\nReview /var/log/messages\n}
               . qq{$prg->{errors}/$prg->{errors} calls failed},
+            msg_typ => q{error},
+            show    => TRUE,
           }
         );
         say q{};
@@ -694,9 +721,10 @@ sub remove {
   log_msg(
     {
       cols    => $cols,
-      show    => TRUE,
-      msg_typ => q{info},
+      eof     => qq{\n},
       msg_str => qq{Removing blacklist support files and scripts...},
+      msg_typ => q{info},
+      show    => TRUE,
     }
   );
 
@@ -707,19 +735,20 @@ sub remove {
   log_msg(
     {
       cols    => $cols,
-      show    => TRUE,
-      msg_typ => q{info},
+      eof     => qq{\n},
       msg_str => qq{Removing $name sources and task scheduler entries},
+      msg_typ => q{info},
+      show    => TRUE,
     }
   );
 
   my @commands = (
-    qq{sudo $begin\n},
-    qq{sudo $delete service dns forwarding blacklist\n},
-    qq{sudo $delete system task-scheduler task update_blacklists\n},
-    qq{sudo $commit\n},
-    qq{sudo $save\n},
-    qq{sudo $end\n},
+    qq{$begin\n},
+    qq{$delete service dns forwarding blacklist\n},
+    qq{$delete system task-scheduler task update_blacklists\n},
+    qq{$commit\n},
+    qq{$save\n},
+    qq{$end\n},
   );
 
   # Run configure and execute the commands
@@ -741,9 +770,10 @@ sub remove {
       log_msg(
         {
           cols    => $cols,
-          show    => TRUE,
-          msg_typ => q{error},
+          eof     => qq{\n},
           msg_str => qq{Unable to remove $name configuration templates},
+          msg_typ => q{error},
+          show    => TRUE,
         }
       );
     }
@@ -764,9 +794,10 @@ sub remove {
       log_msg(
         {
           cols    => $cols,
-          show    => TRUE,
-          msg_typ => q{error},
+          eof     => qq{\n},
           msg_str => qq{Unable to remove $name perl library},
+          msg_typ => q{error},
+          show    => TRUE,
         }
       );
     }
@@ -787,9 +818,10 @@ sub remove {
       log_msg(
         {
           cols    => $cols,
-          show    => TRUE,
-          msg_typ => q{error},
+          eof     => qq{\n},
           msg_str => qq{Unable to remove $name perl library},
+          msg_typ => q{error},
+          show    => TRUE,
         }
       );
     }
@@ -825,11 +857,12 @@ sub setup {
   if (@directory) {
     log_msg(
       {
-        cols    => $cols,
-        show    => TRUE,
-        msg_typ => q{info},
+        cols => $cols,
+        eof  => qq{\n},
         msg_str =>
           qq{Removing previous version blacklist files from directory: $cfg->{dnsmasq}/},
+        msg_typ => q{info},
+        show    => TRUE,
       }
     );
 
@@ -910,9 +943,10 @@ sub setup {
   log_msg(
     {
       cols    => $cols,
-      show    => TRUE,
-      msg_typ => q{info},
+      eof     => qq{\n},
       msg_str => qq{Creating default $name sources and task scheduler entries},
+      msg_typ => q{info},
+      show    => TRUE,
     }
   );
 
@@ -941,7 +975,7 @@ LINE:
 
   # Run configure and execute the commands
   exec_shell( { commands => \@commands } )
-    or die qq{Unable to execute blacklist configuration commands};
+    or die q{Unable to execute blacklist configuration commands!};
 
   get_blacklist();
 
@@ -988,9 +1022,11 @@ sub write_file {
   open my $FH, q{>}, $input->{file} or return;
   log_msg(
     {
+      cols    => $cols,
+      eof     => qq{\n},
+      msg_str => sprintf( q{Saving %s}, basename( $input->{file} ) ),
       msg_typ => q{info},
-      msg_str => sprintf q{Saving %s},
-      basename( $input->{file} ),
+      show    => TRUE,
     }
   );
 

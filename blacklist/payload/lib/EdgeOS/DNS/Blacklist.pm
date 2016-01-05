@@ -70,7 +70,7 @@ our $c       = {
 our @EXPORT = ();
 
 sub append_spaces {
-  my $str    = shift;
+  my $str    = shift // q{};
   my $tmp    = $str =~ s/.*[^[:print:]]+//r;
   my $spaces = q{ } x ( get_cols() - length $tmp );
 
@@ -86,8 +86,7 @@ sub delete_file {
     log_msg(
       {
         msg_typ => q{info},
-        msg_str => sprintf q{Deleting file %s},
-        $input->{file},
+        msg_str => sprintf( q{Deleting file %s}, $input->{file} ),
       }
     );
     unlink $input->{file};
@@ -97,8 +96,7 @@ sub delete_file {
     log_msg(
       {
         msg_typ => q{warning},
-        msg_str => sprintf q{Unable to delete %s},
-        $input->{file},
+        msg_str => sprintf( q{Unable to delete %s}, $input->{file} ),
       }
     );
     return;
@@ -182,7 +180,6 @@ sub get_cfg_actv {
           q{[service dns forwarding blacklist is not configured], exiting!},
       }
     );
-
     return;
   }
   if ( ( !scalar keys %{ $input->{config}->{domains}->{src} } )
@@ -253,7 +250,7 @@ sub get_cols {
 # Read a file into memory and return the data to the calling function
 sub get_file {
   my $input = shift;
-  my @data  = ();
+  my @data;
   if ( -f $input->{file} ) {
     open my $CF, q{<}, $input->{file}
       or die qq{error: Unable to open $input->{file}: $!};
@@ -448,20 +445,25 @@ sub log_msg {
 
   return unless ( length $input->{msg_typ} . $input->{msg_str} > 2 );
 
+  $input->{eof} //= q{};
+
   syslog(
     $log_msg->{ $input->{msg_typ} },
     qq{$input->{msg_typ}: } . $input->{msg_str}
       =~ s/\e[[][?]{0,1}\d+(?>(;\d+)*)[lm]//gr
   );
 
-  print $c->{off}, qq{\r}, q{ } x $input->{cols}, qq{\r} if $input->{show};
+  print $c->{off}, qq{\r}, append_spaces(), qq{\r} if $input->{show};
 
   if ( $input->{msg_typ} eq q{info} ) {
-    print $c->{off}, qq{$input->{msg_typ}: $input->{msg_str}} if $input->{show};
+    print $c->{off}, append_spaces(qq{$input->{msg_typ}: $input->{msg_str}}),
+      $input->{eof}
+      if $input->{show};
   }
   else {
     print STDERR $c->{off}, $c->{red},
-      qq{$input->{msg_typ}: $input->{msg_str}$c->{clr}}
+      append_spaces(qq{$input->{msg_typ}: $input->{msg_str}}), $c->{clr},
+      $input->{eof}
       if $input->{show};
   }
 
@@ -560,13 +562,15 @@ LINE:
     log_msg(
       {
         msg_typ => q{info},
-        msg_str => sprintf
+        msg_str => sprintf(
           qq{$c->{off}%s: $c->{grn}%s$c->{clr} %s processed, ($c->{red}%s$c->{clr} discarded) from $c->{mag}%s$c->{clr} lines\r},
-        $input->{src},
-        $input->{config}->{ $input->{area} }->{src}->{ $input->{src} }
-          ->{icount}, $input->{config}->{ $input->{area} }->{type},
-        @{ $input->{config}->{ $input->{area} }->{src}->{ $input->{src} } }
-          { q{duplicates}, q{records} },
+          $input->{src},
+          $input->{config}->{ $input->{area} }->{src}->{ $input->{src} }
+            ->{icount},
+          $input->{config}->{ $input->{area} }->{type},
+          @{ $input->{config}->{ $input->{area} }->{src}->{ $input->{src} } }
+            { q{duplicates}, q{records} }
+        ),
       }
     );
     return TRUE;
@@ -584,8 +588,7 @@ sub write_file {
   log_msg(
     {
       msg_typ => q{info},
-      msg_str => sprintf q{Saving %s},
-      basename( $input->{file} ),
+      msg_str => sprintf( q{Saving %s}, basename( $input->{file} ) ),
     }
   );
 
@@ -606,18 +609,23 @@ EdgeOS::DNS::Blacklist - Perl extension for EdgeOS dnsmasq blacklist configurati
 =head1 SYNOPSIS
 
   use EdgeOS::DNS::Blacklist (qw{
-  delete_file
-  get_cfg_actv
-  get_cfg_file
-  get_file
-  get_url
-  is_admin
-  is_configure
-  log_msg
-  popx
-  process_data
-  usage
-  write_file});
+    $c
+    append_spaces
+    delete_file
+    get_cfg_actv
+    get_cfg_file
+    get_cols
+    get_file
+    get_url
+    is_admin
+    is_build
+    is_configure
+    is_version
+    log_msg
+    popx
+    process_data
+    write_file
+    });
 
 =head1 DESCRIPTION
 
