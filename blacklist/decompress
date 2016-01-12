@@ -69,7 +69,7 @@ do
 			2)		clear console
 					if /opt/vyatta/bin/yesno -n 'Do you want to completely remove Blacklist? [y/N]: '
 					then
-						sudo ./remove
+						./remove
 						break
 					fi
 					;;

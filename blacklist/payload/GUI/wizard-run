@@ -30,16 +30,14 @@ sub apply {
   if ( keys %{$cfg} ) {
     $cfg->{disabled} = $cfg->{disabled} == 0 ? q{false} : q{true};
     push @cfg_cmds, qq{$set $base_node disabled $cfg->{disabled};};
-    push @cfg_cmds,
-      qq{$set $base_node dns_redirect_ip } . qq{$cfg->{dns_redirect_ip};};
+    push @cfg_cmds, qq{$set $base_node dns_redirect_ip } . qq{$cfg->{dns_redirect_ip};};
 
     for my $exclude ( keys %{ $cfg->{exclude} } ) {
       push @cfg_cmds, qq{$set $base_node exclude $exclude;};
     }
 
     for my $area (qw{domains hosts zones}) {
-      push @cfg_cmds, qq{$set $base_node $area dns_redirect_ip }
-        . qq{$cfg->{$area}->{dns_redirect_ip};};
+      push @cfg_cmds, qq{$set $base_node $area dns_redirect_ip } . qq{$cfg->{$area}->{dns_redirect_ip};};
 
       for my $include ( keys %{ $cfg->{$area}->{include} } ) {
         push @cfg_cmds, qq{$set $base_node $area include $include;};
@@ -50,12 +48,11 @@ sub apply {
       }
 
       for my $source ( keys %{ $cfg->{$area}->{src} } ) {
-        push @cfg_cmds, qq{$set $base_node $area source $source description }
-          . qq{'$cfg->{$area}->{src}->{$source}->{description}';};
-        push @cfg_cmds, qq{$set $base_node $area source $source prefix }
-          . qq{'$cfg->{$area}->{src}->{$source}->{prefix}';};
-        push @cfg_cmds, qq{$set $base_node $area source $source url }
-          . qq{'$cfg->{$area}->{src}->{$source}->{url}';};
+        push @cfg_cmds,
+          qq{$set $base_node $area source $source description } . qq{'$cfg->{$area}->{src}->{$source}->{description}';};
+        push @cfg_cmds,
+          qq{$set $base_node $area source $source prefix } . qq{'$cfg->{$area}->{src}->{$source}->{prefix}';};
+        push @cfg_cmds, qq{$set $base_node $area source $source url } . qq{'$cfg->{$area}->{src}->{$source}->{url}';};
       }
     }
     push @cfg_cmds, $commit . q{;};
@@ -67,11 +64,11 @@ sub apply {
     return;
   }
 
-# Save filehandles for STDOUT and STDERR
+  # Save filehandles for STDOUT and STDERR
   open( STDOUT_ORIG, q(>&STDOUT) );
   open( STDERR_ORIG, q(>&STDERR) );
 
-# Set new filehandles for STDOUT and STDERR
+  # Set new filehandles for STDOUT and STDERR
   my $temp = qq(/tmp/error.$$);
   open( STDOUT, q(>), $temp ) or die qq($0: cannot open STDOUT: $!);
   open( STDERR, q(>&STDOUT) ) or die qq($0: cannot open STDERR: $!);
@@ -101,8 +98,7 @@ sub get_file {
   my $input = shift;
   my @data  = ();
   if ( -f $input->{file} ) {
-    open my $CF, q{<}, $input->{file}
-      or die qq{error: Unable to open $input->{file}: $!};
+    open my $CF, q{<}, $input->{file} or die qq{error: Unable to open $input->{file}: $!};
     chomp( @data = <$CF> );
     close $CF;
   }
@@ -114,16 +110,11 @@ sub load {
   my $blacklist = get_cfg_actv( { config => $cfg->{tmp}, show => 0 } );
 
   if ($blacklist) {
-    $cfg->{tmp}->{disabled}
-      = $cfg->{tmp}->{disabled} == 0 ? qq{false} : qq{true};
+    $cfg->{tmp}->{disabled} = $cfg->{tmp}->{disabled} == 0 ? qq{false} : qq{true};
 
-    $cfg->{tmp}->{global} = {
-      dns_redirect_ip => $cfg->{tmp}->{dns_redirect_ip},
-      disabled        => $cfg->{tmp}->{disabled},
-    };
+    $cfg->{tmp}->{global} = { dns_redirect_ip => $cfg->{tmp}->{dns_redirect_ip}, disabled => $cfg->{tmp}->{disabled}, };
 
-    $cfg->{tmp}->{global}->{excludes}
-      = [ map { { exclude => $_ } } sort keys %{ $cfg->{tmp}->{exclude} } ]
+    $cfg->{tmp}->{global}->{excludes} = [ map { { exclude => $_ } } sort keys %{ $cfg->{tmp}->{exclude} } ]
       if exists $cfg->{tmp}->{exclude};
 
     $cfg->{data}->{global} = [ $cfg->{tmp}->{global} ];
@@ -137,28 +128,22 @@ sub load {
     # Rename root keys, so that the Feature Wizard gets unique field names
     for my $area (@areas) {
 
-      my @includes
-        = map { { include => $_ } }
-        sort keys %{ $cfg->{tmp}->{$area}->{blklst} }
+      my @includes = map { { include => $_ } } sort keys %{ $cfg->{tmp}->{$area}->{blklst} }
         if exists $cfg->{tmp}->{$area}->{blklst};
 
-      my @excludes
-        = map { { exclude => $_ } }
-        sort keys %{ $cfg->{tmp}->{$area}->{exclude} }
+      my @excludes = map { { exclude => $_ } } sort keys %{ $cfg->{tmp}->{$area}->{exclude} }
         if exists $cfg->{tmp}->{$area}->{exclude};
 
       my @sources = map {
         my $key = $_;
         { source => [ %{ $cfg->{tmp}->{$area}->{src}->{$key} } ] }
-        } sort keys %{ $cfg->{tmp}->{$area}->{src} }
-        if exists $cfg->{tmp}->{$area}->{src};
+      } sort keys %{ $cfg->{tmp}->{$area}->{src} } if exists $cfg->{tmp}->{$area}->{src};
 
-      $cfg->{data}->{$area} = {
-        dns_redirect_ip => $cfg->{tmp}->{dns_redirect_ip},
-        includes        => \@includes,
-        excludes        => \@excludes,
-        sources         => \@sources,
-      };
+      $cfg->{data}->{$area} = { dns_redirect_ip => $cfg->{tmp}->{dns_redirect_ip},
+                                includes        => \@includes,
+                                excludes        => \@excludes,
+                                sources         => \@sources,
+                              };
     }
     delete $cfg->{tmp};
     print encode_json($cfg);
@@ -171,21 +156,20 @@ sub load {
 
 sub remove {
 
-# Save filehandles for STDOUT and STDERR
+  # Save filehandles for STDOUT and STDERR
   open( STDOUT_ORIG, q(>&STDOUT) );
   open( STDERR_ORIG, q(&STDERR) );
 
-# Set new filehandles for STDOUT and STDERR
+  # Set new filehandles for STDOUT and STDERR
   my $temp = qq(/tmp/error.$$);
   open( STDOUT, q(>), $temp ) or die qq($0: cannot open STDOUT: $!);
   open( STDERR, q(>&STDOUT) ) or die qq($0: cannot open STDERR: $!);
   print(qq(### Errors reported by $0 version $version ###\n));
 
   my $cfg_lvl .= q(service dns forwarding blacklist);
-  my $remove_blacklist
-    = join( q{;}, $begin, qq{$delete $cfg_lvl}, $commit, $save, $end );
-  my $output = system($remove_blacklist);
-  my $err    = $?;
+  my $remove_blacklist = join( q{;}, $begin, qq{$delete $cfg_lvl}, $commit, $save, $end );
+  my $output           = system($remove_blacklist);
+  my $err              = $?;
 
   close(STDOUT);
   close(STDERR);

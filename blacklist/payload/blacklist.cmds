@@ -1,11 +1,8 @@
-# set service dns forwarding blacklist dns-redirect-ip 192.168.168.1
-# set service dns forwarding blacklist hosts source hpHosts description 'hpHosts optimized in hosts format'
-# set service dns forwarding blacklist hosts source hpHosts prefix '127.0.0.1 '
-# set service dns forwarding blacklist hosts source hpHosts url 'http://hosts-file.net/download/HOSTS-Optimized.txt'
 delete service dns forwarding blacklist
 delete system task-scheduler task update_blacklists
-set service dns forwarding blacklist disabled false
 set service dns forwarding blacklist dns-redirect-ip 0.0.0.0
+set service dns forwarding blacklist disabled false
+# set service dns forwarding blacklist dns-redirect-ip 192.168.168.1
 set service dns forwarding blacklist domains include adsrvr.org
 set service dns forwarding blacklist domains include adtechus.net
 set service dns forwarding blacklist domains include advertising.com
@@ -25,6 +22,7 @@ set service dns forwarding blacklist exclude amazon.com
 set service dns forwarding blacklist exclude amazonaws.com
 set service dns forwarding blacklist exclude apple.com
 set service dns forwarding blacklist exclude ask.com
+set service dns forwarding blacklist exclude avast.com
 set service dns forwarding blacklist exclude bitdefender.com
 set service dns forwarding blacklist exclude cdn.visiblemeasures.com
 set service dns forwarding blacklist exclude cloudfront.net
@@ -50,6 +48,7 @@ set service dns forwarding blacklist exclude rackcdn.com
 set service dns forwarding blacklist exclude schema.org
 set service dns forwarding blacklist exclude skype.com
 set service dns forwarding blacklist exclude smacargo.com
+set service dns forwarding blacklist exclude sourceforge.net
 set service dns forwarding blacklist exclude ssl-on9.com
 set service dns forwarding blacklist exclude ssl-on9.net
 set service dns forwarding blacklist exclude static.chartbeat.com
@@ -61,6 +60,9 @@ set service dns forwarding blacklist hosts include beap.gemini.yahoo.com
 set service dns forwarding blacklist hosts source adaway description 'Blocking mobile ad providers and some analytics providers'
 set service dns forwarding blacklist hosts source adaway prefix '127.0.0.1 '
 set service dns forwarding blacklist hosts source adaway url 'http://adaway.org/hosts.txt'
+# set service dns forwarding blacklist hosts source hpHosts description 'hpHosts optimized in hosts format'
+# set service dns forwarding blacklist hosts source hpHosts prefix '127.0.0.1 '
+# set service dns forwarding blacklist hosts source hpHosts url 'http://hosts-file.net/download/HOSTS-Optimized.txt'
 set service dns forwarding blacklist hosts source malwaredomainlist description '127.0.0.1 based host and domain list'
 set service dns forwarding blacklist hosts source malwaredomainlist prefix '127.0.0.1 '
 set service dns forwarding blacklist hosts source malwaredomainlist url 'http://www.malwaredomainlist.com/hostslist/hosts.txt'

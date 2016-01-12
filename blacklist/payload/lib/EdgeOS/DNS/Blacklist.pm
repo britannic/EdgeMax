@@ -1,25 +1,34 @@
+# **** License ****
+# COPYRIGHT AND LICENCE
+#
+# Copyright (C) 2016 by Neil Beadle
+#
+# This library is free software; you can redistribute it and/or modify
+# it under the same terms as Perl itself, either Perl version 5.23.4 or,
+# at your option, any later version of Perl 5 you may have available.
+#
+# Author: Neil Beadle
+# Date:   January 2016
+# Description: Script for creating dnsmasq configuration files to redirect dns
+# look ups to alternative IPs (blackholes, pixel servers etc.)
+#
+# **** End License ****
 package EdgeOS::DNS::Blacklist;
-use parent 'Exporter';    # imports and subclasses Exporter
-
+use parent qw(Exporter);    # imports and subclasses Exporter
+use base qw(Exporter);
 use v5.14;
-use strict;
-use warnings;
+# use strict;
+# use warnings;
 use lib q{/opt/vyatta/share/perl5/};
 use File::Basename;
 use Getopt::Long;
 use HTTP::Tiny;
-use POSIX qw{geteuid};
+use POSIX qw{geteuid getegid getgroups};
 use Sys::Syslog qw(:standard :macros);
 use Term::ReadKey qw(GetTerminalSize);
 use threads;
 use URI;
 use Vyatta::Config;
-
-use constant TRUE  => 1;
-use constant FALSE => 0;
-
-# require Exporter;
-our @ISA = qw(Exporter);
 
 # Items to export into callers namespace by default. Note: do not export
 # names by default without a very good reason. Use EXPORT_OK instead.
@@ -32,25 +41,36 @@ our @ISA = qw(Exporter);
 our @EXPORT_OK = (
   qw{
     $c
+    $FALSE
+    $spoke
+    $TRUE
     append_spaces
     delete_file
     get_cfg_actv
     get_cfg_file
     get_cols
+    get_dev_stats
     get_file
     get_url
+    get_user
     is_admin
     is_build
     is_configure
     is_version
     log_msg
+    pinwheel
     popx
     process_data
+    set_dev_grp
     write_file
     }
 );
-our $VERSION = q{1.3};
-our $c       = {
+our $VERSION = 1.4;
+our $TRUE;
+*TRUE = \1;
+our $FALSE;
+*FALSE = \0;
+our $c = {
   blk        => qq{\033[30m},
   blink      => qq{\033[5m},
   blu        => qq{\033[34m},
@@ -66,9 +86,10 @@ our $c       = {
   wyt        => qq{\033[37m},
   ylw        => qq{\033[93m},
 };
+our $spoke;
+our @EXPORT;
 
-our @EXPORT = ();
-
+# Pad a string to max terminal columns
 sub append_spaces {
   my $str    = shift // q{};
   my $tmp    = $str =~ s/.*[^[:print:]]+//r;
@@ -79,6 +100,7 @@ sub append_spaces {
   return $str . $spaces;
 }
 
+# Does just what it says
 sub delete_file {
   my $input = shift;
 
@@ -101,7 +123,7 @@ sub delete_file {
     );
     return;
   }
-  return TRUE;
+  return $TRUE;
 }
 
 # Process the active (not committed or saved) configuration
@@ -122,11 +144,11 @@ sub get_cfg_actv {
 
 # Check to see if blacklist is configured
   $config->setLevel(q{service dns forwarding});
-  my $blklst_exists = $config->$exists(q{blacklist}) ? TRUE : FALSE;
+  my $blklst_exists = $config->$exists(q{blacklist}) ? $TRUE : $FALSE;
 
   if ($blklst_exists) {
     $config->setLevel(q{service dns forwarding blacklist});
-    $input->{config}->{disabled} = $config->$returnValue(q{disabled}) // FALSE;
+    $input->{config}->{disabled} = $config->$returnValue(q{disabled}) // $FALSE;
     $input->{config}->{dns_redirect_ip}
       = $config->$returnValue(q{dns-redirect-ip}) // q{0.0.0.0};
 
@@ -135,7 +157,7 @@ sub get_cfg_actv {
     }
 
     $input->{config}->{disabled}
-      = $input->{config}->{disabled} eq q{false} ? FALSE : TRUE;
+      = $input->{config}->{disabled} eq q{false} ? $FALSE : $TRUE;
 
     for my $area (qw{hosts domains zones}) {
       $config->setLevel(qq{service dns forwarding blacklist $area});
@@ -172,7 +194,7 @@ sub get_cfg_actv {
     }
   }
   else {
-    $input->{show} = TRUE;
+    $input->{show} = $TRUE;
     log_msg(
       {
         msg_typ => q{error},
@@ -186,7 +208,7 @@ sub get_cfg_actv {
     && ( !scalar keys %{ $input->{config}->{hosts}->{src} } )
     && ( !scalar keys %{ $input->{config}->{zones}->{src} } ) )
   {
-    $input->{show} = TRUE;
+    $input->{show} = $TRUE;
     log_msg(
       {
         msg_ref => q{error},
@@ -195,7 +217,7 @@ sub get_cfg_actv {
     );
     return;
   }
-  return TRUE;
+  return $TRUE;
 }
 
 # Process a configuration file in memory after get_file() loads it
@@ -206,13 +228,13 @@ sub get_cfg_file {
   my $configured
     = (  $tmp_ref->{domains}->{source}
       || $tmp_ref->{hosts}->{source}
-      || $tmp_ref->{zones}->{source} ) ? TRUE : FALSE;
+      || $tmp_ref->{zones}->{source} ) ? $TRUE : $FALSE;
 
   if ($configured) {
     $input->{config}->{dns_redirect_ip} = $tmp_ref->{q{dns-redirect-ip}}
       // q{0.0.0.0};
     $input->{config}->{disabled}
-      = $tmp_ref->{disabled} eq q{false} ? FALSE : TRUE;
+      = $tmp_ref->{disabled} eq q{false} ? $FALSE : $TRUE;
     $input->{config}->{exclude}
       = exists $tmp_ref->{exclude} ? $tmp_ref->{exclude} : ();
 
@@ -236,29 +258,44 @@ sub get_cfg_file {
     );
     return;
   }
-  return TRUE;
+  return $TRUE;
 }
 
+# Try multiple ways to get terminal columns
 sub get_cols {
-  local $SIG{__WARN__} = sub {TRUE};
+  local $SIG{__WARN__} = sub {$TRUE};
   return ( ( GetTerminalSize( \*STDOUT ) )[0]
       || $ENV{COLUMNS}
       || qx{tput cols}
       || 80 );
 }
 
+# Get directory stats, user/group ownership
+sub get_dev_stats {
+  my $input = shift;
+  my @attributes
+    = (
+    qw{dev inode mode nlink uid gid rdev size atime mtime ctime blksize blocks}
+    );
+  return
+    print STDERR qq{Error: attribute must be one or more of "}
+    . join( q{, } => @attributes ) . q{".}
+    if !$input->{attribute} ~~ @attributes;
+  @{ $input->{dev_stats} }{@attributes} = stat( $input->{dev} )
+    or die $!;
+  return $input->{dev_stats}->{ $input->{attribute} };
+}
+
 # Read a file into memory and return the data to the calling function
 sub get_file {
   my $input = shift;
-  my @data;
   if ( -f $input->{file} ) {
     open my $CF, q{<}, $input->{file}
       or die qq{error: Unable to open $input->{file}: $!};
-    chomp( @data = <$CF> );
-
+    chomp( @{ $input->{data} } = <$CF> );
     close $CF;
   }
-  return $input->{data} = \@data;
+  return $input->{data};
 }
 
 # Build hashes from the configuration file data (called by get_nodes())
@@ -305,31 +342,31 @@ LINE:
 
     for ($line) {
       when (/$re->{MULT}/) {
-        push( @nodes, $+{MULT}, $+{VALU}, 1 );
+        push( @nodes => $+{MULT}, $+{VALU}, 1 );
         get_hash( { nodes => \@nodes, hash_ref => $cfg_ref } );
-        popx( \@nodes, 3 );
+        popx( @nodes, 3 );
       }
       when (/$re->{NODE}/) {
-        push @nodes, $+{NODE};
+        push @nodes => $+{NODE};
       }
       when (/$re->{LEAF}/) {
         $level++;
-        push( @nodes, $+{LEAF}, $+{NAME} );
+        push( @nodes => $+{LEAF}, $+{NAME} );
       }
       when (/$re->{NAME}/) {
-        push( @nodes, $+{NAME}, $+{VALU} );
+        push( @nodes => $+{NAME}, $+{VALU} );
         get_hash( { nodes => \@nodes, hash_ref => $cfg_ref } );
-        popx( \@nodes, 2 );
+        popx( @nodes => 2 );
       }
       when (/$re->{DESC}/) {
-        push( @nodes, $+{NAME}, $+{DESC} );
+        push( @nodes => $+{NAME}, $+{DESC} );
         get_hash( { nodes => \@nodes, hash_ref => $cfg_ref } );
-        popx( \@nodes, 2 );
+        popx( @nodes => 2 );
       }
       when (/$re->{MISC}/) {
-        push( @nodes, $+{MISC}, $+{MISC} );
+        push( @nodes => $+{MISC}, $+{MISC} );
         get_hash( { nodes => \@nodes, hash_ref => $cfg_ref } );
-        popx( \@nodes, 2 );
+        popx( @nodes => 2 );
       }
       when (/$re->{CMNT}/) {
         next;
@@ -383,9 +420,21 @@ sub get_url {
   }
 }
 
+# Get user & group IDs
+sub get_user {
+  my $input = shift // return;
+  my $attributes = {
+    gid  => getegid(),
+    grps => [ getgroups() ],
+    name => getlogin(),
+    uid  => geteuid(),
+  };
+  return $attributes->{ $input->{attribute} };
+}
+
 # Make sure script runs as root
 sub is_admin {
-  return TRUE if geteuid() == 0;
+  return $TRUE if geteuid() == 0;
   return;
 }
 
@@ -401,7 +450,7 @@ sub is_build {
 
   if ( $input->{build} >= 4783374 )    # script tested on os v1.7.0 & above
   {
-    return TRUE;
+    return $TRUE;
   }
   elsif ( $input->{build} < 4783374 )    # os must be upgraded
   {
@@ -412,7 +461,7 @@ sub is_build {
 # Check to see if we are being run under configure
 sub is_configure {
   qx{/bin/cli-shell-api inSession};
-  return $? >> 8 != 0 ? FALSE : TRUE;
+  return $? >> 8 != 0 ? $FALSE : $TRUE;
 }
 
 # get EdgeOS version
@@ -421,17 +470,16 @@ sub is_version {
   my $cmd = qq{cat /opt/vyatta/etc/version};
   chomp( my $edgeOS = qx{$cmd} );
 
-  if ( $edgeOS =~ m/^Version/ ) {
-    if ( $edgeOS =~ s{^Version:\s*(?<VERSION>.*)$}{$+{VERSION}}xms ) {
-      my @ver = split /\./, $edgeOS;
-      $version = join ".", @ver[ 0, 1, 2 ];
-      $build = $ver[3];
-    }
+  if ( $edgeOS =~ s{^Version:\s*(?<VERSION>.*)$}{$+{VERSION}}xms ) {
+    my @ver = split /\./ => $edgeOS;
+    $version = join "." => @ver[ 0, 1, 2 ];
+    $build = $ver[3];
   }
+
   return { version => $version, build => $build };
 }
 
-# Log and print (if -v)
+# Log and print (if $show = $TRUE)
 sub log_msg {
   my $input   = shift;
   my $log_msg = {
@@ -467,17 +515,22 @@ sub log_msg {
       if $input->{show};
   }
 
-  return TRUE;
+  return $TRUE;
+}
+
+# Create an animated activity spinner
+sub pinwheel {
+  my %wheel = ( q{|} => q{/}, q{/} => q{-}, q{-} => q{\\}, q{\\} => q{|}, );
+  $spoke = ( not defined $spoke ) ? q{|} : $wheel{$spoke};
+  return qq{\r[$c->{ylw}$spoke$c->{clr}]};
 }
 
 # pop array x times
-sub popx {
+sub popx (\@$) {
   my ( $array, $count ) = ( shift, shift );
   return if !@{$array};
-  for ( 1 .. $count ) {
-    pop @{$array};
-  }
-  return TRUE;
+  for ( 1 .. $count ) { pop @{$array}; }
+  return $TRUE;
 }
 
 # Crunch the data and throw out anything we don't need
@@ -493,7 +546,7 @@ sub process_data {
   };
 
   # Clear the status lines
-  print $c->{off}, qq{\r}, qq{ } x $input->{cols}, qq{\r} if $input->{show};
+  print $c->{off} => qq{\r}, qq{ } x $input->{cols}, qq{\r} if $input->{show};
 
 # Process the lines we've been given
 LINE:
@@ -510,20 +563,20 @@ LINE:
     for my $element (@elements) {
 
       # Break it down into it components
-      my @domain = split /[.]/, $element;
+      my @domain = split /[.]/ => $element;
 
       # Create an array of all the subdomains
       my @keys;
       for ( 2 .. @domain ) {
-        push @keys, join q{.}, @domain;
+        push @keys, join q{.} => @domain;
         shift @domain;
       }
 
       # Have we seen this key before?
-      my $key_exists = FALSE;
+      my $key_exists = $FALSE;
       for my $key (@keys) {
         if ( exists $input->{config}->{ $input->{area} }->{exclude}->{$key} ) {
-          $key_exists = TRUE;
+          $key_exists = $TRUE;
           $input->{config}->{ $input->{area} }->{exclude}->{$key}++;
         }
       }
@@ -573,9 +626,26 @@ LINE:
         ),
       }
     );
-    return TRUE;
+    return $TRUE;
   }
   return;
+}
+
+# Fix active configuration directory group and user ownership
+sub set_dev_grp {
+  my $input = shift // return;
+  my $dev_grp
+    = get_dev_stats( { attribute => q{gid}, dev => $input->{dir_handle} } );
+  if ( $dev_grp ~~ @{ $input->{grps} } ) {
+    return $TRUE;
+  }
+  else {
+    my $result
+      = qx{sudo chgrp -R $input->{dir_grp} $input->{dir_handle}}
+      ? $FALSE
+      : $TRUE;
+    return $result;
+  }
 }
 
 # Write the data to file
@@ -593,10 +663,9 @@ sub write_file {
   );
 
   print {$FH} @{ $input->{data} };
-
   close $FH;
 
-  return TRUE;
+  return $TRUE;
 }
 
 1;
@@ -610,21 +679,29 @@ EdgeOS::DNS::Blacklist - Perl extension for EdgeOS dnsmasq blacklist configurati
 
   use EdgeOS::DNS::Blacklist (qw{
     $c
+    $FALSE
+    $spoke
+    $TRUE
     append_spaces
     delete_file
     get_cfg_actv
     get_cfg_file
     get_cols
+    get_dev_stats
     get_file
     get_url
+    get_user
     is_admin
     is_build
     is_configure
     is_version
     log_msg
+    pinwheel
     popx
     process_data
+    set_dev_grp
     write_file
+
     });
 
 =head1 DESCRIPTION

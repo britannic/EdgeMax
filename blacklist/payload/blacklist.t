@@ -37,6 +37,9 @@ use warnings;
 use EdgeOS::DNS::Blacklist (
   qw{
     $c
+    $FALSE
+    $TRUE
+    $spoke
     append_spaces
     get_cfg_actv
     get_cfg_file
@@ -45,14 +48,13 @@ use EdgeOS::DNS::Blacklist (
     is_configure
     is_admin
     log_msg
+    pinwheel
     popx
     }
 );
 
-use constant TRUE  => 1;
-use constant FALSE => 0;
-my $version = q{1.2};
-my ( $blacklist_removed, $cfg_file, $spoke );
+my $version = q{1.3};
+my ( $blacklist_removed, $cfg_file );
 
 ########## Run main ###########
 exit 0 if &main();
@@ -130,7 +132,8 @@ sub exec_test {
       return cmp_ok(
         $input->{run}->{lval}, $input->{run}->{op},
         $input->{run}->{rval}, $input->{run}->{comment}
-      ) or diag( $input->{run}->{diag} );
+        )
+        or diag( $input->{run}->{diag} );
     },
   };
 
@@ -197,7 +200,7 @@ sub get_tests {
   my $success
     = defined $cfg_file
     ? get_cfg_file( { config => $input->{cfg}, file => $cfg_file } )
-    : get_cfg_actv( { config => $input->{cfg}, show => TRUE } );
+    : get_cfg_actv( { config => $input->{cfg}, show => $TRUE } );
 
   $input->{cfg}->{domains_pre_f}
     = [ glob qq{$input->{cfg}->{dnsmasq_dir}/domains.pre*blacklist.conf} ];
@@ -218,7 +221,7 @@ sub get_tests {
         . qq{ found - investigate!}
         . $c->{clr},
       lval   => qq{$input->{cfg}->{updatescript}},
-      result => TRUE,
+      result => $TRUE,
       test   => q{is_file},
     };
 
@@ -232,7 +235,7 @@ sub get_tests {
         . qq{ should exist - investigate!}
         . $c->{clr},
       lval   => qq{$input->{cfg}->{flag_file}},
-      result => TRUE,
+      result => $TRUE,
       test   => q{is_file},
     };
 
@@ -246,7 +249,7 @@ sub get_tests {
         . qq{ found - investigate!}
         . $c->{clr},
       lval   => qq{$input->{cfg}->{no_op}},
-      result => TRUE,
+      result => $TRUE,
       test   => q{isnt_file},
     };
 
@@ -260,7 +263,7 @@ sub get_tests {
         . qq{ should exist - investigate!}
         . $c->{clr},
       lval   => qq{$input->{cfg}->{testscript}},
-      result => TRUE,
+      result => $TRUE,
       test   => q{is_file},
     };
 
@@ -271,7 +274,7 @@ sub get_tests {
     }
   }
   else {
-    $blacklist_removed = TRUE;
+    $blacklist_removed = $TRUE;
     print append_spaces( pinwheel()
         . q{ Blacklist is removed - testing to check its cleanly removed...} );
 
@@ -292,7 +295,7 @@ sub get_tests {
         . qq{ shouldn't exist - investigate!}
         . $c->{clr},
       lval   => qq{$input->{cfg}->{testscript}},
-      result => FALSE,
+      result => $TRUE,
       test   => q{isnt_file},
     };
 
@@ -303,7 +306,7 @@ sub get_tests {
         . qq{$input->{cfg}->{dnsmasq_dir}/ - they should be deleted!}
         . $c->{clr},
       lval   => scalar( @{ $input->{cfg}->{strays} } ),
-      result => TRUE,
+      result => $TRUE,
       test   => q{isnt},
     };
 
@@ -314,18 +317,29 @@ sub get_tests {
         qq{$c->{red} Found $input->{cfg}->{tmplts} - it should be removed!}
         . $c->{clr},
       lval   => $input->{cfg}->{tmplts},
-      result => FALSE,
+      result => $TRUE,
       test   => q{isnt_dir},
     };
 
     print pinwheel();
+    my $lib = qq{$input->{cfg}->{lib}/$input->{cfg}->{mod_dir}};
+    $tests->{ $ikey++ } = {
+      comment => qq{Checking Blacklist perl lib directory doesn't exist},
+      diag    => qq{$c->{red} Found $lib - it should be removed!} . $c->{clr},
+      lval    => $lib,
+      result  => $TRUE,
+      test    => q{isnt_dir},
+    };
+
+    print pinwheel();
+    my $module
+      = qq{$input->{cfg}->{lib}/$input->{cfg}->{mod_dir}/$input->{cfg}->{module}};
     $tests->{ $ikey++ } = {
       comment => qq{Checking Blacklist.pm perl module doesn't exist},
-      diag => qq{$c->{red} Found $input->{cfg}->{lib} - it should be removed!}
-        . $c->{clr},
-      lval   => $input->{cfg}->{lib},
-      result => FALSE,
-      test   => q{isnt_dir},
+      diag   => qq{$c->{red} Found $module - it should be removed!} . $c->{clr},
+      lval   => $module,
+      result => $TRUE,
+      test   => q{isnt_file},
     };
   }
 
@@ -351,7 +365,7 @@ sub get_tests {
             . qq{ not found for $source - investigate!}
             . $c->{clr},
           lval   => $file,
-          result => TRUE,
+          result => $TRUE,
           test   => q{is_file},
         };
       }
@@ -410,8 +424,7 @@ sub get_tests {
         my %found_ips = map {
           my $found_ip = $_;
           $found_ip =~ s/$re/$+{IP}/ms;
-          $found_ip => 1,
-            tmpkey  => print pinwheel(),
+          $found_ip => 1, tmpkey => print pinwheel(),
         } keys %content;
         delete $found_ips{tmpkey};
 
@@ -429,7 +442,7 @@ sub get_tests {
               . $c->{clr},
             lval   => $found_ip,
             op     => q{eq},
-            result => TRUE,
+            result => $TRUE,
             rval   => $ip,
             test   => q{cmp_ok},
           };
@@ -457,7 +470,7 @@ sub get_tests {
                 . basename($file)
                 . $c->{clr},
               lval => @keys ~~ %content,
-              result => TRUE,
+              result => $TRUE,
               test   => q{is},
             };
           }
@@ -475,7 +488,7 @@ sub get_tests {
               . basename($file)
               . qq{ - investigate the following entries:$c->{clr}\n},
             lval    => scalar @content{@keys},
-            result  => TRUE,
+            result  => $TRUE,
             run_sub => sub {
               my $re_fqdn = qr{address=[/][.]{0,1}(.*)[/].*}o;
               my %found;
@@ -513,7 +526,7 @@ HOST:
           . $c->{clr},
         lval   => $resolved_ip,
         op     => q{eq},
-        result => TRUE,
+        result => $TRUE,
         rval   => $ip,
         test   => q{cmp_ok},
       };
@@ -529,11 +542,13 @@ sub main {
     dnsmasq_dir => q{/etc/dnsmasq.d},
     failed      => 0,
     flag_file   => q{/var/log/update-dnsmasq-flagged.cmds},
-    lib         => q{/config/lib/perl/},
+    lib         => q{/config/lib/perl},
+    mod_dir     => q{EdgeOS/DNS/},
+    module      => q{Blacklist.pm},
     no_op       => q{/tmp/.update-dnsmasq.no-op},
+    testscript  => q{/config/scripts/blacklist.t},
     tmplts      => q{/opt/vyatta/share/vyatta-cfg/templates/service/dns/}
       . q{forwarding/blacklist/},
-    testscript   => q{/config/scripts/blacklist.t},
     updatescript => q{/config/scripts/update-dnsmasq.pl}
   };
 
@@ -560,7 +575,7 @@ sub main {
   if ( $t_count->{failed} == 0 && !$blacklist_removed ) {
     say(  qq{$c->{grn}All $t_count->{tests} tests passed - dnsmasq }
         . qq{blacklisting is configured correctly$c->{clr}} );
-    return TRUE;
+    return $TRUE;
   }
   elsif ( $blacklist_removed && $t_count->{failed} != 0 ) {
     say(  qq{$c->{red} $t_count->{failed} $t_word failed out of }
@@ -571,7 +586,7 @@ sub main {
   elsif ( $blacklist_removed && $t_count->{failed} == 0 ) {
     say(  qq{$c->{grn}All $t_count->{tests} tests passed - dnsmasq }
         . qq{blacklisting has been completely removed$c->{clr}} );
-    return TRUE;
+    return $TRUE;
   }
   else {
     say(  qq{$c->{red} $t_count->{failed} $t_word failed out of }
@@ -579,13 +594,6 @@ sub main {
         . qq{$c->{clr}} );
     return;
   }
-}
-
-sub pinwheel {
-  my %wheel = ( q{|} => q{/}, q{/} => q{-}, q{-} => q{\\}, q{\\} => q{|}, );
-
-  $spoke = ( not defined $spoke ) ? q{|} : $wheel{$spoke};
-  return qq{\r[$c->{ylw}$spoke$c->{clr}]};
 }
 
 sub usage {
@@ -606,9 +614,9 @@ sub usage {
       print STDERR q{options:},
         map( q{ } x 4 . $_->[0],
         sort { $a->[1] cmp $b->[1] } grep $_->[0] ne q{},
-        @{ get_options( { option => TRUE } ) } ),
+        @{ get_options( { option => $TRUE } ) } ),
         qq{\n};
-      $exitcode == 9 ? return TRUE : exit $exitcode;
+      $exitcode == 9 ? return $TRUE : exit $exitcode;
     },
     version => sub {
       my $exitcode = shift;
