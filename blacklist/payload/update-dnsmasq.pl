@@ -44,9 +44,9 @@ use EdgeOS::DNS::Blacklist (
     write_file
     }
 );
-
+delete $ENV{PATH};
 my ( $cfg_file, $show );
-my $version = q{3.5.3};
+my $version = q{3.5.5};
 my $cols    = get_cols();
 
 ############################### script runs here ###############################

@@ -44,7 +44,7 @@ our @EXPORT_OK = (
     $FALSE
     $spoke
     $TRUE
-    append_spaces
+    pad_str
     delete_file
     get_cfg_actv
     get_cfg_file
@@ -65,7 +65,7 @@ our @EXPORT_OK = (
     write_file
     }
 );
-our $VERSION = 1.4;
+our $VERSION = 1.5;
 our $TRUE;
 *TRUE = \1;
 our $FALSE;
@@ -90,7 +90,7 @@ our $spoke;
 our @EXPORT;
 
 # Pad a string to max terminal columns
-sub append_spaces {
+sub pad_str {
   my $str    = shift // q{};
   my $tmp    = $str =~ s/.*[^[:print:]]+//r;
   my $spaces = q{ } x ( get_cols() - length $tmp );
@@ -501,16 +501,16 @@ sub log_msg {
       =~ s/\e[[][?]{0,1}\d+(?>(;\d+)*)[lm]//gr
   );
 
-  print $c->{off}, qq{\r}, append_spaces(), qq{\r} if $input->{show};
+  print $c->{off}, qq{\r}, pad_str(), qq{\r} if $input->{show};
 
   if ( $input->{msg_typ} eq q{info} ) {
-    print $c->{off}, append_spaces(qq{$input->{msg_typ}: $input->{msg_str}}),
+    print $c->{off}, pad_str(qq{$input->{msg_typ}: $input->{msg_str}}),
       $input->{eof}
       if $input->{show};
   }
   else {
     print STDERR $c->{off}, $c->{red},
-      append_spaces(qq{$input->{msg_typ}: $input->{msg_str}}), $c->{clr},
+      pad_str(qq{$input->{msg_typ}: $input->{msg_str}}), $c->{clr},
       $input->{eof}
       if $input->{show};
   }
@@ -682,7 +682,7 @@ EdgeOS::DNS::Blacklist - Perl extension for EdgeOS dnsmasq blacklist configurati
     $FALSE
     $spoke
     $TRUE
-    append_spaces
+    pad_str
     delete_file
     get_cfg_actv
     get_cfg_file

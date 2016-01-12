@@ -40,7 +40,7 @@ use EdgeOS::DNS::Blacklist (
     $FALSE
     $TRUE
     $spoke
-    append_spaces
+    pad_str
     get_cfg_actv
     get_cfg_file
     get_cols
@@ -53,7 +53,7 @@ use EdgeOS::DNS::Blacklist (
     }
 );
 
-my $version = q{1.3};
+my $version = q{1.4};
 my ( $blacklist_removed, $cfg_file );
 
 ########## Run main ###########
@@ -70,7 +70,7 @@ sub exec_test {
         $input->{run}->{comment}
       );
       if ( !$rslt ) {
-        diag( $input->{run}->{diag} );
+        diag( $c->{red} . $input->{run}->{diag} . $c->{clr} );
         $input->{run}->{run_sub}->() if defined $input->{run}->{run_sub};
         return;
       }
@@ -83,7 +83,7 @@ sub exec_test {
         $input->{run}->{comment}
       );
       if ( !$rslt ) {
-        diag( $input->{run}->{diag} );
+        diag( $c->{red} . $input->{run}->{diag} . $c->{clr} );
         $input->{run}->{run_sub}->() if defined $input->{run}->{run_sub};
         return;
       }
@@ -96,7 +96,7 @@ sub exec_test {
         $input->{run}->{comment}
       );
       if ( !$rslt ) {
-        diag( $input->{run}->{diag} );
+        diag( $c->{red} . $input->{run}->{diag} . $c->{clr} );
         $input->{run}->{run_sub}->() if defined $input->{run}->{run_sub};
         return;
       }
@@ -109,7 +109,7 @@ sub exec_test {
         $input->{run}->{comment}
       );
       if ( !$rslt ) {
-        diag( $input->{run}->{diag} );
+        diag( $c->{red} . $input->{run}->{diag} . $c->{clr} );
         $input->{run}->{run_sub}->() if defined $input->{run}->{run_sub};
         return;
       }
@@ -122,7 +122,7 @@ sub exec_test {
         $input->{run}->{comment}
       );
       if ( !$rslt ) {
-        diag( $input->{run}->{diag} );
+        diag( $c->{red} . $input->{run}->{diag} . $c->{clr} );
         $input->{run}->{run_sub}->() if defined $input->{run}->{run_sub};
         return;
       }
@@ -133,7 +133,7 @@ sub exec_test {
         $input->{run}->{lval}, $input->{run}->{op},
         $input->{run}->{rval}, $input->{run}->{comment}
         )
-        or diag( $input->{run}->{diag} );
+        or diag( $c->{red} . $input->{run}->{diag} . $c->{clr} );
     },
   };
 
@@ -193,8 +193,7 @@ sub get_tests {
   my $tests = {};
   my $ikey  = 1;
 
-  print append_spaces(
-    pinwheel() . qq{ Loading EdgeOS router configuration...} );
+  print pad_str(qq{@{[pinwheel()]} Loading EdgeOS router configuration...});
 
   # Now choose which data set will define the configuration
   my $success
@@ -210,16 +209,13 @@ sub get_tests {
     = [ glob qq{$input->{cfg}->{dnsmasq_dir}/zones.pre*blacklist.conf} ];
 
   if ($success) {
-    print append_spaces( pinwheel() . q{ Adding tests for key files...} );
+    print pad_str(qq{@{[pinwheel()]} Adding tests for key files...});
 
     $tests->{ $ikey++ } = {
-      comment => q{Checking }
-        . basename( $input->{cfg}->{updatescript} )
-        . q{ exists},
-      diag => qq{$c->{red}}
-        . basename( $input->{cfg}->{updatescript} )
-        . qq{ found - investigate!}
-        . $c->{clr},
+      comment =>
+        qq{Checking @{[basename( $input->{cfg}->{updatescript} )]} exists},
+      diag =>
+        qq{@{[basename( $input->{cfg}->{updatescript} )]} found - investigate!},
       lval   => qq{$input->{cfg}->{updatescript}},
       result => $TRUE,
       test   => q{is_file},
@@ -227,13 +223,11 @@ sub get_tests {
 
     print pinwheel();
     $tests->{ $ikey++ } = {
-      comment => q{Checking }
-        . basename( $input->{cfg}->{flag_file} )
-        . q{ exists},
-      diag => qq{$c->{red}}
-        . basename( $input->{cfg}->{flag_file} )
-        . qq{ should exist - investigate!}
-        . $c->{clr},
+      comment =>
+        qq{Checking @{[basename( $input->{cfg}->{flag_file} )]} exists},
+      diag =>
+        qq{@{[basename( $input->{cfg}->{flag_file} )]} }
+        . q{should exist - investigate!},
       lval   => qq{$input->{cfg}->{flag_file}},
       result => $TRUE,
       test   => q{is_file},
@@ -241,42 +235,36 @@ sub get_tests {
 
     print pinwheel();
     $tests->{ $ikey++ } = {
-      comment => q{Checking }
-        . basename( $input->{cfg}->{no_op} )
-        . q{ doesn't exist},
-      diag => qq{$c->{red}}
-        . basename( $input->{cfg}->{no_op} )
-        . qq{ found - investigate!}
-        . $c->{clr},
-      lval   => qq{$input->{cfg}->{no_op}},
+      comment =>
+        qq{Checking @{[basename( $input->{cfg}->{no_op} )]} doesn't exist},
+      diag => qq{@{[basename( $input->{cfg}->{no_op} )]} found - investigate!},
+      lval => qq{$input->{cfg}->{no_op}},
       result => $TRUE,
       test   => q{isnt_file},
     };
 
     print pinwheel();
     $tests->{ $ikey++ } = {
-      comment => q{Checking }
-        . basename( $input->{cfg}->{testscript} )
-        . q{ exists},
-      diag => qq{$c->{red}}
-        . basename( $input->{cfg}->{testscript} )
-        . qq{ should exist - investigate!}
-        . $c->{clr},
+      comment =>
+        qq{Checking @{[basename( $input->{cfg}->{testscript} )]} exists},
+      diag =>
+        qq{@{[basename( $input->{cfg}->{testscript} )]} }
+        . q{should exist - investigate!},
       lval   => qq{$input->{cfg}->{testscript}},
       result => $TRUE,
       test   => q{is_file},
     };
 
     if ( $input->{cfg}->{disabled} ) {
-      print append_spaces( pinwheel()
-          . qq{ Blacklist is disabled, no further testing required...\n} );
+      print pad_str( qq{@{[pinwheel()]} Blacklist is disabled, },
+        q{no further testing required...\n} );
       return;
     }
   }
   else {
     $blacklist_removed = $TRUE;
-    print append_spaces( pinwheel()
-        . q{ Blacklist is removed - testing to check its cleanly removed...} );
+    print pad_str( qq{@{[pinwheel()]} Blacklist is removed - },
+      q{testing to check its cleanly removed...} );
 
     # Check for stray files
     $input->{cfg}->{strays}
@@ -287,13 +275,11 @@ sub get_tests {
 
     print pinwheel();
     $tests->{ $ikey++ } = {
-      comment => q{Checking }
-        . basename( $input->{cfg}->{testscript} )
-        . q{ removed},
-      diag => qq{$c->{red}}
-        . basename( $input->{cfg}->{testscript} )
-        . qq{ shouldn't exist - investigate!}
-        . $c->{clr},
+      comment =>
+        q{Checking @{[basename( $input->{cfg}->{testscript} )]} removed},
+      diag =>
+        qq{@{[basename( $input->{cfg}->{testscript} )]} }
+        . q{shouldn't exist - investigate!},
       lval   => qq{$input->{cfg}->{testscript}},
       result => $TRUE,
       test   => q{isnt_file},
@@ -302,9 +288,8 @@ sub get_tests {
     print pinwheel();
     $tests->{ $ikey++ } = {
       comment => qq{Checking *.blacklist.conf files don't exist},
-      diag    => qq{$c->{red} Found @{ $input->{cfg}->{strays} } in }
-        . qq{$input->{cfg}->{dnsmasq_dir}/ - they should be deleted!}
-        . $c->{clr},
+      diag    => qq{Found @{ $input->{cfg}->{strays} } in }
+        . qq{$input->{cfg}->{dnsmasq_dir}/ - remove and restart dnsmasq!},
       lval   => scalar( @{ $input->{cfg}->{strays} } ),
       result => $TRUE,
       test   => q{isnt},
@@ -314,8 +299,7 @@ sub get_tests {
     $tests->{ $ikey++ } = {
       comment => qq{Checking blacklist configure templates don't exist},
       diag =>
-        qq{$c->{red} Found $input->{cfg}->{tmplts} - it should be removed!}
-        . $c->{clr},
+        qq{Found $input->{cfg}->{tmplts} - should be deleted!},
       lval   => $input->{cfg}->{tmplts},
       result => $TRUE,
       test   => q{isnt_dir},
@@ -325,7 +309,7 @@ sub get_tests {
     my $lib = qq{$input->{cfg}->{lib}/$input->{cfg}->{mod_dir}};
     $tests->{ $ikey++ } = {
       comment => qq{Checking Blacklist perl lib directory doesn't exist},
-      diag    => qq{$c->{red} Found $lib - it should be removed!} . $c->{clr},
+      diag    => qq{Found $lib - it should be removed!},
       lval    => $lib,
       result  => $TRUE,
       test    => q{isnt_dir},
@@ -336,10 +320,10 @@ sub get_tests {
       = qq{$input->{cfg}->{lib}/$input->{cfg}->{mod_dir}/$input->{cfg}->{module}};
     $tests->{ $ikey++ } = {
       comment => qq{Checking Blacklist.pm perl module doesn't exist},
-      diag   => qq{$c->{red} Found $module - it should be removed!} . $c->{clr},
-      lval   => $module,
-      result => $TRUE,
-      test   => q{isnt_file},
+      diag    => qq{Found $module - it should be removed!},
+      lval    => $module,
+      result  => $TRUE,
+      test    => q{isnt_file},
     };
   }
 
@@ -347,7 +331,7 @@ sub get_tests {
 
   for my $area (@areas) {
 
-    print append_spaces( pinwheel() . qq{ Adding tests for $area content...} );
+    print pad_str(qq{@{[pinwheel()]} Adding tests for $area content...});
 
     my %content;
     my @files = @{ get_files( { cfg => $input->{cfg}, area => $area } ) };
@@ -360,11 +344,8 @@ sub get_tests {
         print pinwheel();
         $tests->{ $ikey++ } = {
           comment => qq{$source},
-          diag    => qq{$c->{red}}
-            . basename($file)
-            . qq{ not found for $source - investigate!}
-            . $c->{clr},
-          lval   => $file,
+          diag => qq{@{[basename($file)]} not found for $source - investigate!},
+          lval => $file,
           result => $TRUE,
           test   => q{is_file},
         };
@@ -373,8 +354,8 @@ sub get_tests {
       # Test global and area exclusions
       for my $f_ref (@files) {
         my ( $source, $file ) = @{$f_ref};
-        print append_spaces(
-          pinwheel() . qq{ Deep scanning content from $area files...} );
+        print pad_str( qq{@{[pinwheel()]} Deep scanning data in $area files },
+          q{for exclusion tests...} );
 
         %content = map { ( $_ => 1, tmpkey => print pinwheel(), ) }
           @{ get_file( { file => $file } ) };
@@ -382,16 +363,13 @@ sub get_tests {
         if ( keys %content ) {
           for my $host ( sort keys %{ $input->{cfg}->{exclude} } ) {
             my @keys = ( qq{address=/.$host/$ip}, qq{address=/$host/$ip} );
-            print append_spaces(
-              pinwheel() . qq{ Adding global $area $host exclusion tests...} );
+            print pad_str( qq{@{[pinwheel()]} Adding global $area $host },
+              q{exclusion tests...} );
 
             $tests->{ $ikey++ } = {
-              comment => qq{Checking "global exclude" $host not in }
-                . basename($file),
-              diag => qq{$c->{red}}
-                . qq{Found "global exclude" $host in }
-                . basename($file) . q{!}
-                . $c->{clr},
+              comment =>
+                qq{Checking "global exclude" $host not in @{[basename($file)]}},
+              diag => qq{Found "global exclude" $host in @{[basename($file)]}!},
               lval => @keys ~~ %content,
               result => q{},
               test   => q{is},
@@ -401,24 +379,21 @@ sub get_tests {
 
         for my $host ( sort keys %{ $input->{cfg}->{$area}->{exclude} } ) {
           my @keys = ( qq{address=/.$host/$ip}, qq{address=/$host/$ip} );
-          print append_spaces(
-            pinwheel() . qq{ Adding tests for $area $host exclusion...} );
+          print pad_str(
+            qq{@{[pinwheel()]} Adding tests for $area $host exclusion...});
 
           $tests->{ $ikey++ } = {
-            comment => qq{Checking "$area exclude" $host not in }
-              . basename($file),
-            diag => qq{$c->{red}}
-              . qq{Found "$area exclude" $host in }
-              . basename($file) . q{!}
-              . $c->{clr},
-            lval => @keys ~~ %content,
+            comment =>
+              qq{Checking "$area exclude" $host not in @{[basename($file)]}},
+            diag   => qq{Found "$area exclude" $host in @{[basename($file)]}!},
+            lval   => @keys ~~ %content,
             result => q{},
             test   => q{is},
           };
         }
 
-        print append_spaces(
-          pinwheel() . qq{ Deep scanning data for $area IP tests...} );
+        print pad_str(
+          qq{@{[pinwheel()]} Deep scanning data for $area IP tests...});
 
         my $re        = qr{(?:address=[/][.]{0,1}.*[/])(?<IP>.*)};
         my %found_ips = map {
@@ -429,17 +404,12 @@ sub get_tests {
         delete $found_ips{tmpkey};
 
         for my $found_ip ( sort keys %found_ips ) {
-          print append_spaces(
-            pinwheel() . qq{ Adding test for correct IP...} );
+          print pad_str(qq{@{[pinwheel()]} Adding tests for correct IP...});
           $tests->{ $ikey++ } = {
-            comment => qq{IP address $found_ip found in }
-              . basename($file)
+            comment => qq{IP address $found_ip found in @{[basename($file)]}}
               . qq{ matches configured $ip},
-            diag => qq{$c->{red}}
-              . qq{IP address $found_ip found in }
-              . basename($file)
-              . qq{ doesn't match configured $ip!}
-              . $c->{clr},
+            diag => qq{IP address $found_ip found in @{[basename($file)]}}
+              . qq{ doesn't match configured $ip!},
             lval   => $found_ip,
             op     => q{eq},
             result => $TRUE,
@@ -460,15 +430,13 @@ sub get_tests {
           for my $host ( sort keys %{ $input->{cfg}->{$area}->{blklst} } ) {
             my @keys = ( qq{address=/.$host/$ip}, qq{address=/$host/$ip} );
 
-            print append_spaces(
-              pinwheel() . qq{ Adding tests for blacklisted $host...} );
+            print pad_str(
+              qq{@{[pinwheel()]} Adding tests for blacklisted $host...});
             $tests->{ $ikey++ } = {
-              comment => qq{Checking "$area include" $host is in }
-                . basename($file),
-              diag => qq{$c->{red}}
-                . qq{"$area include" $host not found in }
-                . basename($file)
-                . $c->{clr},
+              comment =>
+                qq{Checking "$area include" $host is in @{[basename($file)]}},
+              diag =>
+                qq{"$area include" $host not found in @{[basename($file)]}},
               lval => @keys ~~ %content,
               result => $TRUE,
               test   => q{is},
@@ -478,15 +446,13 @@ sub get_tests {
           my $address = $area ne q{domains} ? q{address=/} : q{address=/.};
           my @keys = map { my $include = $_; qq{$address$include/$ip} }
             sort keys %{ $input->{cfg}->{$area}->{blklst} };
-          print append_spaces( pinwheel() . qq{ Adding additional tests...} );
+          print pad_str(qq{@{[pinwheel()]} Adding additional tests...});
 
           $tests->{ $ikey++ } = {
-            comment => qq{Checking }
-              . basename($file)
-              . qq{ only contains "$area include" entries},
-            diag => qq{$c->{red}"$area include" has additional entries in }
-              . basename($file)
-              . qq{ - investigate the following entries:$c->{clr}\n},
+            comment =>
+              qq{Checking @{[basename($file)]} only contains "$area include" entries},
+            diag => qq{"$area include" has additional entries in }
+              . qq{@{[basename($file)]} - investigate the following entries:\n},
             lval    => scalar @content{@keys},
             result  => $TRUE,
             run_sub => sub {
@@ -510,20 +476,18 @@ sub get_tests {
 HOST:
   for my $area (@areas) {
     my $ip = $input->{cfg}->{$area}->{dns_redirect_ip};
-    print append_spaces(
-      pinwheel() . qq{ Scanning $area redirection DNS resolution...} );
+    print pad_str(
+      qq{@{[pinwheel()]} Scanning $area for DNS redirection tests...});
 
     for my $host ( sort keys %{ $input->{cfg}->{$area}->{blklst} } ) {
       $host = q{www.} . $host if $area eq q{domains};
       my $resolved_ip = inet_ntoa( inet_aton($host) ) or next HOST;
-      print append_spaces( pinwheel() . qq{ Resolved $host to $resolved_ip} );
+      print pad_str(qq{@{[pinwheel()]} Resolved $host to $resolved_ip});
 
       $tests->{ $ikey++ } = {
         comment => qq{Checking $host is redirected by dnsmasq to $ip},
-        diag    => qq{$c->{red}}
-          . qq{dnsmasq replied with $host = $resolved_ip, should have been }
-          . $ip . q{!}
-          . $c->{clr},
+        diag =>
+          qq{dnsmasq replied with $host = $resolved_ip, should be $ip!},
         lval   => $resolved_ip,
         op     => q{eq},
         result => $TRUE,
@@ -558,8 +522,7 @@ sub main {
   usage( { option => q{cfg_file}, exit_code => 1 } )
     if defined $cfg_file && !-f $cfg_file;
 
-  print append_spaces(
-    pinwheel() . q{ Testing dnsmasq blacklist configuration} );
+  print pad_str(qq{@{[pinwheel()]} Testing dnsmasq blacklist configuration});
 
   my $planned_tests = get_tests( { cfg => $cfg } );
 
