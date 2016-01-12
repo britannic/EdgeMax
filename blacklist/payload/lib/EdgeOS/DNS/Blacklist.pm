@@ -715,13 +715,7 @@ None by default.
 
 =head1 SEE ALSO
 
-Mention other useful documentation such as the documentation of
-related modules or operating system documentation (such as man pages
-in UNIX), or any relevant external documentation such as RFCs or
-standards.
-
-
-If you have a web site set up for your module, mention it here.
+http://community.ubnt.com/t5/EdgeMAX/CLI-Integrated-dnsmasq-Adblocking-amp-Blacklisting-v3-3-2-Easy/m-p/1344740#U1344740
 
 =head1 AUTHOR
 
@@ -729,7 +723,7 @@ Neil Beadle, E<lt>blacklist@empirecreekcircle.comE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2015 by Neil Beadle
+Copyright (C) 2016 by Neil Beadle
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself, either Perl version 5.23.4 or,
