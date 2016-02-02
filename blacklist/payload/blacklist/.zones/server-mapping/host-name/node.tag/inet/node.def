@@ -1,0 +1,5 @@
+multi:
+type: ipv4,ipv6
+help: Address [REQUIRED]
+val_help: ipv4; IPv4 address
+val_help: ipv6; IPv6 address

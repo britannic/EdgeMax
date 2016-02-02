@@ -1,7 +1,8 @@
-multi:
+tag:
 type: txt
-help: Domains to INCLUDE in the DNS forwarding blacklist
+help: Host name for DNS address mapping
 
 syntax:expression: pattern $VAR(@) "^[[:alnum:]][-.[:alnum:]]*[[:alnum:]]$"
                    ; "invalid host name $VAR(@)"
 
+commit:expression: $VAR(./inet) != ""; "IP address for the static mapping must be set"

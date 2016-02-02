@@ -1,0 +1,8 @@
+type: txt
+help: A blacklist source url that provides a list of domain names to redirect
+
+val_help: http; Example: http://tv-redirect.com/bl/ZONES
+comp_help: URL must provide a list to download without prompting
+
+commit:expression: $VAR(../prefix) != ""; "A source prefix search string must be set"
+

@@ -1,0 +1,7 @@
+multi:
+type: txt
+help: Domains to INCLUDE in DNS forwarding zones
+
+syntax:expression: pattern $VAR(@) "^[[:alnum:]][-.[:alnum:]]*[[:alnum:]]$"
+                   ; "invalid host name $VAR(@)"
+

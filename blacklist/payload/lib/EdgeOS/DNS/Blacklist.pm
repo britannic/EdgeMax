@@ -17,6 +17,7 @@ package EdgeOS::DNS::Blacklist;
 use parent qw(Exporter);    # imports and subclasses Exporter
 use base qw(Exporter);
 use v5.14;
+
 # use strict;
 # use warnings;
 use lib q{/opt/vyatta/share/perl5/};
@@ -108,7 +109,7 @@ sub delete_file {
     log_msg(
       {
         msg_typ => q{info},
-        msg_str => sprintf( q{Deleting file %s}, $input->{file} ),
+        msg_str => qq{Deleting file $input->{file}},
       }
     );
     unlink $input->{file};
@@ -118,7 +119,7 @@ sub delete_file {
     log_msg(
       {
         msg_typ => q{warning},
-        msg_str => sprintf( q{Unable to delete %s}, $input->{file} ),
+        msg_str => qq{Unable to delete $input->{file}},
       }
     );
     return;
@@ -159,7 +160,7 @@ sub get_cfg_actv {
     $input->{config}->{disabled}
       = $input->{config}->{disabled} eq q{false} ? $FALSE : $TRUE;
 
-    for my $area (qw{hosts domains zones}) {
+    for my $area (qw{hosts domains}) {
       $config->setLevel(qq{service dns forwarding blacklist $area});
       $input->{config}->{$area}->{dns_redirect_ip}
         = $config->$returnValue(q{dns-redirect-ip})
@@ -190,6 +191,16 @@ sub get_cfg_actv {
           $config->$returnValue(q{prefix}),
           $config->$returnValue(q{url})
           );
+        $input->{config}->{$area}->{src}->{$source}->{file}
+          = $config->$returnValue(q{file})
+          if $area eq zones;
+      }
+
+      $config->setLevel(
+        qq{service dns forwarding blacklist $area server-mapping});
+      for my $host ( $config->$listNodes(q{host-name}) ) {
+        $input->{config}->{$area}->{server_mapping}->{$host}->{ip}
+          = $config->$returnValue(q{inet});
       }
     }
   }
@@ -212,7 +223,8 @@ sub get_cfg_actv {
     log_msg(
       {
         msg_ref => q{error},
-        msg_str => q{At least one domain or host source must be configured},
+        msg_str => q{At least one domain, host source or server mapping }
+          . q{must be configured},
       }
     );
     return;
@@ -238,13 +250,13 @@ sub get_cfg_file {
     $input->{config}->{exclude}
       = exists $tmp_ref->{exclude} ? $tmp_ref->{exclude} : ();
 
-    for my $area (qw{hosts domains zones}) {
+    for my $area (qw{hosts domains}) {
       $input->{config}->{$area}->{dns_redirect_ip}
         = $input->{config}->{dns_redirect_ip}
         if !exists( $tmp_ref->{$area}->{q{dns-redirect-ip}} );
 
-      @{ $input->{config}->{$area} }{qw(blklst exclude src)}
-        = @{ $tmp_ref->{$area} }{qw(include exclude source)};
+      @{ $input->{config}->{$area} }{qw(blklst exclude src mapping)}
+        = @{ $tmp_ref->{$area} }{qw(include exclude source server-mapping)};
 
     }
   }

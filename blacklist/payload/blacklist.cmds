@@ -18,6 +18,7 @@ set service dns forwarding blacklist exclude 122.2o7.net
 set service dns forwarding blacklist exclude 1e100.net
 set service dns forwarding blacklist exclude adobedtm.com
 set service dns forwarding blacklist exclude akamai.net
+set service dns forwarding blacklist exclude akamaihd.net
 set service dns forwarding blacklist exclude amazon.com
 set service dns forwarding blacklist exclude amazonaws.com
 set service dns forwarding blacklist exclude apple.com
@@ -51,6 +52,7 @@ set service dns forwarding blacklist exclude smacargo.com
 set service dns forwarding blacklist exclude sourceforge.net
 set service dns forwarding blacklist exclude ssl-on9.com
 set service dns forwarding blacklist exclude ssl-on9.net
+set service dns forwarding blacklist exclude sstatic.net
 set service dns forwarding blacklist exclude static.chartbeat.com
 set service dns forwarding blacklist exclude storage.googleapis.com
 set service dns forwarding blacklist exclude windows.net
