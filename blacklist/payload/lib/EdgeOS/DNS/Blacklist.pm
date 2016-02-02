@@ -66,7 +66,7 @@ our @EXPORT_OK = (
     write_file
     }
 );
-our $VERSION = 1.5;
+our $VERSION = q{1.5.1};
 our $TRUE;
 *TRUE = \1;
 our $FALSE;
