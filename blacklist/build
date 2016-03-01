@@ -2,7 +2,7 @@
 export COPY_EXTENDED_ATTRIBUTES_DISABLE=true
 export COPYFILE_DISABLE=true
 
-VERSION='3.5.1'
+VERSION='3.5.5'
 NAME='dnsmasq_blklist'
 DROPBOX='/Users/Neil/Dropbox/EdgeMax'
 BLACKLIST="${NAME}.${VERSION}."
