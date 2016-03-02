@@ -38,16 +38,16 @@ use EdgeOS::DNS::Blacklist (
   qw{
     $c
     $FALSE
-    $TRUE
     $spoke
-    pad_str
+    $TRUE
     get_cfg_actv
     get_cfg_file
     get_cols
     get_file
-    is_configure
     is_admin
+    is_configure
     log_msg
+    pad_str
     pinwheel
     popx
     }
@@ -256,15 +256,19 @@ sub get_tests {
     };
 
     if ( $input->{cfg}->{disabled} ) {
-      print pad_str( qq{@{[pinwheel()]} Blacklist is disabled, },
-        q{no further testing required...\n} );
+      print pad_str(
+        qq{@{[pinwheel()]} Blacklist is disabled, },
+        q{no further testing required...\n}
+      );
       return;
     }
   }
   else {
     $blacklist_removed = $TRUE;
-    print pad_str( qq{@{[pinwheel()]} Blacklist is removed - },
-      q{testing to check its cleanly removed...} );
+    print pad_str(
+      qq{@{[pinwheel()]} Blacklist is removed - },
+      q{testing to check its cleanly removed...}
+    );
 
     # Check for stray files
     $input->{cfg}->{strays}
@@ -354,17 +358,24 @@ sub get_tests {
       # Test global and area exclusions
       for my $f_ref (@files) {
         my ( $source, $file ) = @{$f_ref};
-        print pad_str( qq{@{[pinwheel()]} Deep scanning data in $area files },
-          q{for exclusion tests...} );
+        print pad_str(
+          qq{@{[pinwheel()]} Deep scanning data in $area files },
+          q{for exclusion tests...}
+        );
 
-        %content = map { ( $_ => 1, tmpkey => print pinwheel(), ) }
-          @{ get_file( { file => $file } ) };
-        delete $content{tmpkey};
+        if ( -f $file ) {
+          %content = map { ( $_ => 1, tmpkey => print pinwheel(), ) }
+            @{ get_file( { file => $file } ) };
+          delete $content{tmpkey};
+        }
+
         if ( keys %content ) {
           for my $host ( sort keys %{ $input->{cfg}->{exclude} } ) {
             my @keys = ( qq{address=/.$host/$ip}, qq{address=/$host/$ip} );
-            print pad_str( qq{@{[pinwheel()]} Adding global $area $host },
-              q{exclusion tests...} );
+            print pad_str(
+              qq{@{[pinwheel()]} Adding global $area $host },
+              q{exclusion tests...}
+            );
 
             $tests->{ $ikey++ } = {
               comment =>

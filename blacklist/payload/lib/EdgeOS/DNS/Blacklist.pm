@@ -44,7 +44,6 @@ our @EXPORT_OK = (
     $FALSE
     $spoke
     $TRUE
-    pad_str
     delete_file
     get_cfg_actv
     get_cfg_file
@@ -58,6 +57,7 @@ our @EXPORT_OK = (
     is_configure
     is_version
     log_msg
+    pad_str
     pinwheel
     popx
     process_data

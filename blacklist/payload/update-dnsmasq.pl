@@ -30,16 +30,16 @@ use EdgeOS::DNS::Blacklist (
     $c
     $FALSE
     $TRUE
-    append_spaces
     delete_file
-    get_cols
     get_cfg_actv
     get_cfg_file
+    get_cols
     get_file
     get_url
     is_admin
     is_configure
     log_msg
+    pad_str
     process_data
     write_file
     }
@@ -414,7 +414,7 @@ sub main {
   }
 
   # Clean up the status line
-  print $c->{off}, qq{\r}, append_spaces(), qq{\r} if $show;
+  print $c->{off}, qq{\r}, pad_str(), qq{\r} if $show;
 
   log_msg(
            {
