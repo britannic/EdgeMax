@@ -515,13 +515,13 @@ sub log_msg {
   print $c->{off}, qq{\r}, pad_str(), qq{\r} if $input->{show};
 
   if ( $input->{msg_typ} eq q{info} ) {
-    print $c->{off}, append_spaces(qq{$input->{msg_typ}: $input->{msg_str}}),
+    print $c->{off}, pad_str(qq{$input->{msg_typ}: $input->{msg_str}}),
       $input->{eof}
       if $input->{show};
   }
   else {
     print STDERR $c->{off}, $c->{red},
-      append_spaces(qq{$input->{msg_typ}: $input->{msg_str}}), $c->{clr},
+      pad_str(qq{$input->{msg_typ}: $input->{msg_str}}), $c->{clr},
       $input->{eof}
       if $input->{show};
   }
