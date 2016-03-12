@@ -126,7 +126,7 @@ sub delete_file {
   return $TRUE;
 }
 
-# Process the active (not committed or saved) configuration
+# Process the active configuration
 sub get_cfg_actv {
   my $config       = new Vyatta::Config;
   my $input        = shift;
@@ -190,9 +190,6 @@ sub get_cfg_actv {
           $config->$returnValue(q{prefix}),
           $config->$returnValue(q{url})
           );
-        $input->{config}->{$area}->{src}->{$source}->{file}
-          = $config->$returnValue(q{file})
-          if $area eq q{zones};
       }
 
       $config->setLevel(
@@ -215,8 +212,7 @@ sub get_cfg_actv {
     return;
   }
   if ( ( !scalar keys %{ $input->{config}->{domains}->{src} } )
-    && ( !scalar keys %{ $input->{config}->{hosts}->{src} } )
-    && ( !scalar keys %{ $input->{config}->{zones}->{src} } ) )
+    && ( !scalar keys %{ $input->{config}->{hosts}->{src} } ) )
   {
     $input->{show} = $TRUE;
     log_msg(
@@ -238,8 +234,7 @@ sub get_cfg_file {
     = get_nodes( { config_data => get_file( { file => $input->{file} } ) } );
   my $configured
     = (  $tmp_ref->{domains}->{source}
-      || $tmp_ref->{hosts}->{source}
-      || $tmp_ref->{zones}->{source} ) ? $TRUE : $FALSE;
+      || $tmp_ref->{hosts}->{source} ) ? $TRUE : $FALSE;
 
   if ($configured) {
     $input->{config}->{dns_redirect_ip} = $tmp_ref->{q{dns-redirect-ip}}
