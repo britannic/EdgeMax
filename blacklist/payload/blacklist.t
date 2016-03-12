@@ -19,20 +19,21 @@ use feature qw{switch};
 use lib q{/opt/vyatta/share/perl5};
 use lib q{/config/lib/perl};
 use lib q{./lib};
-use Socket;
-use Test::More;
 use File::Basename;
 use Getopt::Long;
 use HTTP::Tiny;
 use IO::Select;
 use IPC::Open3;
 use POSIX;
-use strict;
+use Socket;
 use Sys::Syslog;
+use Term::ANSIColor;
 use Term::ReadKey;
+use Test::More;
 use threads;
 use Vyatta::Config;
 use v5.14;
+use strict;
 use warnings;
 use EdgeOS::DNS::Blacklist (
   qw{
@@ -129,11 +130,14 @@ sub exec_test {
       return $rslt;
     },
     cmp_ok => sub {
-      return cmp_ok(
+      my $rslt = cmp_ok(
         $input->{run}->{lval}, $input->{run}->{op},
         $input->{run}->{rval}, $input->{run}->{comment}
-        )
-        or diag( $c->{red} . $input->{run}->{diag} . $c->{clr} );
+      );
+      if ( !$rslt ) {
+        diag( $c->{red} . $input->{run}->{diag} . $c->{clr} );
+      }
+      return $rslt;
     },
   };
 
@@ -494,12 +498,21 @@ HOST:
       $host = q{www.} . $host if $area eq q{domains};
       my $resolved_ip = inet_ntoa( inet_aton($host) ) or next HOST;
       print pad_str(qq{@{[pinwheel()]} Resolved $host to $resolved_ip});
+      my $AND = colored( "AND", 'bold underline yellow' );
+      my $IF  = colored( "IF",  'bold underline yellow' );
 
       $tests->{ $ikey++ } = {
         comment => qq{Checking $host is redirected by dnsmasq to $ip},
         diag =>
-          qq{dnsmasq replied with $host = $resolved_ip, should be $ip! }
-          . q{Ignore this error, if your router doesn't resolve DNS locally.},
+          qq{dnsmasq replied with $host = $resolved_ip, should be $ip! \n}
+          . $c->{grn}
+          . qq{Ignore this error, }
+          . qq {$IF }
+          . $c->{grn}
+          . qq{your router doesn't resolve DNS locally.\n}
+          . qq{$AND }
+          . $c->{grn}
+          . qq{your client devices are getting $host = $ip.},
         lval   => $resolved_ip,
         op     => q{eq},
         result => $TRUE,

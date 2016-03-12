@@ -17,6 +17,7 @@ package EdgeOS::DNS::Blacklist;
 use parent qw(Exporter);    # imports and subclasses Exporter
 use base qw(Exporter);
 use v5.14;
+
 # use strict;
 # use warnings;
 use lib q{/opt/vyatta/share/perl5/};
@@ -81,7 +82,8 @@ our $c = {
   on         => qq{\033[?25h},
   red        => qq{\033[91m},
   reverse    => qq{\033[7m},
-  underline  => qq{\033[4m},
+  ulineon    => qq{\033[4m},
+  ulineoff   => qq{\033[24m},
   underscore => qq{\033[4m},
   wyt        => qq{\033[37m},
   ylw        => qq{\033[93m},
@@ -233,8 +235,9 @@ sub get_cfg_file {
   my $tmp_ref
     = get_nodes( { config_data => get_file( { file => $input->{file} } ) } );
   my $configured
-    = (  $tmp_ref->{domains}->{source}
-      || $tmp_ref->{hosts}->{source} ) ? $TRUE : $FALSE;
+    = ( $tmp_ref->{domains}->{source} || $tmp_ref->{hosts}->{source} )
+    ? $TRUE
+    : $FALSE;
 
   if ($configured) {
     $input->{config}->{dns_redirect_ip} = $tmp_ref->{q{dns-redirect-ip}}
