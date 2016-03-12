@@ -20,6 +20,26 @@ EdgeMax dnsmasq Blacklist and Adware Blocking is derived from the received wisdo
 * Since the EdgeOS is a fork and port of Vyatta 6.3, this script could easily be adapted to work on VyOS and Vyatta derived ports
 
 ## Versions
+* v3.5.5: Updates/fixes include:
+- Added clarifying explanation for failed IP tests; advises user to ignore if router resolves upstream DNS and not locally
+- Fixed minor bug with command shell redirection
+- Additional excludes added to blacklist configuration list
+
+- v3.5.3: Updates/fixes include:
+- Added code to fix 'set' failures if /opt/vyatta/active/service/dns/forwarding/ group ownership isn't writable for the operator
+- Additional excludes added based on user feedback
+- Minor optimizations and additional tests added
+- Setup commands now include PURGE to clean up stale config sessions:
+
+| # | Option  |                         Function                          |
+|---|---------|-----------------------------------------------------------|
+| 1 | INSTALL |Install dnsmasq blacklist CLI configuration functionality|
+| 2 | REMOVE  |Remove dnsmasq blacklist CLI configuration functionality|
+| 3 | TEST    |Validate dnsmasq blacklist CLI configuration functionality|
+| 4 | BACKUP  |Save blacklist configuration to /config/user-data/blacklist.cmds|
+| 5 | PURGE   |Clean up stale config sessions|
+| 5 | QUIT    |Exit the installer|
+
 * v3.5: Updates/fixes include:
     - Global exclude is now available ([set service dns forwarding blacklist exclude ...])
     - Removed --debug option from update-dnsmasq.pl
