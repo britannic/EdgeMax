@@ -1,8 +1,8 @@
 delete service dns forwarding blacklist
 delete system task-scheduler task update_blacklists
-# set service dns forwarding blacklist dns-redirect-ip 0.0.0.0
+set service dns forwarding blacklist dns-redirect-ip 0.0.0.0
 set service dns forwarding blacklist disabled false
-set service dns forwarding blacklist dns-redirect-ip 192.168.168.1
+# set service dns forwarding blacklist dns-redirect-ip 192.168.168.1
 set service dns forwarding blacklist domains include adsrvr.org
 set service dns forwarding blacklist domains include adtechus.net
 set service dns forwarding blacklist domains include advertising.com
@@ -11,6 +11,7 @@ set service dns forwarding blacklist domains include doubleclick.net
 set service dns forwarding blacklist domains include free-counter.co.uk
 set service dns forwarding blacklist domains include intellitxt.com
 set service dns forwarding blacklist domains include kiosked.com
+set service dns forwarding blacklist domains include patoghee.in
 set service dns forwarding blacklist domains source malc0de description 'List of zones serving malicious executables observed by malc0de.com/database/'
 set service dns forwarding blacklist domains source malc0de prefix 'zone '
 set service dns forwarding blacklist domains source malc0de url 'http://malc0de.com/bl/ZONES'
@@ -49,6 +50,7 @@ set service dns forwarding blacklist exclude msdn.com
 set service dns forwarding blacklist exclude paypal.com
 set service dns forwarding blacklist exclude rackcdn.com
 set service dns forwarding blacklist exclude schema.org
+set service dns forwarding blacklist exclude shopify.com
 set service dns forwarding blacklist exclude skype.com
 set service dns forwarding blacklist exclude smacargo.com
 set service dns forwarding blacklist exclude sourceforge.net
