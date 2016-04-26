@@ -20,18 +20,47 @@ EdgeMax dnsmasq Blacklist and Adware Blocking is derived from the received wisdo
 * Since the EdgeOS is a fork and port of Vyatta 6.3, this script could easily be adapted to work on VyOS and Vyatta derived ports
 
 ## Versions
-* v3.6beta1: Enhancements
+* v3.6-beta.1: Enhancements
 - Ability to add a source that can read a local file
 
         set service dns forwarding blacklist hosts source myhosts description 'testing file source'
         set service dns forwarding blacklist hosts source myhosts dns-redirect-ip 10.10.10.1
         set service dns forwarding blacklist hosts source myhosts file /config/user-data/blist.hosts.src
 
+    - file contents example for /config/user-data/blist.hosts.src:
+
+            gsmtop.net
+            click.buzzcity.net
+            ads.admoda.com
+            stats.pflexads.com
+            a.glcdn.co
+            wwww.adleads.com
+            ad.madvertise.de
+            apps.buzzcity.net
+            ads.mobgold.com
+            android.bcfads.com
+            req.appads.com
+            show.buzzcity.net
+            api.analytics.omgpop.com
+            r.edge.inmobicdn.net
+            www.mmnetwork.mobi
+            img.ads.huntmad.com
+            creative1cdn.mobfox.com
+            admicro2.vcmedia.vn
+            admicro1.vcmedia.vn
+
 - Each source can now have its own dns-redirect-ip for granular control
 
         set service dns forwarding blacklist hosts source openphish dns-redirect-ip 172.16.10.1
 
 - Additional excludes added to blacklist configuration list
+- To install:
+    * upload install_dnsmasq_blklist.v3.6-beta.1.tgz to your router (ensure you modify the command if you want to install an older version)
+        - curl -o /tmp/install_dnsmasq_blklist.v3.6-beta.1.tgz http://community.ubnt.com/ubnt/attachments/ubnt/EdgeMAX/78132/50/install_dnsmasq_blklist.v3.6-beta.1.tgz
+        - sudo tar zxvf ./install_dnsmasq_blklist.v3.6-beta.1.tgz
+        - sudo bash ./install_dnsmasq_blklist.v3.6-beta.1
+        - select menu option #1 if installing for the first time
+        - select menu option #2 to completely remove blacklisting if you have a previous version, then run install again using option #1
 
 * v3.5.5: Updates/fixes include:
 - Added clarifying explanation for failed IP tests; advises user to ignore if router resolves upstream DNS and not locally
