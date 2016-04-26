@@ -20,6 +20,19 @@ EdgeMax dnsmasq Blacklist and Adware Blocking is derived from the received wisdo
 * Since the EdgeOS is a fork and port of Vyatta 6.3, this script could easily be adapted to work on VyOS and Vyatta derived ports
 
 ## Versions
+* v3.6beta1: Enhancements
+- Ability to add a source that can read a local file
+
+        set service dns forwarding blacklist hosts source myhosts description 'testing file source'
+        set service dns forwarding blacklist hosts source myhosts dns-redirect-ip 10.10.10.1
+        set service dns forwarding blacklist hosts source myhosts file /config/user-data/blist.hosts.src
+
+- Each source can now have its own dns-redirect-ip for granular control
+
+        set service dns forwarding blacklist hosts source openphish dns-redirect-ip 172.16.10.1
+
+- Additional excludes added to blacklist configuration list
+
 * v3.5.5: Updates/fixes include:
 - Added clarifying explanation for failed IP tests; advises user to ignore if router resolves upstream DNS and not locally
 - Fixed minor bug with command shell redirection

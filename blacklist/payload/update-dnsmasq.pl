@@ -10,7 +10,7 @@
 # at your option, any later version of Perl 5 you may have available.
 #
 # Author: Neil Beadle
-# Date:   January 2016
+# Date:   April 2016
 # Description: Script for creating dnsmasq configuration files to redirect dns
 # look ups to alternative IPs (blackholes, pixel servers etc.)
 #
@@ -47,11 +47,12 @@ use EdgeOS::DNS::Blacklist (
 );
 delete $ENV{PATH};
 my ( $cfg_file, $show );
-my $version = q{3.5.5};
+my $version = q{3.6beta1};
 my $cols    = get_cols();
 
 ############################### script runs here ###############################
-exit 0 if &main();
+exit if &main();
+exit 1;
 ################################################################################
 
 # Set up command line options
@@ -85,13 +86,13 @@ sub get_options {
 sub main {
   my $dnsmasq_svc = q{/etc/init.d/dnsmasq};
   my $cfg         = {
-    disabled    => 0,
-    dnsmasq_dir => q{/etc/dnsmasq.d},
-    flag_lvl    => 5,
-    flag_file   => q{/var/log/update-dnsmasq-flagged.cmds},
-    log_name    => q{update-dnsmasq},
-    no_op       => q{/tmp/.update-dnsmasq.no-op},
-    domains     => {
+    disabled  => 0,
+    dmasq_d   => q{/etc/dnsmasq.d},
+    flg_lvl   => 5,
+    flg_file => q{/var/log/update-dnsmasq-flagged.cmds},
+    log_name  => q{update-dnsmasq},
+    no_op     => q{/tmp/.update-dnsmasq.no-op},
+    domains   => {
       duplicates => 0,
       icount     => 0,
       records    => 0,
@@ -170,26 +171,26 @@ sub main {
         $cfg->{$area}->{exclude}->{$key} = $value;
       }
       $cfg->{$area}->{icount} = scalar keys %{ $cfg->{$area}->{blklst} } // 0;
-      @{ $cfg->{$area} }{ q{records}, q{unique} }
-        = @{ $cfg->{$area} }{ q{icount}, q{icount} };
+      @{ $cfg->{$area} }{qw{records unique}}
+        = @{ $cfg->{$area} }{qw{icount icount}};
 
       # Remove any files that no longer have configured sources
       my $sources_ref = {
         map {
           my $key = $_;
-          qq{$cfg->{dnsmasq_dir}/$area.$key.blacklist.conf} => 1;
+          qq{$cfg->{dmasq_d}/$area.$key.blacklist.conf} => 1;
           } @sources
       };
 
       my $files_ref = { map { my $key = $_; $key => 1; }
-          glob qq{$cfg->{dnsmasq_dir}/$area.*blacklist.conf} };
+          glob qq{$cfg->{dmasq_d}/$area.*blacklist.conf} };
 
       for my $file ( keys $files_ref ) {
         delete_file( { file => $file } )
           if !exists $sources_ref->{$file} && $file;
       }
 
-      # write each configured areas includes into individual dnsmasq files
+      # write each configured area's includes into individual dnsmasq files
       if ( $cfg->{$area}->{icount} > 0 ) {
         my $equals = $area ne q{domains} ? q{=/} : q{=/.};
         write_file(
@@ -201,7 +202,7 @@ sub main {
                   $equals, $value, $cfg->{$area}->{dns_redirect_ip};
                 } sort keys %{ $cfg->{$area}->{blklst} }
             ],
-            file => qq{$cfg->{dnsmasq_dir}/$area.pre-configured.blacklist.conf},
+            file => qq{$cfg->{dmasq_d}/$area.pre-configured.blacklist.conf},
           }
         );
       }
@@ -209,8 +210,6 @@ sub main {
       for my $source (@sources) {
         my ( $file, $url )
           = @{ $cfg->{$area}->{src}->{$source} }{ q{file}, q{url} };
-        my $uri  = new URI($url);
-        my $host = $uri->host;
 
         # Initialize the sources counters
         @{ $cfg->{$area}->{src}->{$source} }
@@ -221,7 +220,10 @@ sub main {
           ? qr{(?:\A(?:http:|https:){1}[/]{1,2})}om
           : $cfg->{$area}->{src}->{$source}->{prefix};
 
+        my $host;
         if ($url) {
+          my $uri = new URI($url);
+          $host = $uri->host;
           log_msg(
             {
               cols    => $cols,
@@ -246,9 +248,17 @@ sub main {
           );
         }
         elsif ($file) {    # get file data
+          $host = $source;
           push @threads => threads->create(
             { context => q{list}, exit => q{thread_only} },
-            \&get_file, { file => $file, src => $source }
+            \&get_file,
+            {
+              area   => $area,
+              host   => $host,
+              file   => $file,
+              prefix => $prefix,
+              src    => $source
+            }
           );
         }
         sleep 1 while ( scalar threads->list(threads::running) >= $max_thrds );
@@ -256,8 +266,12 @@ sub main {
 
       for my $thread (@threads) {
         my $data = $thread->join();
-        my $rec_count = scalar keys %{ $data->{data} } // 0;
+        if ( $data->{file} ) {
+          $data->{data}
+            = { map { my $key = $_; lc($key) => 1 } @{ $data->{data} } };
+        }
 
+        my $rec_count = scalar keys %{ $data->{data} } // 0;
         $cfg->{$area}->{src}->{ $data->{src} }->{records} += $rec_count;
 
         if ( exists $data->{host} && scalar $rec_count ) {
@@ -284,10 +298,12 @@ sub main {
             }
           );
 
+          # Delete $data->{data} key and data
           delete $data->{data};
 
           # Write blacklist to file, change to domain format if area = domains
-          if ( $cfg->{$area}->{src}->{ $data->{src} }->{icount} > 0 ) {
+          my $file = qq{$cfg->{dmasq_d}/$area.$data->{src}.blacklist.conf};
+          if ( keys %{ $cfg->{$area}->{src}->{ $data->{src} }->{blklst} } ) {
             my $equals = $area ne q{domains} ? q{=/} : q{=/.};
             write_file(
               {
@@ -295,12 +311,12 @@ sub main {
                   map {
                     my $value = $_;
                     sprintf qq{%s%s%s/%s\n} => $cfg->{$area}->{target},
-                      $equals, $value, $cfg->{$area}->{dns_redirect_ip};
+                      $equals, $value,
+                      $cfg->{$area}->{src}->{ $data->{src} }->{dns_redirect_ip};
                     } sort
                     keys %{ $cfg->{$area}->{src}->{ $data->{src} }->{blklst} }
                 ],
-                file =>
-                  qq{$cfg->{dnsmasq_dir}/$area.$data->{src}.blacklist.conf},
+                file => $file,
               }
             );
 
@@ -319,6 +335,13 @@ sub main {
             delete $cfg->{$area}->{src}->{ $data->{src} };
           }
           else {
+            my @data = ( "# No data received\n", "# This shouldn't happen!\n" );
+            write_file(
+              {
+                data => \@data,
+                file => $file,
+              }
+            );
             log_msg(
               {
                 cols    => $cols,
@@ -345,9 +368,8 @@ sub main {
         }
       );
 
+      # Now lets report the domains that exceeded $cfg->{flg_lvl}
       my @flagged_domains;
-
-      # Now lets report the domains that were seen more than $cfg->{flag_lvl}
       for my $key (
         sort {
           $cfg->{hosts}->{exclude}->{$b} <=> $cfg->{hosts}->{exclude}->{$a}
@@ -355,7 +377,7 @@ sub main {
         )
       {
         my $value = $cfg->{hosts}->{exclude}->{$key};
-        if ( $value >= $cfg->{flag_lvl} && length $key > 5 ) {
+        if ( $value >= $cfg->{flg_lvl} && length $key > 5 ) {
           log_msg(
             {
               cols    => $cols,
@@ -381,7 +403,7 @@ sub main {
                   => $value;
                 } @flagged_domains
             ],
-            file => $cfg->{flag_file},
+            file => $cfg->{flg_file},
           }
         );
 
@@ -391,7 +413,7 @@ sub main {
             show    => $show,
             msg_typ => q{info},
             msg_str =>
-              qq{Flagged domains command set written to: $cfg->{flag_file}},
+              qq{Flagged domains command set written to: $cfg->{flg_file}},
           }
         );
       }
@@ -401,8 +423,7 @@ sub main {
     }
   }
   elsif ( $cfg->{disabled} ) {
-    for my $file ( glob qq{$cfg->{dnsmasq_dir}/{domains,hosts}*blacklist.conf} )
-    {
+    for my $file ( glob qq{$cfg->{dmasq_d}/{domains,hosts}*blacklist.conf} ) {
       delete_file( { file => $file } ) if $file;
     }
   }

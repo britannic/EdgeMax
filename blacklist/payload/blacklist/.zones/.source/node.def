@@ -1,7 +1,0 @@
-tag:
-type: txt
-help: Redirected domains zone source name
-comp_help: Type any unique name, use quotes if spaces or special characters are used
-
-commit:expression: $VAR(./url) != "" || $VAR(./file) != ""; "At least one zone source url or file must be configured."
-

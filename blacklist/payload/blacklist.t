@@ -54,7 +54,7 @@ use EdgeOS::DNS::Blacklist (
     }
 );
 
-my $version = q{1.4};
+my $version = q{1.5};
 my ( $blacklist_removed, $cfg_file );
 
 ########## Run main ###########
@@ -209,8 +209,6 @@ sub get_tests {
     = [ glob qq{$input->{cfg}->{dnsmasq_dir}/domains.pre*blacklist.conf} ];
   $input->{cfg}->{hosts_pre_f}
     = [ glob qq{$input->{cfg}->{dnsmasq_dir}/hosts.pre*blacklist.conf} ];
-  $input->{cfg}->{zones_pre_f}
-    = [ glob qq{$input->{cfg}->{dnsmasq_dir}/zones.pre*blacklist.conf} ];
 
   if ($success) {
     print pad_str(qq{@{[pinwheel()]} Adding tests for key files...});
@@ -369,12 +367,14 @@ sub get_tests {
 
         if ( -f $file ) {
           %content = map { ( $_ => 1, tmpkey => print pinwheel(), ) }
-            @{ get_file( { file => $file } ) };
+            @{ get_file( { file => $file } )->{data} };
           delete $content{tmpkey};
         }
 
         if ( keys %content ) {
           for my $host ( sort keys %{ $input->{cfg}->{exclude} } ) {
+            $ip = $input->{cfg}->{$area}->{src}->{$source}->{dns_redirect_ip}
+              // $ip;
             my @keys = ( qq{address=/.$host/$ip}, qq{address=/$host/$ip} );
             print pad_str(
               qq{@{[pinwheel()]} Adding global $area $host },
@@ -436,13 +436,14 @@ sub get_tests {
 
       for my $file ( @{ $input->{cfg}->{ $area . q{_pre_f} } } ) {
         %content = map { ( $_ => 1, tmpkey => print pinwheel(), ) }
-          @{ get_file( { file => $file } ) };
+          @{ get_file( { file => $file } )->{data} };
         delete $content{tmpkey};
 
         print pinwheel();
 
         if ( keys %content ) {
           for my $host ( sort keys %{ $input->{cfg}->{$area}->{blklst} } ) {
+            $ip = $input->{cfg}->{$area}->{dns_redirect_ip} // $ip;
             my @keys = ( qq{address=/.$host/$ip}, qq{address=/$host/$ip} );
 
             print pad_str(

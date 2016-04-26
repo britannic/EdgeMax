@@ -10,7 +10,7 @@
 # at your option, any later version of Perl 5 you may have available.
 #
 # Author: Neil Beadle
-# Date:   March 2016
+# Date:   April 2016
 # Description: Script for creating dnsmasq configuration files to redirect dns
 # look ups to alternative IPs (blackholes, pixel servers etc.)
 #
@@ -63,27 +63,27 @@ my $end     = q{/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper end};
 my $save    = q{sudo /opt/vyatta/sbin/vyatta-cfg-cmd-wrapper save};
 my $set     = q{/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper set};
 my $cfg     = {
-  actv      => q{/opt/vyatta/config/active/service/dns/forwarding/},
-  cnf_ext   => q{.conf},
-  disabled  => 0,
-  dmasq_d   => q{/etc/dnsmasq.d},
-  flg_lvl   => 5,
-  dnsmasq   => q{/etc/dnsmasq.d},
-  EdgeOS    => q{EdgeOS},
-  file      => q{./blacklist.cmds},
-  flg_file  => q{/var/log/update-dnsmasq-flagged.cmds},
-  no_op     => q{/tmp/.update-dnsmasq.no-op},
-  oldconf   => qq{{domai*,hos*,zon*}.blacklist.conf},
-  oldscrpt  => q{update-blacklists-dnsmasq.pl},
-  old_lib   => q{/opt/vyatta/share/perl5},
-  lib       => q{/config/lib/perl},
-  script    => q{update-dnsmasq.pl},
-  scrpt_d   => q{/config/scripts},
-  tmplts    => q{/opt/vyatta/share/vyatta-cfg/templates/service/dns/forwarding},
-  tstscrpt  => q{blacklist.t},
-  utility   => q{ubnt-cln-cfg-orphans.sh},
-  group     => q{users},
-  domains   => {
+  actv     => q{/opt/vyatta/config/active/service/dns/forwarding/},
+  cnf_ext  => q{.conf},
+  disabled => 0,
+  dmasq_d  => q{/etc/dnsmasq.d},
+  flg_lvl  => 5,
+  dnsmasq  => q{/etc/dnsmasq.d},
+  EdgeOS   => q{EdgeOS},
+  file     => q{./blacklist.cmds},
+  flg_file => q{/var/log/update-dnsmasq-flagged.cmds},
+  no_op    => q{/tmp/.update-dnsmasq.no-op},
+  oldconf  => qq{{domai*,hos*,zon*}.blacklist.conf},
+  oldscrpt => q{update-blacklists-dnsmasq.pl},
+  old_lib  => q{/opt/vyatta/share/perl5},
+  lib      => q{/config/lib/perl},
+  script   => q{update-dnsmasq.pl},
+  scrpt_d  => q{/config/scripts},
+  tmplts   => q{/opt/vyatta/share/vyatta-cfg/templates/service/dns/forwarding},
+  tstscrpt => q{blacklist.t},
+  utility  => q{ubnt-cln-cfg-orphans.sh},
+  group    => q{users},
+  domains  => {
     duplicates => 0,
     icount     => 0,
     records    => 0,
@@ -300,7 +300,7 @@ sub get_blacklist {
     my @areas;
 
     # Add areas to process only if they contain sources and copy global excludes
-    for my $area (qw{domains hosts zones}) {
+    for my $area (qw{domains hosts}) {
       push @areas => $area if scalar keys %{ $cfg->{$area}->{src} };
     }
 
@@ -324,14 +324,16 @@ sub get_blacklist {
           qq{$cfg->{dmasq_d}/$area.$key.blacklist.conf} => 1;
           } @sources
       };
+
       my $files_ref = { map { my $key = $_; $key => 1; }
           glob qq{$cfg->{dmasq_d}/$area.*blacklist.conf} };
 
       for my $file ( keys $files_ref ) {
-        delete_file( { file => $file } ) if !exists $sources_ref->{$file};
+        delete_file( { file => $file } )
+          if !exists $sources_ref->{$file} && $file;
       }
 
-      # write each configured areas includes into individual dnsmasq files
+      # write each configured area's includes into individual dnsmasq files
       if ( $cfg->{$area}->{icount} > 0 ) {
         my $equals = $area ne q{domains} ? q{=/} : q{=/.};
         write_file(
@@ -339,8 +341,8 @@ sub get_blacklist {
             data => [
               map {
                 my $value = $_;
-                sprintf qq{%s%s%s/%s\n}, $cfg->{$area}->{target}, $equals,
-                  $value, $cfg->{$area}->{dns_redirect_ip};
+                sprintf qq{%s%s%s/%s\n} => $cfg->{$area}->{target},
+                  $equals, $value, $cfg->{$area}->{dns_redirect_ip};
                 } sort keys %{ $cfg->{$area}->{blklst} }
             ],
             file => qq{$cfg->{dmasq_d}/$area.pre-configured.blacklist.conf},
@@ -349,9 +351,8 @@ sub get_blacklist {
       }
 
       for my $source (@sources) {
-        my ( $file, $url ) = @{ $cfg->{$area}->{src}->{$source} }{qw{file url}};
-        my $uri  = new URI($url);
-        my $host = $uri->host;
+        my ( $file, $url )
+          = @{ $cfg->{$area}->{src}->{$source} }{ q{file}, q{url} };
 
         # Initialize the sources counters
         @{ $cfg->{$area}->{src}->{$source} }
@@ -359,10 +360,13 @@ sub get_blacklist {
 
         $prefix
           = $cfg->{$area}->{src}->{$source}->{prefix} ~~ q{http}
-          ? qr{(?:^(?:http:|https:){1}[/]{1,2})}o
+          ? qr{(?:\A(?:http:|https:){1}[/]{1,2})}om
           : $cfg->{$area}->{src}->{$source}->{prefix};
 
-        if ( scalar $url ) {
+        my $host;
+        if ($url) {
+          my $uri = new URI($url);
+          $host = $uri->host;
           log_msg(
             {
               cols => $cols,
@@ -387,19 +391,30 @@ sub get_blacklist {
             );
         }
         elsif ($file) {    # get file data
-          push @threads,
-            threads->create(
+          $host = $source;
+          push @threads => threads->create(
             { context => q{list}, exit => q{thread_only} },
-            \&get_file, { file => $file, src => $source }
-            );
+            \&get_file,
+            {
+              area   => $area,
+              host   => $host,
+              file   => $file,
+              prefix => $prefix,
+              src    => $source
+            }
+          );
         }
         sleep 1 while ( scalar threads->list(threads::running) >= $max_thrds );
       }
 
       for my $thread (@threads) {
         my $data = $thread->join();
-        my $rec_count = scalar keys %{ $data->{data} } // 0;
+        if ( $data->{file} ) {
+          $data->{data}
+            = { map { my $key = $_; lc($key) => 1 } @{ $data->{data} } };
+        }
 
+        my $rec_count = scalar keys %{ $data->{data} } // 0;
         $cfg->{$area}->{src}->{ $data->{src} }->{records} += $rec_count;
 
         if ( exists $data->{host} && scalar $rec_count ) {
@@ -437,7 +452,11 @@ sub get_blacklist {
           # Delete $data->{data} key and data
           delete $data->{data};
 
-          if ( $cfg->{$area}->{src}->{ $data->{src} }->{icount} > 0 ) {
+          # Write blacklist to file, change to domain format if area = domains
+          my $file = qq{$cfg->{dmasq_d}/$area.$data->{src}.blacklist.conf};
+
+          # if ( $cfg->{$area}->{src}->{ $data->{src} }->{icount} > 0 ) {
+          if ( keys %{ $cfg->{$area}->{src}->{ $data->{src} }->{blklst} } ) {
             my $equals = $area ne q{domains} ? q{=/} : q{=/.};
             write_file(
               {
@@ -449,10 +468,11 @@ sub get_blacklist {
                     } sort
                     keys %{ $cfg->{$area}->{src}->{ $data->{src} }->{blklst} }
                 ],
-                file => qq{$cfg->{dmasq_d}/$area.$data->{src}.blacklist.conf},
+                file => $file,
               }
             );
 
+            # Compute statistics
             $cfg->{$area}->{unique}
               += scalar
               keys %{ $cfg->{$area}->{src}->{ $data->{src} }->{blklst} };
@@ -467,6 +487,13 @@ sub get_blacklist {
             delete $cfg->{$area}->{src}->{ $data->{src} };
           }
           else {
+            my @data = ( "# No data received\n", "# This shouldn't happen!\n" );
+            write_file(
+              {
+                data => \@data,
+                file => $file,
+              }
+            );
             log_msg(
               {
                 cols    => $cols,
@@ -495,8 +522,9 @@ sub get_blacklist {
         }
       );
 
-      # Now lets report the domains that were seen more than $cfg->{'flg_lvl'}
       my @flagged_domains;
+
+      # Now lets report the domains that exceeded $cfg->{flag_lvl}
       for my $key (
         sort {
           $cfg->{hosts}->{exclude}->{$b} <=> $cfg->{hosts}->{exclude}->{$a}
@@ -751,8 +779,8 @@ sub remove {
 
   set_dev_grp(
     {
-      dir_handle => $cfg->{actv}, dir_grp => $cfg->{group},
-      grps => get_user( { attribute => q{grps} } )
+      dir_handle => $cfg->{actv}, dir_grp     => $cfg->{group},
+      grps       => get_user(     { attribute => q{grps} } )
     }
     )
     or die qq{Unable to repair active configuration directory permissions!};
@@ -886,7 +914,8 @@ sub setup {
         cols => $cols,
         eof  => qq{\n},
         msg_str =>
-          qq{Removing previous version blacklist files from directory: $cfg->{dnsmasq}/},
+          q{Removing previous version blacklist files from directory: }
+          . qq{$cfg->{dnsmasq}/},
         msg_typ => q{info},
         show    => $TRUE,
       }
@@ -917,8 +946,8 @@ sub setup {
   # Install update-dnsmasq.pl script
   exec_command(
     {
-      cmd =>
-        qq{install -o root -g root -m 0755 $cfg->{script} "$cfg->{scrpt_d}/$cfg->{script}"},
+      cmd => qq{install -o root -g root -m 0755 $cfg->{script} }
+        . qq{"$cfg->{scrpt_d}/$cfg->{script}"},
       exec_msg =>
         qq{Installing $name $cfg->{script} script to $cfg->{scrpt_d}/},
       fail_msg =>
@@ -961,8 +990,8 @@ sub setup {
   # Fix permissions on the active configuration directory
   set_dev_grp(
     {
-      dir_handle => $cfg->{actv}, dir_grp => $cfg->{group},
-      grps => get_user( { attribute => q{grps} } )
+      dir_handle => $cfg->{actv}, dir_grp     => $cfg->{group},
+      grps       => get_user(     { attribute => q{grps} } )
     }
     )
     or die qq{Unable to repair active configuration directory permissions!};
@@ -1099,4 +1128,3 @@ sub write_file {
 
   return $TRUE;
 }
-
