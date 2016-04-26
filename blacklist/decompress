@@ -3,8 +3,8 @@ echo
 echo 'Self Extracting Installer'
 echo
 
-VERSION='v3.1'
-# Set up the Vyatta environment
+VERSION='v3.2'
+# Set up the EdgeOS environment
 source /opt/vyatta/etc/functions/script-template
 shopt -s expand_aliases
 alias show='_vyatta_op_run show'

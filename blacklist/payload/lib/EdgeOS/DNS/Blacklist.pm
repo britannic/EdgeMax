@@ -66,7 +66,7 @@ our @EXPORT_OK = (
     write_file
     }
 );
-our $VERSION = q{1.5.1};
+our $VERSION = q{1.6};
 our $TRUE;
 *TRUE = \1;
 our $FALSE;
@@ -187,18 +187,14 @@ sub get_cfg_actv {
         $config->setLevel(
           qq{service dns forwarding blacklist $area source $source});
         @{ $input->{config}->{$area}->{src}->{$source} }
-          {qw(description prefix url)} = (
+          {qw(description dns_redirect_ip file prefix url)} = (
           $config->$returnValue(q{description}),
+          $config->$returnValue(q{dns-redirect-ip})
+            // $input->{config}->{$area}->{dns_redirect_ip},
+          $config->$returnValue(q{file}),
           $config->$returnValue(q{prefix}),
           $config->$returnValue(q{url})
           );
-      }
-
-      $config->setLevel(
-        qq{service dns forwarding blacklist $area server-mapping});
-      for my $host ( $config->$listNodes(q{host-name}) ) {
-        $input->{config}->{$area}->{server_mapping}->{$host}->{ip}
-          = $config->$returnValue(q{inet});
       }
     }
   }
@@ -220,7 +216,7 @@ sub get_cfg_actv {
     log_msg(
       {
         msg_ref => q{error},
-        msg_str => q{At least one domain, host source or server mapping }
+        msg_str => q{At least one domain, host online source/file }
           . q{must be configured},
       }
     );
@@ -248,13 +244,16 @@ sub get_cfg_file {
       = exists $tmp_ref->{exclude} ? $tmp_ref->{exclude} : ();
 
     for my $area (qw{hosts domains}) {
+
       $input->{config}->{$area}->{dns_redirect_ip}
-        = $input->{config}->{dns_redirect_ip}
-        if !exists( $tmp_ref->{$area}->{q{dns-redirect-ip}} );
+        = $tmp_ref->{$area}->{q{dns-redirect-ip}}
+        // $input->{config}->{dns_redirect_ip};
 
-      @{ $input->{config}->{$area} }{qw(blklst exclude src mapping)}
-        = @{ $tmp_ref->{$area} }{qw(include exclude source server-mapping)};
-
+      for my $source ( $tmp_ref->{$area}->{src} ) {
+        $input->{config}->{$area}->{src}->{$source}->{dns_redirect_ip}
+          = $tmp_ref->{$area}->{src}->{$source}->{dns_redirect_ip}
+          // $input->{config}->{$area}->{dns_redirect_ip};
+      }
     }
   }
   else {
@@ -304,7 +303,7 @@ sub get_file {
     chomp( @{ $input->{data} } = <$CF> );
     close $CF;
   }
-  return $input->{data};
+  return $input;
 }
 
 # Build hashes from the configuration file data (called by get_nodes())
@@ -335,17 +334,17 @@ sub get_nodes {
     CMNT => qr/^(?<LCMT>[\/*]+).*(?<RCMT>[*\/]+)$/o,
     DESC => qr/^(?<NAME>[\w-]+)\s"?(?<DESC>[^"]+)?"?$/o,
     MPTY => qr/^$/o,
-    LEAF => qr/^(?<LEAF>[\w\-]+)\s(?<NAME>[\S]+)\s[{]{1}$/o,
+    LEAF => qr/^(?<LEAF>[\w-]+)\s(?<NAME>[\S]+)\s[{]{1}$/o,
     LSPC => qr/\s+$/o,
     MISC => qr/^(?<MISC>[\w-]+)$/o,
     MULT => qr/^(?<MULT>(?:include|exclude)+)\s(?<VALU>[\S]+)$/o,
-    NAME => qr/^(?<NAME>[\w\-]+)\s(?<VALU>[\S]+)$/o,
+    NAME => qr/^(?<NAME>[\w-]+)\s(?<VALU>[\S]+)$/o,
     NODE => qr/^(?<NODE>[\w-]+)\s[{]{1}$/o,
     RSPC => qr/^\s+/o,
   };
 
 LINE:
-  for my $line ( @{ $input->{config_data} } ) {
+  for my $line ( @{ $input->{config_data}->{data} } ) {
     $line =~ s/$re->{LSPC}//;
     $line =~ s/$re->{RSPC}//;
 
@@ -510,15 +509,13 @@ sub log_msg {
       =~ s/\e[[][?]{0,1}\d+(?>(;\d+)*)[lm]//gr
   );
 
-  print $c->{off}, qq{\r}, pad_str(), qq{\r} if $input->{show};
-
   if ( $input->{msg_typ} eq q{info} ) {
-    print $c->{off}, pad_str(qq{$input->{msg_typ}: $input->{msg_str}}),
+    print $c->{off}, qq{\r}, pad_str(qq{$input->{msg_typ}: $input->{msg_str}}),
       $input->{eof}
       if $input->{show};
   }
   else {
-    print STDERR $c->{off}, $c->{red},
+    print STDERR $c->{off}, $c->{red}, qq{\r},
       pad_str(qq{$input->{msg_typ}: $input->{msg_str}}), $c->{clr},
       $input->{eof}
       if $input->{show};
