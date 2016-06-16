@@ -1,0 +1,380 @@
+#!/usr/bin/env perl
+
+use v5.14;
+use lib q(/opt/vyatta/share/perl5/);
+use lib q{/config/lib/perl/};
+use Sys::Syslog qw(:standard :macros);
+use JSON::PP qw(decode_json encode_json);
+use Vyatta::Config;
+
+use constant TRUE  => 1;
+use constant FALSE => 0;
+
+my $version = 1.1;
+my $action  = $ARGV[0];
+my $file    = $ARGV[1];
+my $name    = q(dnsmasq blacklist);
+my $begin   = q{/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper begin};
+my $commit  = q{/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper commit};
+my $delete  = q{/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper delete};
+my $end     = q{/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper end};
+my $save    = q{/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper save};
+my $set     = q{/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper set};
+my $TRUE = 1;
+# *TRUE = \1;
+my $FALSE = 0;
+# *FALSE = \0;
+
+my $c = {
+  blk        => qq{\033[30m},
+  blink      => qq{\033[5m},
+  blu        => qq{\033[34m},
+  clr        => qq{\033[0m},
+  grn        => qq{\033[92m},
+  mag        => qq{\033[95m},
+  off        => qq{\033[?25l},
+  on         => qq{\033[?25h},
+  red        => qq{\033[91m},
+  reverse    => qq{\033[7m},
+  ulineon    => qq{\033[4m},
+  ulineoff   => qq{\033[24m},
+  underscore => qq{\033[4m},
+  wyt        => qq{\033[37m},
+  ylw        => qq{\033[93m},
+};
+
+# Process the active configuration
+sub get_cfg_actv {
+  my $config       = new Vyatta::Config;
+  my $input        = shift;
+  my $exists       = q{existsOrig};
+  my $listNodes    = q{listOrigNodes};
+  my $returnValue  = q{returnOrigValue};
+  my $returnValues = q{returnOrigValues};
+
+  if ( is_configure() ) {
+    $exists       = q{exists};
+    $listNodes    = q{listNodes};
+    $returnValue  = q{returnValue};
+    $returnValues = q{returnValues};
+  }
+
+# Check to see if blacklist is configured
+  $config->setLevel(q{service dns forwarding});
+  my $blklst_exists = $config->$exists(q{blacklist}) ? $TRUE : $FALSE;
+  printf $blklst_exists, "\n";
+
+  if ($blklst_exists) {
+    $config->setLevel(q{service dns forwarding blacklist});
+    $input->{config}->{disabled} = $config->$returnValue(q{disabled}) // $FALSE;
+    $input->{config}->{dns_redirect_ip}
+      = $config->$returnValue(q{dns-redirect-ip}) // q{0.0.0.0};
+
+    for my $key ( $config->$returnValues(q{exclude}) ) {
+      $input->{config}->{exclude}->{$key} = 1;
+    }
+
+    $input->{config}->{disabled}
+      = $input->{config}->{disabled} eq q{false} ? $FALSE : $TRUE;
+
+    for my $area (qw{hosts domains}) {
+      $config->setLevel(qq{service dns forwarding blacklist $area});
+      $input->{config}->{$area}->{dns_redirect_ip}
+        = $config->$returnValue(q{dns-redirect-ip})
+        // $input->{config}->{dns_redirect_ip};
+
+      for my $key ( $config->$returnValues(q{include}) ) {
+        $input->{config}->{$area}->{blklst}->{$key} = 1;
+      }
+
+      for my $key ( $config->$returnValues(q{exclude}) ) {
+        $input->{config}->{$area}->{exclude}->{$key} = 1;
+      }
+
+      if ( !keys %{ $input->{config}->{$area}->{exclude} } ) {
+        $input->{config}->{$area}->{exclude} = {};
+      }
+
+      if ( !keys %{ $input->{config}->{exclude} } ) {
+        $input->{config}->{exclude} = {};
+      }
+
+      for my $source ( $config->$listNodes(q{source}) ) {
+        $config->setLevel(
+          qq{service dns forwarding blacklist $area source $source});
+        @{ $input->{config}->{$area}->{src}->{$source} }
+          {qw(description prefix url)} = (
+          $config->$returnValue(q{description}),
+          $config->$returnValue(q{prefix}),
+          $config->$returnValue(q{url})
+          );
+      }
+
+      $config->setLevel(
+        qq{service dns forwarding blacklist $area server-mapping});
+      for my $host ( $config->$listNodes(q{host-name}) ) {
+        $input->{config}->{$area}->{server_mapping}->{$host}->{ip}
+          = $config->$returnValue(q{inet});
+      }
+    }
+  }
+  else {
+    $input->{show} = $TRUE;
+    log_msg(
+      {
+        msg_typ => q{error},
+        msg_str =>
+          q{[service dns forwarding blacklist is not configured], exiting!},
+      }
+    );
+    return;
+  }
+  if ( ( !scalar keys %{ $input->{config}->{domains}->{src} } )
+    && ( !scalar keys %{ $input->{config}->{hosts}->{src} } ) )
+  {
+    $input->{show} = $TRUE;
+    log_msg(
+      {
+        msg_ref => q{error},
+        msg_str => q{At least one domain, host source or server mapping }
+          . q{must be configured},
+      }
+    );
+    return;
+  }
+  return $TRUE;
+}
+
+# Check to see if we are being run under configure
+sub is_configure {
+  qx{/bin/cli-shell-api inSession};
+  return $? >> 8 != 0 ? $FALSE : $TRUE;
+}
+
+
+# Log and print (if $show = $TRUE)
+sub log_msg {
+  my $input   = shift;
+  my $log_msg = {
+    alert    => LOG_ALERT,
+    critical => LOG_CRIT,
+    debug    => LOG_DEBUG,
+    error    => LOG_ERR,
+    info     => LOG_NOTICE,
+    warning  => LOG_WARNING,
+  };
+
+  return unless ( length $input->{msg_typ} . $input->{msg_str} > 2 );
+
+  $input->{eof} //= q{};
+
+  syslog(
+    $log_msg->{ $input->{msg_typ} },
+    qq{$input->{msg_typ}: } . $input->{msg_str}
+      =~ s/\e[[][?]{0,1}\d+(?>(;\d+)*)[lm]//gr
+  );
+
+  print $c->{off}, qq{\r}, pad_str(), qq{\r} if $input->{show};
+
+  if ( $input->{msg_typ} eq q{info} ) {
+    print $c->{off}, pad_str(qq{$input->{msg_typ}: $input->{msg_str}}),
+      $input->{eof}
+      if $input->{show};
+  }
+  else {
+    print STDERR $c->{off}, $c->{red},
+      pad_str(qq{$input->{msg_typ}: $input->{msg_str}}), $c->{clr},
+      $input->{eof}
+      if $input->{show};
+  }
+
+  return $TRUE;
+}
+
+sub apply {
+  my $base_node = q{service dns forwarding blacklist};
+  my $cfg       = {};
+  my @cfg_cmds  = ( $begin . q{;} );
+  my $input = &get_file( { file => $file } )
+  $cfg = decode_json($input->{data});
+
+  if ( keys %{$cfg} ) {
+    $cfg->{disabled} = $cfg->{disabled} == 0 ? q{false} : q{true};
+    push @cfg_cmds, qq{$set $base_node disabled $cfg->{disabled};};
+    push @cfg_cmds,
+      qq{$set $base_node dns_redirect_ip } . qq{$cfg->{dns_redirect_ip};};
+
+    for my $exclude ( keys %{ $cfg->{exclude} } ) {
+      push @cfg_cmds, qq{$set $base_node exclude $exclude;};
+    }
+
+    for my $area (qw{domains hosts zones}) {
+      push @cfg_cmds, qq{$set $base_node $area dns_redirect_ip }
+        . qq{$cfg->{$area}->{dns_redirect_ip};};
+
+      for my $include ( keys %{ $cfg->{$area}->{include} } ) {
+        push @cfg_cmds, qq{$set $base_node $area include $include;};
+      }
+
+      for my $exclude ( keys %{ $cfg->{$area}->{exclude} } ) {
+        push @cfg_cmds, qq{$set $base_node $area exclude $exclude;};
+      }
+
+      for my $source ( keys %{ $cfg->{$area}->{src} } ) {
+        push @cfg_cmds, qq{$set $base_node $area source $source description }
+          . qq{'$cfg->{$area}->{src}->{$source}->{description}';};
+        push @cfg_cmds, qq{$set $base_node $area source $source prefix }
+          . qq{'$cfg->{$area}->{src}->{$source}->{prefix}';};
+        push @cfg_cmds, qq{$set $base_node $area source $source url }
+          . qq{'$cfg->{$area}->{src}->{$source}->{url}';};
+      }
+    }
+    push @cfg_cmds, $commit . q{;};
+    push @cfg_cmds, $save . q{;};
+    push @cfg_cmds, $end . q{;};
+  }
+  else {
+    print encode_json( { success => 0, error => qq($name not installed!), } );
+    return;
+  }
+
+# Save filehandles for STDOUT and STDERR
+  open( STDOUT_ORIG, q(>&STDOUT) );
+  open( STDERR_ORIG, q(>&STDERR) );
+
+# Set new filehandles for STDOUT and STDERR
+  my $temp = qq(/tmp/error.$$);
+  open( STDOUT, q(>), $temp ) or die qq($0: cannot open STDOUT: $!);
+  open( STDERR, q(>&STDOUT) ) or die qq($0: cannot open STDERR: $!);
+  print(qq(### Errors reported by $0 version $version ###\n));
+
+  my $output = system(qq{@cfg_cmds});
+  my $err    = $?;
+
+  close(STDOUT);
+  close(STDERR);
+  open( STDOUT, q(>&STDOUT_ORIG) );
+  open( STDERR, q(>&STDERR_ORIG) );
+
+  if ( !$err ) {
+    print encode_json( { success => 1, } );
+  }
+  else {
+    print encode_json( { success => 0, error => qx(cat $temp), } );
+  }
+  close(STDOUT_ORIG);
+  close(STDERR_ORIG);
+  unlink($temp);
+}
+
+# Read a file into memory and return the data to the calling function
+sub get_file {
+  my $input = shift;
+  my @data  = ();
+  if ( -f $input->{file} ) {
+    open my $CF, q{<}, $input->{file}
+      or die qq{error: Unable to open $input->{file}: $!};
+    chomp( @data = <$CF> );
+    close $CF;
+  }
+  return @data;
+}
+
+sub load {
+  my $cfg = { success => 1, data => {}, tmp => {}, };
+  my $blacklist = get_cfg_actv( { config => $cfg->{tmp}, show => 0 } );
+
+  if ($blacklist) {
+    $cfg->{tmp}->{disabled}
+      = $cfg->{tmp}->{disabled} == 0 ? qq{false} : qq{true};
+
+    $cfg->{tmp}->{global} = {
+      dns_redirect_ip => $cfg->{tmp}->{dns_redirect_ip},
+      disabled        => $cfg->{tmp}->{disabled},
+    };
+
+    $cfg->{tmp}->{global}->{excludes}
+      = [ map { { exclude => $_ } } sort keys %{ $cfg->{tmp}->{exclude} } ]
+      if exists $cfg->{tmp}->{exclude};
+
+    $cfg->{data}->{global} = [ $cfg->{tmp}->{global} ];
+
+    # Rename root keys, so that the Feature Wizard gets unique field names
+    for my $area (qw{domains hosts zones}) {
+
+      my @includes
+        = map { { include => $_ } }
+        sort keys %{ $cfg->{tmp}->{$area}->{blklst} }
+        if exists $cfg->{tmp}->{$area}->{blklst};
+
+       my @excludes
+        = map { { exclude => $_ } }
+        sort keys %{ $cfg->{tmp}->{$area}->{exclude} }
+        if exists $cfg->{tmp}->{$area}->{exclude};
+
+      my @sources =
+        map {
+          my $key = $_;
+          { source => [ %{ $cfg->{tmp}->{$area}->{src}->{$key} } ] }
+        } sort keys %{ $cfg->{tmp}->{$area}->{src}
+        }
+        if exists $cfg->{tmp}->{$area}->{src};
+
+      $cfg->{data}->{$area} = {
+        dns_redirect_ip => $cfg->{tmp}->{dns_redirect_ip},
+        includes        => \@includes,
+        excludes        => \@excludes,
+        sources         => \@sources,
+      };
+    }
+    delete $cfg->{tmp};
+    print encode_json($cfg);
+  }
+  else {
+    print encode_json( { success => 0, error => qq($name not installed!), } );
+    return;
+  }
+}
+
+sub remove {
+
+# Save filehandles for STDOUT and STDERR
+  open( STDOUT_ORIG, q(>&STDOUT) );
+  open( STDERR_ORIG, q(&STDERR) );
+
+# Set new filehandles for STDOUT and STDERR
+  my $temp = qq(/tmp/error.$$);
+  open( STDOUT, q(>), $temp ) or die qq($0: cannot open STDOUT: $!);
+  open( STDERR, q(>&STDOUT) ) or die qq($0: cannot open STDERR: $!);
+  print(qq(### Errors reported by $0 version $version ###\n));
+
+  my $cfg_lvl .= q(service dns forwarding blacklist);
+  my $remove_blacklist
+    = join( q{;}, $begin, qq{$delete $cfg_lvl}, $commit, $save, $end );
+  my $output = system($remove_blacklist);
+  my $err    = $?;
+
+  close(STDOUT);
+  close(STDERR);
+  open( STDOUT, q{>&STDOUT_ORIG} );
+  open( STDERR, q{>&STDERR_ORIG} );
+
+  if ( !$err ) {
+    print encode_json( { success => 1, } );
+  }
+  else {
+    print encode_json( { success => 0, error => qx(cat $temp), } );
+  }
+
+  close(STDOUT_ORIG);
+  close(STDERR_ORIG);
+  unlink($temp);
+}
+
+given ($action) {
+  when (/apply/)  { apply; }
+  when (/delete/) { remove; }
+  when (/load/)   { load; }
+  default         { die qq{Unknown action: $!}; }
+}
+

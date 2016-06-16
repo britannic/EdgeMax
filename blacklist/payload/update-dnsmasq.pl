@@ -47,7 +47,7 @@ use EdgeOS::DNS::Blacklist (
 );
 delete $ENV{PATH};
 my ( $cfg_file, $show );
-my $version = q{3.6-beta.1};
+my $version = q{3.6-beta.2};
 my $cols    = get_cols();
 
 ############################### script runs here ###############################

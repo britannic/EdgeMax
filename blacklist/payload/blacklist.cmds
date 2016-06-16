@@ -1,8 +1,11 @@
-# delete service dns forwarding blacklist
-# delete system task-scheduler task update_blacklists
-set service dns forwarding blacklist dns-redirect-ip 0.0.0.0
-set service dns forwarding blacklist disabled false
+delete service dns forwarding blacklist
+delete system task-scheduler task update_blacklists
 # set service dns forwarding blacklist dns-redirect-ip 192.168.168.1
+# set service dns forwarding blacklist hosts source hpHosts description 'Ad and Tracking servers only'
+# set service dns forwarding blacklist hosts source hpHosts prefix 127.0.0.1
+# set service dns forwarding blacklist hosts source hpHosts url 'http://hosts-file.net/ad_servers.txt'
+set service dns forwarding blacklist disabled false
+set service dns forwarding blacklist dns-redirect-ip 0.0.0.0
 set service dns forwarding blacklist domains include adsrvr.org
 set service dns forwarding blacklist domains include adtechus.net
 set service dns forwarding blacklist domains include advertising.com
@@ -15,8 +18,17 @@ set service dns forwarding blacklist domains include patoghee.in
 set service dns forwarding blacklist domains source malc0de description 'List of zones serving malicious executables observed by malc0de.com/database/'
 set service dns forwarding blacklist domains source malc0de prefix 'zone '
 set service dns forwarding blacklist domains source malc0de url 'http://malc0de.com/bl/ZONES'
-set service dns forwarding blacklist exclude 2o7.net
+set service dns forwarding blacklist domains source malwaredomains.com description 'Just domains'
+set service dns forwarding blacklist domains source malwaredomains.com prefix ''
+set service dns forwarding blacklist domains source malwaredomains.com url 'http://mirror1.malwaredomains.com/files/justdomains'
+set service dns forwarding blacklist domains source simple_tracking description 'Basic tracking list by Disconnect'
+set service dns forwarding blacklist domains source simple_tracking prefix ''
+set service dns forwarding blacklist domains source simple_tracking url 'https://s3.amazonaws.com/lists.disconnect.me/simple_tracking.txt'
+set service dns forwarding blacklist domains source zeus description 'abuse.ch ZeuS domain blocklist'
+set service dns forwarding blacklist domains source zeus prefix ''
+set service dns forwarding blacklist domains source zeus url 'https://zeustracker.abuse.ch/blocklist.php?download=domainblocklist'
 set service dns forwarding blacklist exclude 1e100.net
+set service dns forwarding blacklist exclude 2o7.net
 set service dns forwarding blacklist exclude adobedtm.com
 set service dns forwarding blacklist exclude akamai.net
 set service dns forwarding blacklist exclude akamaihd.net
@@ -48,6 +60,7 @@ set service dns forwarding blacklist exclude images-amazon.com
 set service dns forwarding blacklist exclude live.com
 set service dns forwarding blacklist exclude microsoft.com
 set service dns forwarding blacklist exclude msdn.com
+set service dns forwarding blacklist exclude msecnd.net
 set service dns forwarding blacklist exclude paypal.com
 set service dns forwarding blacklist exclude rackcdn.com
 set service dns forwarding blacklist exclude schema.org
@@ -60,35 +73,37 @@ set service dns forwarding blacklist exclude ssl-on9.net
 set service dns forwarding blacklist exclude sstatic.net
 set service dns forwarding blacklist exclude static.chartbeat.com
 set service dns forwarding blacklist exclude storage.googleapis.com
-set service dns forwarding blacklist exclude msecnd.net
 set service dns forwarding blacklist exclude windows.net
 set service dns forwarding blacklist exclude xboxlive.com
 set service dns forwarding blacklist exclude yimg.com
 set service dns forwarding blacklist exclude ytimg.com
 set service dns forwarding blacklist hosts include beap.gemini.yahoo.com
-set service dns forwarding blacklist hosts source adaway description 'Blocking mobile ad providers and some analytics providers'
-set service dns forwarding blacklist hosts source adaway prefix '127.0.0.1 '
-set service dns forwarding blacklist hosts source adaway url 'http://adaway.org/hosts.txt'
-# set service dns forwarding blacklist hosts source hpHosts description 'Ad and Tracking servers only'
-# set service dns forwarding blacklist hosts source hpHosts prefix 127.0.0.1
-# set service dns forwarding blacklist hosts source hpHosts url 'http://hosts-file.net/ad_servers.txt'
-set service dns forwarding blacklist hosts source malwaredomainlist description '127.0.0.1 based host and domain list'
-set service dns forwarding blacklist hosts source malwaredomainlist prefix '127.0.0.1 '
-set service dns forwarding blacklist hosts source malwaredomainlist url 'http://www.malwaredomainlist.com/hostslist/hosts.txt'
+# set service dns forwarding blacklist hosts source adaway description 'Blocking mobile ad providers and some analytics providers'
+# set service dns forwarding blacklist hosts source adaway prefix '127.0.0.1 '
+# set service dns forwarding blacklist hosts source adaway url 'http://adaway.org/hosts.txt'
+# set service dns forwarding blacklist hosts source malwaredomainlist description '127.0.0.1 based host and domain list'
+# set service dns forwarding blacklist hosts source malwaredomainlist prefix '127.0.0.1 '
+# set service dns forwarding blacklist hosts source malwaredomainlist url 'http://www.malwaredomainlist.com/hostslist/hosts.txt'
 set service dns forwarding blacklist hosts source openphish description 'OpenPhish automatic phishing detection'
 set service dns forwarding blacklist hosts source openphish prefix http
 set service dns forwarding blacklist hosts source openphish url 'https://openphish.com/feed.txt'
-set service dns forwarding blacklist hosts source someonewhocares description 'Zero based host and domain list'
-set service dns forwarding blacklist hosts source someonewhocares prefix 0.0.0.0
-set service dns forwarding blacklist hosts source someonewhocares url 'http://someonewhocares.org/hosts/zero/'
+set service dns forwarding blacklist hosts source raw.github.com description 'This hosts file is a merged collection of hosts from reputable sources'
+set service dns forwarding blacklist hosts source raw.github.com prefix '0.0.0.0 '
+set service dns forwarding blacklist hosts source raw.github.com url 'https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts'
+# set service dns forwarding blacklist hosts source someonewhocares description 'Zero based host and domain list'
+# set service dns forwarding blacklist hosts source someonewhocares prefix 0.0.0.0
+# set service dns forwarding blacklist hosts source someonewhocares url 'http://someonewhocares.org/hosts/zero/'
+set service dns forwarding blacklist hosts source sysctl.org description 'This hosts file is a merged collection of hosts from cameleon'
+set service dns forwarding blacklist hosts source sysctl.org prefix '127.0.0.1	 '
+set service dns forwarding blacklist hosts source sysctl.org url 'http://sysctl.org/cameleon/hosts'
 set service dns forwarding blacklist hosts source volkerschatz description 'Ad server blacklists'
 set service dns forwarding blacklist hosts source volkerschatz prefix http
 set service dns forwarding blacklist hosts source volkerschatz url 'http://www.volkerschatz.com/net/adpaths'
-set service dns forwarding blacklist hosts source winhelp2002 description 'Zero based host and domain list'
-set service dns forwarding blacklist hosts source winhelp2002 prefix '0.0.0.0 '
-set service dns forwarding blacklist hosts source winhelp2002 url 'http://winhelp2002.mvps.org/hosts.txt'
+# set service dns forwarding blacklist hosts source winhelp2002 description 'Zero based host and domain list'
+# set service dns forwarding blacklist hosts source winhelp2002 prefix '0.0.0.0 '
+# set service dns forwarding blacklist hosts source winhelp2002 url 'http://winhelp2002.mvps.org/hosts.txt'
 set service dns forwarding blacklist hosts source yoyo description 'Fully Qualified Domain Names only - no prefix to strip'
 set service dns forwarding blacklist hosts source yoyo prefix ''
 set service dns forwarding blacklist hosts source yoyo url 'http://pgl.yoyo.org/as/serverlist.php?hostformat=nohtml&showintro=1&mimetype=plaintext'
-# set system task-scheduler task update_blacklists executable path /config/scripts/update-dnsmasq.pl
-# set system task-scheduler task update_blacklists interval 1d
+set system task-scheduler task update_blacklists executable path /config/scripts/update-dnsmasq.pl
+set system task-scheduler task update_blacklists interval 1d
