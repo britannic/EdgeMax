@@ -1,9 +1,21 @@
 delete service dns forwarding blacklist
 delete system task-scheduler task update_blacklists
 # set service dns forwarding blacklist dns-redirect-ip 192.168.168.1
+# set service dns forwarding blacklist hosts source adaway description 'Blocking mobile ad providers and some analytics providers'
+# set service dns forwarding blacklist hosts source adaway prefix '127.0.0.1 '
+# set service dns forwarding blacklist hosts source adaway url 'http://adaway.org/hosts.txt'
 # set service dns forwarding blacklist hosts source hpHosts description 'Ad and Tracking servers only'
 # set service dns forwarding blacklist hosts source hpHosts prefix 127.0.0.1
 # set service dns forwarding blacklist hosts source hpHosts url 'http://hosts-file.net/ad_servers.txt'
+# set service dns forwarding blacklist hosts source malwaredomainlist description '127.0.0.1 based host and domain list'
+# set service dns forwarding blacklist hosts source malwaredomainlist prefix '127.0.0.1 '
+# set service dns forwarding blacklist hosts source malwaredomainlist url 'http://www.malwaredomainlist.com/hostslist/hosts.txt'
+# set service dns forwarding blacklist hosts source someonewhocares description 'Zero based host and domain list'
+# set service dns forwarding blacklist hosts source someonewhocares prefix 0.0.0.0
+# set service dns forwarding blacklist hosts source someonewhocares url 'http://someonewhocares.org/hosts/zero/'
+# set service dns forwarding blacklist hosts source winhelp2002 description 'Zero based host and domain list'
+# set service dns forwarding blacklist hosts source winhelp2002 prefix '0.0.0.0 '
+# set service dns forwarding blacklist hosts source winhelp2002 url 'http://winhelp2002.mvps.org/hosts.txt'
 set service dns forwarding blacklist disabled false
 set service dns forwarding blacklist dns-redirect-ip 0.0.0.0
 set service dns forwarding blacklist domains include adsrvr.org
@@ -78,30 +90,18 @@ set service dns forwarding blacklist exclude xboxlive.com
 set service dns forwarding blacklist exclude yimg.com
 set service dns forwarding blacklist exclude ytimg.com
 set service dns forwarding blacklist hosts include beap.gemini.yahoo.com
-# set service dns forwarding blacklist hosts source adaway description 'Blocking mobile ad providers and some analytics providers'
-# set service dns forwarding blacklist hosts source adaway prefix '127.0.0.1 '
-# set service dns forwarding blacklist hosts source adaway url 'http://adaway.org/hosts.txt'
-# set service dns forwarding blacklist hosts source malwaredomainlist description '127.0.0.1 based host and domain list'
-# set service dns forwarding blacklist hosts source malwaredomainlist prefix '127.0.0.1 '
-# set service dns forwarding blacklist hosts source malwaredomainlist url 'http://www.malwaredomainlist.com/hostslist/hosts.txt'
 set service dns forwarding blacklist hosts source openphish description 'OpenPhish automatic phishing detection'
 set service dns forwarding blacklist hosts source openphish prefix http
 set service dns forwarding blacklist hosts source openphish url 'https://openphish.com/feed.txt'
 set service dns forwarding blacklist hosts source raw.github.com description 'This hosts file is a merged collection of hosts from reputable sources'
 set service dns forwarding blacklist hosts source raw.github.com prefix '0.0.0.0 '
 set service dns forwarding blacklist hosts source raw.github.com url 'https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts'
-# set service dns forwarding blacklist hosts source someonewhocares description 'Zero based host and domain list'
-# set service dns forwarding blacklist hosts source someonewhocares prefix 0.0.0.0
-# set service dns forwarding blacklist hosts source someonewhocares url 'http://someonewhocares.org/hosts/zero/'
 set service dns forwarding blacklist hosts source sysctl.org description 'This hosts file is a merged collection of hosts from cameleon'
 set service dns forwarding blacklist hosts source sysctl.org prefix '127.0.0.1	 '
 set service dns forwarding blacklist hosts source sysctl.org url 'http://sysctl.org/cameleon/hosts'
 set service dns forwarding blacklist hosts source volkerschatz description 'Ad server blacklists'
 set service dns forwarding blacklist hosts source volkerschatz prefix http
 set service dns forwarding blacklist hosts source volkerschatz url 'http://www.volkerschatz.com/net/adpaths'
-# set service dns forwarding blacklist hosts source winhelp2002 description 'Zero based host and domain list'
-# set service dns forwarding blacklist hosts source winhelp2002 prefix '0.0.0.0 '
-# set service dns forwarding blacklist hosts source winhelp2002 url 'http://winhelp2002.mvps.org/hosts.txt'
 set service dns forwarding blacklist hosts source yoyo description 'Fully Qualified Domain Names only - no prefix to strip'
 set service dns forwarding blacklist hosts source yoyo prefix ''
 set service dns forwarding blacklist hosts source yoyo url 'http://pgl.yoyo.org/as/serverlist.php?hostformat=nohtml&showintro=1&mimetype=plaintext'
