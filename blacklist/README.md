@@ -21,11 +21,11 @@ EdgeMax dnsmasq Blacklist and Adware Blocking is derived from the received wisdo
 
 ## Versions
 * v3.6-beta.2: Enhancements
-- Ability to add a source that can read a local file
+    - Ability to add a source that uses a local file instead of HTTP
 
-        set service dns forwarding blacklist hosts source myhosts description 'Blacklist file source'
-        set service dns forwarding blacklist hosts source myhosts dns-redirect-ip 10.10.10.1
-        set service dns forwarding blacklist hosts source myhosts file /config/user-data/blist.hosts.src
+            set service dns forwarding blacklist hosts source myhosts description 'Blacklist file source'
+            set service dns forwarding blacklist hosts source myhosts dns-redirect-ip 10.10.10.1
+            set service dns forwarding blacklist hosts source myhosts file /config/user-data/blist.hosts.src
 
     - file contents example for /config/user-data/blist.hosts.src:
 
@@ -52,11 +52,12 @@ EdgeMax dnsmasq Blacklist and Adware Blocking is derived from the received wisdo
 - Each source can now have its own dns-redirect-ip for granular control
         set service dns forwarding blacklist hosts source openphish dns-redirect-ip 172.16.10.1
 
-- Revised source list, with redundant sources removed:
-        delete service dns forwarding blacklist hosts source adaway # description 'Blocking mobile ad providers and some analytics providers'
-        delete service dns forwarding blacklist hosts source malwaredomainlist # description '127.0.0.1 based host and domain list'
-        delete service dns forwarding blacklist hosts source someonewhocares # description 'Zero based host and domain list'
-        delete service dns forwarding blacklist hosts source winhelp2002 # description 'Zero based host and domain list'
+- Revised source list
+    - Redundant sources removed:
+            delete service dns forwarding blacklist hosts source adaway # description 'Blocking mobile ad providers and some analytics providers'
+            delete service dns forwarding blacklist hosts source malwaredomainlist # description '127.0.0.1 based host and domain list'
+            delete service dns forwarding blacklist hosts source someonewhocares # description 'Zero based host and domain list'
+            delete service dns forwarding blacklist hosts source winhelp2002 # description 'Zero based host and domain list'
 
     - Retained sources:
             set service dns forwarding blacklist domains source malc0de description 'List of zones serving malicious executables observed by malc0de.com/database/'
@@ -92,7 +93,7 @@ EdgeMax dnsmasq Blacklist and Adware Blocking is derived from the received wisdo
 
 - To install:
     * upload install_dnsmasq_blklist.v3.6-beta.2.tgz to your router (ensure you modify the command if you want to install an older version)
-        - curl -o /tmp/install_dnsmasq_blklist.v3.6-beta.2.tgz http://community.ubnt.com/ubnt/attachments/ubnt/EdgeMAX/78132/50/install_dnsmasq_blklist.v3.6-beta.2.tgz
+        - curl -o /tmp/install_dnsmasq_blklist.v3.6-beta.2.tgz http://community.ubnt.com/ubnt/attachments/ubnt/EdgeMAX/78132/53/install_dnsmasq_blklist.v3.6-beta.2.tgz
         - sudo tar zxvf ./install_dnsmasq_blklist.v3.6-beta.2.tgz
         - sudo bash ./install_dnsmasq_blklist.v3.6-beta.2
         - select menu option #1 if installing for the first time
