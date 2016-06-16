@@ -25,6 +25,16 @@ use File::Basename;
 use Getopt::Long;
 use HTTP::Tiny;
 use POSIX qw{geteuid getegid getgroups};
+use Socket (
+  qw{
+    AF_INET
+    getaddrinfo
+    getnameinfo
+    inet_ntop
+    unpack_sockaddr_in
+    unpack_sockaddr_in6
+    }
+);
 use Sys::Syslog qw(:standard :macros);
 use Term::ReadKey qw(GetTerminalSize);
 use threads;
@@ -51,6 +61,7 @@ our @EXPORT_OK = (
     get_cols
     get_dev_stats
     get_file
+    get_ip
     get_url
     get_user
     is_admin
@@ -66,7 +77,7 @@ our @EXPORT_OK = (
     write_file
     }
 );
-our $VERSION = q{1.6.1};
+our $VERSION = q{1.6.2};
 our $TRUE;
 *TRUE = \1;
 our $FALSE;
@@ -202,6 +213,7 @@ sub get_cfg_actv {
     $input->{show} = $TRUE;
     log_msg(
       {
+        show    => $input->{show},
         msg_typ => q{error},
         msg_str =>
           q{[service dns forwarding blacklist is not configured], exiting!},
@@ -215,8 +227,9 @@ sub get_cfg_actv {
     $input->{show} = $TRUE;
     log_msg(
       {
-        msg_ref => q{error},
-        msg_str => q{At least one domain, host online source/file }
+        show    => $input->{show},
+        msg_typ => q{error},
+        msg_str => q{At least one domain or host online source/file }
           . q{must be configured},
       }
     );
@@ -257,8 +270,10 @@ sub get_cfg_file {
     }
   }
   else {
+    $input->{show} = $TRUE;
     log_msg(
       {
+        show    => $input->{show},
         msg_typ => q{error},
         msg_str =>
           q{[service dns forwarding blacklist] isn't configured, exiting!},
@@ -320,6 +335,26 @@ sub get_hash {
 
   ${$hash} = $value if $value;
   return $hash_ref;
+}
+
+# Get an IP address from a hostname
+sub get_ip {
+  my $addr;
+  my $host = shift;
+  my $ip;
+  my ( $err, @getaddr ) = getaddrinfo( $host, 0 );
+
+  if ( $getaddr[0]->{family} == AF_INET ) {
+    return "" if length( $getaddr[0]->{addr} ) < 16;
+    $addr = unpack_sockaddr_in( $getaddr[0]->{addr} );
+    $ip = inet_ntop( AF_INET, $addr );
+  }
+  else {
+    return "" if length( $getaddr[0]->{addr} ) < 28;
+    $addr = unpack_sockaddr_in6( $getaddr[0]->{addr} );
+    $ip = inet_ntop( $getaddr[0]->{family}, $addr );
+  }
+  return $ip;
 }
 
 # Process a configure file and extract the blacklist data set

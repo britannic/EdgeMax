@@ -25,7 +25,6 @@ use HTTP::Tiny;
 use IO::Select;
 use IPC::Open3;
 use POSIX;
-use Socket;
 use Sys::Syslog;
 use Term::ANSIColor;
 use Term::ReadKey;
@@ -45,6 +44,7 @@ use EdgeOS::DNS::Blacklist (
     get_cfg_file
     get_cols
     get_file
+    get_ip
     is_admin
     is_configure
     log_msg
@@ -54,8 +54,9 @@ use EdgeOS::DNS::Blacklist (
     }
 );
 
-my $version = q{1.5};
 my ( $blacklist_removed, $cfg_file );
+my $max_scan = 200;
+my $version = q{1.6};
 
 ########## Run main ###########
 exit 0 if &main();
@@ -72,7 +73,8 @@ sub exec_test {
       );
       if ( !$rslt ) {
         diag( $c->{red} . $input->{run}->{diag} . $c->{clr} );
-        $input->{run}->{run_sub}->() if defined $input->{run}->{run_sub};
+        $input->{run}->{run_sub}->()
+          if defined $input->{run}->{run_sub};
         return;
       }
       return $rslt;
@@ -85,7 +87,8 @@ sub exec_test {
       );
       if ( !$rslt ) {
         diag( $c->{red} . $input->{run}->{diag} . $c->{clr} );
-        $input->{run}->{run_sub}->() if defined $input->{run}->{run_sub};
+        $input->{run}->{run_sub}->()
+          if defined $input->{run}->{run_sub};
         return;
       }
       return $rslt;
@@ -98,7 +101,8 @@ sub exec_test {
       );
       if ( !$rslt ) {
         diag( $c->{red} . $input->{run}->{diag} . $c->{clr} );
-        $input->{run}->{run_sub}->() if defined $input->{run}->{run_sub};
+        $input->{run}->{run_sub}->()
+          if defined $input->{run}->{run_sub};
         return;
       }
       return $rslt;
@@ -111,7 +115,8 @@ sub exec_test {
       );
       if ( !$rslt ) {
         diag( $c->{red} . $input->{run}->{diag} . $c->{clr} );
-        $input->{run}->{run_sub}->() if defined $input->{run}->{run_sub};
+        $input->{run}->{run_sub}->()
+          if defined $input->{run}->{run_sub};
         return;
       }
       return $rslt;
@@ -124,7 +129,8 @@ sub exec_test {
       );
       if ( !$rslt ) {
         diag( $c->{red} . $input->{run}->{diag} . $c->{clr} );
-        $input->{run}->{run_sub}->() if defined $input->{run}->{run_sub};
+        $input->{run}->{run_sub}->()
+          if defined $input->{run}->{run_sub};
         return;
       }
       return $rslt;
@@ -227,8 +233,7 @@ sub get_tests {
     $tests->{ $ikey++ } = {
       comment =>
         qq{Checking @{[basename( $input->{cfg}->{flag_file} )]} exists},
-      diag =>
-        qq{@{[basename( $input->{cfg}->{flag_file} )]} }
+      diag => qq{@{[basename( $input->{cfg}->{flag_file} )]} }
         . q{should exist - investigate!},
       lval   => qq{$input->{cfg}->{flag_file}},
       result => $TRUE,
@@ -239,8 +244,9 @@ sub get_tests {
     $tests->{ $ikey++ } = {
       comment =>
         qq{Checking @{[basename( $input->{cfg}->{no_op} )]} doesn't exist},
-      diag => qq{@{[basename( $input->{cfg}->{no_op} )]} found - investigate!},
-      lval => qq{$input->{cfg}->{no_op}},
+      diag =>
+        qq{@{[basename( $input->{cfg}->{no_op} )]} found - investigate!},
+      lval   => qq{$input->{cfg}->{no_op}},
       result => $TRUE,
       test   => q{isnt_file},
     };
@@ -249,8 +255,7 @@ sub get_tests {
     $tests->{ $ikey++ } = {
       comment =>
         qq{Checking @{[basename( $input->{cfg}->{testscript} )]} exists},
-      diag =>
-        qq{@{[basename( $input->{cfg}->{testscript} )]} }
+      diag => qq{@{[basename( $input->{cfg}->{testscript} )]} }
         . q{should exist - investigate!},
       lval   => qq{$input->{cfg}->{testscript}},
       result => $TRUE,
@@ -283,8 +288,7 @@ sub get_tests {
     $tests->{ $ikey++ } = {
       comment =>
         q{Checking @{[basename( $input->{cfg}->{testscript} )]} removed},
-      diag =>
-        qq{@{[basename( $input->{cfg}->{testscript} )]} }
+      diag => qq{@{[basename( $input->{cfg}->{testscript} )]} }
         . q{shouldn't exist - investigate!},
       lval   => qq{$input->{cfg}->{testscript}},
       result => $TRUE,
@@ -304,11 +308,10 @@ sub get_tests {
     print pinwheel();
     $tests->{ $ikey++ } = {
       comment => qq{Checking blacklist configure templates don't exist},
-      diag =>
-        qq{Found $input->{cfg}->{tmplts} - should be deleted!},
-      lval   => $input->{cfg}->{tmplts},
-      result => $TRUE,
-      test   => q{isnt_dir},
+      diag    => qq{Found $input->{cfg}->{tmplts} - should be deleted!},
+      lval    => $input->{cfg}->{tmplts},
+      result  => $TRUE,
+      test    => q{isnt_dir},
     };
 
     print pinwheel();
@@ -334,7 +337,7 @@ sub get_tests {
   }
 
   my @areas = @{ get_areas( { cfg => $input->{cfg} } ) };
-
+  my $re_fqdn = qr{address=[/][.]{0,1}(.*)[/].*}o;
   for my $area (@areas) {
 
     print pad_str(qq{@{[pinwheel()]} Adding tests for $area content...});
@@ -350,8 +353,9 @@ sub get_tests {
         print pinwheel();
         $tests->{ $ikey++ } = {
           comment => qq{$source},
-          diag => qq{@{[basename($file)]} not found for $source - investigate!},
-          lval => $file,
+          diag =>
+            qq{@{[basename($file)]} not found for $source - investigate!},
+          lval   => $file,
           result => $TRUE,
           test   => q{is_file},
         };
@@ -366,7 +370,8 @@ sub get_tests {
         );
 
         if ( -f $file ) {
-          %content = map { ( $_ => 1, tmpkey => print pinwheel(), ) }
+          %content
+            = map { ( $_ => 1, tmpkey => print pinwheel(), ) }
             @{ get_file( { file => $file } )->{data} };
           delete $content{tmpkey};
         }
@@ -384,12 +389,44 @@ sub get_tests {
             $tests->{ $ikey++ } = {
               comment =>
                 qq{Checking "global exclude" $host not in @{[basename($file)]}},
-              diag => qq{Found "global exclude" $host in @{[basename($file)]}!},
+              diag =>
+                qq{Found "global exclude" $host in @{[basename($file)]}!},
               lval => @keys ~~ %content,
               result => q{},
               test   => q{is},
             };
           }
+        }
+      my $scan = $max_scan;
+      HOST:
+        for my $host ( keys %content ) {
+          $host =~ s/$re_fqdn/$1/ms;
+          $host = q{www.} . $host if $area eq q{domains};
+          my $resolved_ip = get_ip($host) or next HOST;
+          print pad_str(qq{@{[pinwheel()]} Resolved $host to $resolved_ip});
+          my $AND = colored( "AND", 'bold underline yellow' );
+          my $IF  = colored( "IF",  'bold underline yellow' );
+
+          $tests->{ $ikey++ } = {
+            comment => qq{Checking $host is redirected by dnsmasq to $ip},
+            diag =>
+              qq{dnsmasq replied with $host = $resolved_ip, should be $ip! \n}
+              . $c->{grn}
+              . qq{Ignore this error, }
+              . qq {$IF }
+              . $c->{grn}
+              . qq{your router doesn't resolve DNS locally.\n}
+              . qq{$AND }
+              . $c->{grn}
+              . qq{your client devices are getting $host = $ip.},
+            lval   => $resolved_ip,
+            op     => q{eq},
+            result => $TRUE,
+            rval   => $ip,
+            test   => q{cmp_ok},
+          };
+          $scan--;
+          last if $scan == 0;
         }
 
         for my $host ( sort keys %{ $input->{cfg}->{$area}->{exclude} } ) {
@@ -400,8 +437,9 @@ sub get_tests {
           $tests->{ $ikey++ } = {
             comment =>
               qq{Checking "$area exclude" $host not in @{[basename($file)]}},
-            diag   => qq{Found "$area exclude" $host in @{[basename($file)]}!},
-            lval   => @keys ~~ %content,
+            diag =>
+              qq{Found "$area exclude" $host in @{[basename($file)]}!},
+            lval => @keys ~~ %content,
             result => q{},
             test   => q{is},
           };
@@ -423,7 +461,8 @@ sub get_tests {
           $tests->{ $ikey++ } = {
             comment => qq{IP address $found_ip found in @{[basename($file)]}}
               . qq{ matches configured $ip},
-            diag => qq{IP address $found_ip found in @{[basename($file)]}}
+            diag =>
+              qq{IP address $found_ip found in @{[basename($file)]}}
               . qq{ doesn't match configured $ip!},
             lval   => $found_ip,
             op     => q{eq},
@@ -472,7 +511,6 @@ sub get_tests {
             lval    => scalar @content{@keys},
             result  => $TRUE,
             run_sub => sub {
-              my $re_fqdn = qr{address=[/][.]{0,1}(.*)[/].*}o;
               my %found;
               @found{ keys %content } = ();
               delete @found{@keys};
@@ -489,39 +527,39 @@ sub get_tests {
     }
   }
 
-HOST:
-  for my $area (@areas) {
-    my $ip = $input->{cfg}->{$area}->{dns_redirect_ip};
-    print pad_str(
-      qq{@{[pinwheel()]} Scanning $area for DNS redirection tests...});
-
-    for my $host ( sort keys %{ $input->{cfg}->{$area}->{blklst} } ) {
-      $host = q{www.} . $host if $area eq q{domains};
-      my $resolved_ip = inet_ntoa( inet_aton($host) ) or next HOST;
-      print pad_str(qq{@{[pinwheel()]} Resolved $host to $resolved_ip});
-      my $AND = colored( "AND", 'bold underline yellow' );
-      my $IF  = colored( "IF",  'bold underline yellow' );
-
-      $tests->{ $ikey++ } = {
-        comment => qq{Checking $host is redirected by dnsmasq to $ip},
-        diag =>
-          qq{dnsmasq replied with $host = $resolved_ip, should be $ip! \n}
-          . $c->{grn}
-          . qq{Ignore this error, }
-          . qq {$IF }
-          . $c->{grn}
-          . qq{your router doesn't resolve DNS locally.\n}
-          . qq{$AND }
-          . $c->{grn}
-          . qq{your client devices are getting $host = $ip.},
-        lval   => $resolved_ip,
-        op     => q{eq},
-        result => $TRUE,
-        rval   => $ip,
-        test   => q{cmp_ok},
-      };
-    }
-  }
+  # HOST:
+  #   for my $area (@areas) {
+  #     my $ip = $input->{cfg}->{$area}->{dns_redirect_ip};
+  #     print pad_str(
+  #       qq{@{[pinwheel()]} Scanning $area for DNS redirection tests...});
+  #
+  #     for my $host ( sort keys %{ $input->{cfg}->{$area}->{blklst} } ) {
+  #       $host = q{www.} . $host if $area eq q{domains};
+  #       my $resolved_ip = get_ip($host) or next HOST;
+  #       print pad_str(qq{@{[pinwheel()]} Resolved $host to $resolved_ip});
+  #       my $AND = colored( "AND", 'bold underline yellow' );
+  #       my $IF  = colored( "IF",  'bold underline yellow' );
+  #
+  #       $tests->{ $ikey++ } = {
+  #         comment => qq{Checking $host is redirected by dnsmasq to $ip},
+  #         diag =>
+  #           qq{dnsmasq replied with $host = $resolved_ip, should be $ip! \n}
+  #           . $c->{grn}
+  #           . qq{Ignore this error, }
+  #           . qq {$IF }
+  #           . $c->{grn}
+  #           . qq{your router doesn't resolve DNS locally.\n}
+  #           . qq{$AND }
+  #           . $c->{grn}
+  #           . qq{your client devices are getting $host = $ip.},
+  #         lval   => $resolved_ip,
+  #         op     => q{eq},
+  #         result => $TRUE,
+  #         rval   => $ip,
+  #         test   => q{cmp_ok},
+  #       };
+  #     }
+  #   }
   say q{};
   return $tests;
 }
@@ -557,7 +595,8 @@ sub main {
   plan tests => $t_count->{tests};
 
   for my $key ( 1 .. $t_count->{tests} ) {
-    exec_test( { run => $planned_tests->{$key} } ) || $t_count->{failed}++;
+    exec_test( { run => $planned_tests->{$key} } )
+      || $t_count->{failed}++;
   }
 
   my $t_word = $t_count->{failed} <= 1 ? q{test} : q{tests};

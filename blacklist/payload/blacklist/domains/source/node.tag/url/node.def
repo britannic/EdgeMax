@@ -2,7 +2,7 @@ type: txt
 help: A blacklist source url that provides a list of domain names to block
 
 val_help: http; Example: http://malc0de.com/bl/ZONES
-comp_help: Example: http://malc0de.com/bl/ZONES
+comp_help: Check that the url works in a browser and is plain text only
 
 commit:expression: $VAR(../file) == ""; "file and url are mutually exclusive, only set one or the other as a source."
 
