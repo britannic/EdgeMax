@@ -20,10 +20,10 @@ EdgeMax dnsmasq Blacklist and Adware Blocking is derived from the received wisdo
 * Since the EdgeOS is a fork and port of Vyatta 6.3, this script could easily be adapted to work on VyOS and Vyatta derived ports
 
 ## Versions
-* v3.6-beta.1: Enhancements
+* v3.6-beta.2: Enhancements
 - Ability to add a source that can read a local file
 
-        set service dns forwarding blacklist hosts source myhosts description 'testing file source'
+        set service dns forwarding blacklist hosts source myhosts description 'Blacklist file source'
         set service dns forwarding blacklist hosts source myhosts dns-redirect-ip 10.10.10.1
         set service dns forwarding blacklist hosts source myhosts file /config/user-data/blist.hosts.src
 
@@ -50,15 +50,51 @@ EdgeMax dnsmasq Blacklist and Adware Blocking is derived from the received wisdo
             admicro1.vcmedia.vn
 
 - Each source can now have its own dns-redirect-ip for granular control
-
         set service dns forwarding blacklist hosts source openphish dns-redirect-ip 172.16.10.1
 
+- Revised source list, with redundant sources removed:
+        delete service dns forwarding blacklist hosts source adaway # description 'Blocking mobile ad providers and some analytics providers'
+        delete service dns forwarding blacklist hosts source malwaredomainlist # description '127.0.0.1 based host and domain list'
+        delete service dns forwarding blacklist hosts source someonewhocares # description 'Zero based host and domain list'
+        delete service dns forwarding blacklist hosts source winhelp2002 # description 'Zero based host and domain list'
+
+    - Retained sources:
+            set service dns forwarding blacklist domains source malc0de description 'List of zones serving malicious executables observed by malc0de.com/database/'
+            set service dns forwarding blacklist domains source malc0de prefix 'zone '
+            set service dns forwarding blacklist domains source malc0de url 'http://malc0de.com/bl/ZONES'
+            set service dns forwarding blacklist hosts source openphish description 'OpenPhish automatic phishing detection'
+            set service dns forwarding blacklist hosts source openphish prefix http
+            set service dns forwarding blacklist hosts source openphish url 'https://openphish.com/feed.txt'
+            set service dns forwarding blacklist hosts source volkerschatz description 'Ad server blacklists'
+            set service dns forwarding blacklist hosts source volkerschatz prefix http
+            set service dns forwarding blacklist hosts source volkerschatz url 'http://www.volkerschatz.com/net/adpaths'
+            set service dns forwarding blacklist hosts source yoyo description 'Fully Qualified Domain Names only - no prefix to strip'
+            set service dns forwarding blacklist hosts source yoyo prefix ''
+            set service dns forwarding blacklist hosts source yoyo url 'http://pgl.yoyo.org/as/serverlist.php?hostformat=nohtml&showintro=1&mimetype=plaintext'
+
+    - Added sources:
+        - Domains:
+                set service dns forwarding blacklist domains source simple_tracking description 'Basic tracking list by Disconnect'
+                set service dns forwarding blacklist domains source simple_tracking prefix ''
+                set service dns forwarding blacklist domains source simple_tracking url 'https://s3.amazonaws.com/lists.disconnect.me/simple_tracking.txt'
+                set service dns forwarding blacklist domains source zeus description 'abuse.ch ZeuS domain blocklist'
+                set service dns forwarding blacklist domains source zeus prefix ''
+                set service dns forwarding blacklist domains source zeus url 'https://zeustracker.abuse.ch/blocklist.php?download=domainblocklist'
+        - Hosts:
+                set service dns forwarding blacklist hosts source raw.github.com description 'This hosts file is a merged collection of hosts from reputable sources'
+                set service dns forwarding blacklist hosts source raw.github.com prefix '0.0.0.0 '
+                set service dns forwarding blacklist hosts source raw.github.com url 'https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts'
+                set service dns forwarding blacklist hosts source sysctl.org description 'This hosts file is a merged collection of hosts from cameleon'
+                set service dns forwarding blacklist hosts source sysctl.org prefix '127.0.0.1	 '
+                set service dns forwarding blacklist hosts source sysctl.org url 'http://sysctl.org/cameleon/hosts'
+
 - Additional excludes added to blacklist configuration list
+
 - To install:
-    * upload install_dnsmasq_blklist.v3.6-beta.1.tgz to your router (ensure you modify the command if you want to install an older version)
-        - curl -o /tmp/install_dnsmasq_blklist.v3.6-beta.1.tgz http://community.ubnt.com/ubnt/attachments/ubnt/EdgeMAX/78132/50/install_dnsmasq_blklist.v3.6-beta.1.tgz
-        - sudo tar zxvf ./install_dnsmasq_blklist.v3.6-beta.1.tgz
-        - sudo bash ./install_dnsmasq_blklist.v3.6-beta.1
+    * upload install_dnsmasq_blklist.v3.6-beta.2.tgz to your router (ensure you modify the command if you want to install an older version)
+        - curl -o /tmp/install_dnsmasq_blklist.v3.6-beta.2.tgz http://community.ubnt.com/ubnt/attachments/ubnt/EdgeMAX/78132/50/install_dnsmasq_blklist.v3.6-beta.2.tgz
+        - sudo tar zxvf ./install_dnsmasq_blklist.v3.6-beta.2.tgz
+        - sudo bash ./install_dnsmasq_blklist.v3.6-beta.2
         - select menu option #1 if installing for the first time
         - select menu option #2 to completely remove blacklisting if you have a previous version, then run install again using option #1
 

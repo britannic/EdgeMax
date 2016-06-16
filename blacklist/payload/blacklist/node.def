@@ -1,7 +1,6 @@
 priority: 999 # Run after DNS forwarding is configured
 help: Add and delete blacklist blackhole IP, exclusions and URL sources
 
-commit:expression: $VAR(./@/source/@@) != ""; "At least one source must be set to download blacklists for $VAR(@)"
 end: if [[ "$COMMIT_ACTION" != "DELETE" ]]; then
         if [[ "$VAR(./disabled/@@)" == false ]]; then
             sudo /config/scripts/update-dnsmasq.pl -v;
