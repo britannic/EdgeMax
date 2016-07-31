@@ -55,7 +55,7 @@ use EdgeOS::DNS::Blacklist (
 );
 
 my ( $blacklist_removed, $cfg_file );
-my $max_scan = 200;
+my $max_scan = 10;
 my $version = q{1.6};
 
 ########## Run main ###########
