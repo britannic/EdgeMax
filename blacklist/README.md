@@ -20,7 +20,7 @@ EdgeMax dnsmasq Blacklist and Adware Blocking is derived from the received wisdo
 * Since the EdgeOS is a fork and port of Vyatta 6.3, this script could easily be adapted to work on VyOS and Vyatta derived ports
 
 ## Versions
-* v3.6-beta.2: Enhancements
+* v3.6-beta.3: Enhancements
     - Ability to add a source that uses a local file instead of HTTP
 
             set service dns forwarding blacklist hosts source myhosts description 'Blacklist file source'
@@ -94,8 +94,9 @@ EdgeMax dnsmasq Blacklist and Adware Blocking is derived from the received wisdo
 - To install:
     * upload install_dnsmasq_blklist.v3.6-beta.2.tgz to your router (ensure you modify the command if you want to install an older version)
         - curl -o /tmp/install_dnsmasq_blklist.v3.6-beta.2.tgz http://community.ubnt.com/ubnt/attachments/ubnt/EdgeMAX/78132/53/install_dnsmasq_blklist.v3.6-beta.2.tgz
+        - cd /tmp
         - sudo tar zxvf ./install_dnsmasq_blklist.v3.6-beta.2.tgz
-        - sudo bash ./install_dnsmasq_blklist.v3.6-beta.2
+        - bash ./install_dnsmasq_blklist.v3.6-beta.2
         - select menu option #1 if installing for the first time
         - select menu option #2 to completely remove blacklisting if you have a previous version, then run install again using option #1
 
