@@ -73,6 +73,7 @@ set service dns forwarding blacklist exclude live.com
 set service dns forwarding blacklist exclude microsoft.com
 set service dns forwarding blacklist exclude msdn.com
 set service dns forwarding blacklist exclude msecnd.net
+set service dns forwarding blacklist exclude msftncsi.com
 set service dns forwarding blacklist exclude paypal.com
 set service dns forwarding blacklist exclude rackcdn.com
 set service dns forwarding blacklist exclude schema.org

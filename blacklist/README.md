@@ -20,7 +20,7 @@ EdgeMax dnsmasq Blacklist and Adware Blocking is derived from the received wisdo
 * Since the EdgeOS is a fork and port of Vyatta 6.3, this script could easily be adapted to work on VyOS and Vyatta derived ports
 
 ## Versions
-* v3.6-beta.3: Enhancements
+* v3.6: Enhancements
     - Ability to add a source that uses a local file instead of HTTP
 
             set service dns forwarding blacklist hosts source myhosts description 'Blacklist file source'
