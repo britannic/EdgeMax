@@ -92,11 +92,11 @@ EdgeMax dnsmasq Blacklist and Adware Blocking is derived from the received wisdo
 - Additional excludes added to blacklist configuration list
 
 - To install:
-    * upload install_dnsmasq_blklist.v3.6-beta.2.tgz to your router (ensure you modify the command if you want to install an older version)
-        - curl -o /tmp/install_dnsmasq_blklist.v3.6-beta.2.tgz http://community.ubnt.com/ubnt/attachments/ubnt/EdgeMAX/78132/53/install_dnsmasq_blklist.v3.6-beta.2.tgz
+    * upload install_dnsmasq_blklist.v3.6.tgz to your router (ensure you modify the command if you want to install an older version)
+        - curl -o /tmp/install_dnsmasq_blklist.v3.6.tgz http://community.ubnt.com/ubnt/attachments/ubnt/EdgeMAX/78132/53/install_dnsmasq_blklist.v3.6.tgz
         - cd /tmp
-        - sudo tar zxvf ./install_dnsmasq_blklist.v3.6-beta.2.tgz
-        - bash ./install_dnsmasq_blklist.v3.6-beta.2
+        - sudo tar zxvf ./install_dnsmasq_blklist.v3.6.tgz
+        - bash ./install_dnsmasq_blklist.v3.6
         - select menu option #1 if installing for the first time
         - select menu option #2 to completely remove blacklisting if you have a previous version, then run install again using option #1
 

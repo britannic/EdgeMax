@@ -361,7 +361,7 @@ sub main {
           msg_typ => q{info},
           msg_str => sprintf(
             qq{Processed $c->{grn}%s$c->{clr} %s ($c->{red}%s$c->{clr} }
-              . qq{discarded) from $c->{mag}%s$c->{clr} records (%s orig.)%s}
+              . qq{rejected) from $c->{mag}%s$c->{clr} (%s orig.)%s}
               => @{ $cfg->{$area} }{qw(unique type duplicates icount records)},
             qq{\n}
           ),

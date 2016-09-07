@@ -46,3 +46,5 @@ blacklist/install_dnsmasq_blklist.v3.5
 blacklist/install_dnsmasq_blklist.v3.5.5
 
 blacklist/install_dnsmasq_blklist.v3.6-beta.2
+
+.DS_Store
