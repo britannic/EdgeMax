@@ -14,6 +14,7 @@ if [[ -e "${0##*/}" ]]; then
 	[[ -f ${BLACKLIST}setup.tgz ]] && rm ${BLACKLIST}setup.tgz
 	cd ${PAYLOAD}
 	echo ${VERSION} > version
+	cp setup remove
 	tar zcf ../${PAYLOAD}.tgz --exclude='._*' --exclude='.svn' --exclude='.DS_Store' --exclude='*.bak' --exclude='*~' ./*
 	cd ..
 

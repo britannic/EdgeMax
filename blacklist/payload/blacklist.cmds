@@ -24,6 +24,7 @@ set service dns forwarding blacklist domains include advertising.com
 set service dns forwarding blacklist domains include centade.com
 set service dns forwarding blacklist domains include doubleclick.net
 set service dns forwarding blacklist domains include free-counter.co.uk
+set service dns forwarding blacklist domains include hilltopads.net
 set service dns forwarding blacklist domains include intellitxt.com
 set service dns forwarding blacklist domains include kiosked.com
 set service dns forwarding blacklist domains include patoghee.in
