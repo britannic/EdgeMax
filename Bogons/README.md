@@ -46,7 +46,7 @@ In order to use this script, you must first configure an:
 *
 
 ## Compatibility
-* bogon.py has been tested on the EdgeRouter Lite family of routers, versions v1.6.0-v1.8.0alpha.
+* bogon.py has been tested on the EdgeRouter Lite family of routers, versions v1.6.0-v1.9.1.
 * Since the EdgeOS is a fork and port of Vyatta 6.3, this script could easily be adapted to work on VyOS and Vyatta derived ports
 * It does require the Python netaddr module, which can be installed using apt-get, once you have updated your router package repository configuration
 
