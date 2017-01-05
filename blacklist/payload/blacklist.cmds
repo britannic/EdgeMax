@@ -1,5 +1,3 @@
-delete service dns forwarding blacklist
-delete system task-scheduler task update_blacklists
 # set service dns forwarding blacklist dns-redirect-ip 192.168.168.1
 # set service dns forwarding blacklist hosts source adaway description 'Blocking mobile ad providers and some analytics providers'
 # set service dns forwarding blacklist hosts source adaway prefix '127.0.0.1 '
@@ -16,18 +14,25 @@ delete system task-scheduler task update_blacklists
 # set service dns forwarding blacklist hosts source winhelp2002 description 'Zero based host and domain list'
 # set service dns forwarding blacklist hosts source winhelp2002 prefix '0.0.0.0 '
 # set service dns forwarding blacklist hosts source winhelp2002 url 'http://winhelp2002.mvps.org/hosts.txt'
+delete service dns forwarding blacklist
+delete system task-scheduler task update_blacklists
 set service dns forwarding blacklist disabled false
 set service dns forwarding blacklist dns-redirect-ip 0.0.0.0
+set service dns forwarding blacklist domains include adk2x.com
 set service dns forwarding blacklist domains include adsrvr.org
 set service dns forwarding blacklist domains include adtechus.net
 set service dns forwarding blacklist domains include advertising.com
 set service dns forwarding blacklist domains include centade.com
 set service dns forwarding blacklist domains include doubleclick.net
+set service dns forwarding blacklist domains include fastplayz.com
 set service dns forwarding blacklist domains include free-counter.co.uk
 set service dns forwarding blacklist domains include hilltopads.net
 set service dns forwarding blacklist domains include intellitxt.com
 set service dns forwarding blacklist domains include kiosked.com
 set service dns forwarding blacklist domains include patoghee.in
+set service dns forwarding blacklist domains include themillionaireinpjs.com
+set service dns forwarding blacklist domains include traktrafficflow.com
+set service dns forwarding blacklist domains include wwwpromoter.com
 set service dns forwarding blacklist domains source malc0de description 'List of zones serving malicious executables observed by malc0de.com/database/'
 set service dns forwarding blacklist domains source malc0de prefix 'zone '
 set service dns forwarding blacklist domains source malc0de url 'http://malc0de.com/bl/ZONES'
@@ -50,7 +55,9 @@ set service dns forwarding blacklist exclude amazonaws.com
 set service dns forwarding blacklist exclude apple.com
 set service dns forwarding blacklist exclude ask.com
 set service dns forwarding blacklist exclude avast.com
+set service dns forwarding blacklist exclude avira-update.com
 set service dns forwarding blacklist exclude bitdefender.com
+set service dns forwarding blacklist exclude cdn.ravenjs.com
 set service dns forwarding blacklist exclude cdn.visiblemeasures.com
 set service dns forwarding blacklist exclude cloudfront.net
 set service dns forwarding blacklist exclude coremetrics.com
@@ -58,6 +65,7 @@ set service dns forwarding blacklist exclude edgesuite.net
 set service dns forwarding blacklist exclude freedns.afraid.org
 set service dns forwarding blacklist exclude github.com
 set service dns forwarding blacklist exclude githubusercontent.com
+set service dns forwarding blacklist exclude global.ssl.fastly.net
 set service dns forwarding blacklist exclude google.com
 set service dns forwarding blacklist exclude googleadservices.com
 set service dns forwarding blacklist exclude googleapis.com
@@ -76,12 +84,17 @@ set service dns forwarding blacklist exclude msdn.com
 set service dns forwarding blacklist exclude msecnd.net
 set service dns forwarding blacklist exclude msftncsi.com
 set service dns forwarding blacklist exclude paypal.com
+set service dns forwarding blacklist exclude pop.h-cdn.co
 set service dns forwarding blacklist exclude rackcdn.com
+set service dns forwarding blacklist exclude rarlab.com
 set service dns forwarding blacklist exclude schema.org
 set service dns forwarding blacklist exclude shopify.com
 set service dns forwarding blacklist exclude skype.com
 set service dns forwarding blacklist exclude smacargo.com
 set service dns forwarding blacklist exclude sourceforge.net
+set service dns forwarding blacklist exclude spotify.com
+set service dns forwarding blacklist exclude spotify.edgekey.net
+set service dns forwarding blacklist exclude spotilocal.com
 set service dns forwarding blacklist exclude ssl-on9.com
 set service dns forwarding blacklist exclude ssl-on9.net
 set service dns forwarding blacklist exclude sstatic.net

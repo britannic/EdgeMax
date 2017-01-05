@@ -68,12 +68,11 @@ my $cfg     = {
   disabled => 0,
   dmasq_d  => q{/etc/dnsmasq.d},
   flg_lvl  => 5,
-  dnsmasq  => q{/etc/dnsmasq.d},
   EdgeOS   => q{EdgeOS},
   file     => q{./blacklist.cmds},
   flg_file => q{/var/log/update-dnsmasq-flagged.cmds},
   no_op    => q{/tmp/.update-dnsmasq.no-op},
-  oldconf  => qq{{domai*,hos*,zon*}.blacklist.conf},
+  oldconf  => qq{{dnsmasq,domai*,hos*,zon*}.blacklist.conf},
   oldscrpt => q{update-blacklists-dnsmasq.pl},
   old_lib  => q{/opt/vyatta/share/perl5},
   lib      => q{/config/lib/perl},
@@ -366,6 +365,17 @@ sub get_blacklist {
         my $host;
         if ($url) {
           my $uri = new URI($url);
+          if ( $uri->scheme ne 'http' ) {
+            log_msg(
+              {
+                cols    => $cols,
+                show    => $TRUE,
+                msg_typ => q{error},
+                msg_str => sprintf q{URL: %s incorrectly formatted} => $area,
+                $host,
+              }
+              );
+          }
           $host = $uri->host;
           log_msg(
             {
@@ -513,8 +523,8 @@ sub get_blacklist {
           eof     => qq{\n},
           msg_str => sprintf(
             qq{Processed $c->{grn}%s$c->{clr} %s ($c->{red}%s$c->{clr} }
-              . qq{rejected) from $c->{mag}%s$c->{clr} (%s orig.)%s}
-              => @{ $cfg->{$area} }{qw(unique type duplicates icount records)},
+              . qq{rejected) from $c->{mag}%s$c->{clr} (%s orig.)%s} =>
+              @{ $cfg->{$area} }{qw(unique type duplicates icount records)},
             qq{\n}
           ),
           msg_typ => q{info},
@@ -915,7 +925,7 @@ sub setup {
         eof  => qq{\n},
         msg_str =>
           q{Removing previous version blacklist files from directory: }
-          . qq{$cfg->{dnsmasq}/},
+          . qq{$cfg->{dmasq_d}/},
         msg_typ => q{info},
         show    => $TRUE,
       }
