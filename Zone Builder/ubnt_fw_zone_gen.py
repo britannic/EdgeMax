@@ -4,7 +4,7 @@
 #
 # -*- coding: utf-8 -*-
 
-version = '1.7.2-neil'
+version = '1.7.2'
 
 import argparse
 import itertools
