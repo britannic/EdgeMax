@@ -86,13 +86,13 @@ sub get_options {
 sub main {
   my $dnsmasq_svc = q{/etc/init.d/dnsmasq};
   my $cfg         = {
-    disabled  => 0,
-    dmasq_d   => q{/etc/dnsmasq.d},
-    flg_lvl   => 5,
+    disabled => 0,
+    dmasq_d  => q{/etc/dnsmasq.d},
+    flg_lvl  => 5,
     flg_file => q{/var/log/update-dnsmasq-flagged.cmds},
-    log_name  => q{update-dnsmasq},
-    no_op     => q{/tmp/.update-dnsmasq.no-op},
-    domains   => {
+    log_name => q{update-dnsmasq},
+    no_op    => q{/tmp/.update-dnsmasq.no-op},
+    domains  => {
       duplicates => 0,
       icount     => 0,
       records    => 0,
@@ -223,6 +223,18 @@ sub main {
         my $host;
         if ($url) {
           my $uri = new URI($url);
+          if ( $uri->scheme ne 'http' ) {
+            log_msg(
+              {
+                cols    => $cols,
+                show    => $show,
+                msg_typ => q{error},
+                msg_str => sprintf q{URL: %s incorrectly formatted} => $area,
+                $host,
+              }
+              )
+              if $show;
+          }
           $host = $uri->host;
           log_msg(
             {
@@ -361,8 +373,8 @@ sub main {
           msg_typ => q{info},
           msg_str => sprintf(
             qq{Processed $c->{grn}%s$c->{clr} %s ($c->{red}%s$c->{clr} }
-              . qq{rejected) from $c->{mag}%s$c->{clr} (%s orig.)%s}
-              => @{ $cfg->{$area} }{qw(unique type duplicates icount records)},
+              . qq{rejected) from $c->{mag}%s$c->{clr} (%s orig.)%s} =>
+              @{ $cfg->{$area} }{qw(unique type duplicates icount records)},
             qq{\n}
           ),
         }
