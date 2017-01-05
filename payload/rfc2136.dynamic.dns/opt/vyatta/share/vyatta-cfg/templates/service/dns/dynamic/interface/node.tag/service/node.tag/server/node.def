@@ -1,0 +1,4 @@
+help: Server to send DDNS update to (IP address|hostname)
+type: txt
+val_help: ipv4; IP address of DDNS server
+val_help: <hostname>; Hostname of DDNS server
