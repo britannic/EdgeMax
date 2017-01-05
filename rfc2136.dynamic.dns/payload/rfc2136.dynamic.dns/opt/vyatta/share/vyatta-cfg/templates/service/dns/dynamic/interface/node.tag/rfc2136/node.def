@@ -1,0 +1,8 @@
+tag:
+help: RFC2136 Update name
+type: txt
+
+commit:expression: $VAR(./@/zone) != ""; "Set zone for service $VAR(./@) to send DDNS updates for interface $VAR(../@)"
+commit:expression: $VAR(./@/key) != ""; "Set key for service $VAR(./@) to send DDNS updates for interface $VAR(../@)"
+commit:expression: $VAR(./@/record) != ""; "Set record for service $VAR(./@) to send DDNS updates for interface $VAR(../@)"
+commit:expression: $VAR(./@/server) != ""; "Set server for service $VAR(./@) to send DDNS updates for interface $VAR(../@)"

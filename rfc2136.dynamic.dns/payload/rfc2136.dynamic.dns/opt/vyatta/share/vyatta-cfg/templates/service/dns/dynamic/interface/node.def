@@ -1,0 +1,16 @@
+tag:
+help: Interface to send DDNS updates for [REQUIRED]
+type: txt
+allowed: /opt/vyatta/sbin/vyatta-interfaces.pl --show=all
+commit:expression: $VAR(./@/service/@@) != "" || $VAR(./@/rfc2136/@@) != ""; "At least one service must be set to send DDNS updates for $VAR(@)"
+commit:expression: exec "/opt/vyatta/sbin/vyatta-interfaces.pl --dev=$VAR(@) --warn"
+
+delete:touch /tmp/ddclient_$VAR(@).$PPID
+
+end: if [ -f /tmp/ddclient_$VAR(@).$PPID ]; then
+        sudo /opt/vyatta/sbin/vyatta-dynamic-dns.pl --stop-dynamicdns --interface $VAR(@)
+        rm /tmp/ddclient_$VAR(@).$PPID
+     else
+        sudo /opt/vyatta/sbin/vyatta-dynamic-dns.pl --update-dynamicdns --interface $VAR(@)
+     fi
+
