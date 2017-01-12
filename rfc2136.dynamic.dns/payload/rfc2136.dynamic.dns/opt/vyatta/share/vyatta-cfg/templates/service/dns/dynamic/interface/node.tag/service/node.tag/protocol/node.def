@@ -1,5 +1,0 @@
-help: DDNS protocol to use for custom service type
-type: txt
-syntax:expression: pattern $VAR(@) "^[-_[:alnum:]]+$"
-                   ; "Invalid character(s) in protocol name"
-val_help: <protocol>; DDNS protocol name (e.g., dyndns2)

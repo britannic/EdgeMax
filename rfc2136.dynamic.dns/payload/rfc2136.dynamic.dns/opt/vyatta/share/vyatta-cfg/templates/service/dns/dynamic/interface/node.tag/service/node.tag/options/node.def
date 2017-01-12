@@ -1,4 +1,0 @@
-type: txt
-help: Additional options for ddclient. You must use the ddclient
-                configuration syntax as the text is added directly to ddclient
-                configuration file without any syntax checking.
