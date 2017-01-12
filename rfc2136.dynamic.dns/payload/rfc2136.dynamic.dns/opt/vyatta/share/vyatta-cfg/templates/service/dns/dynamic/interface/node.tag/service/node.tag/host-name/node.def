@@ -1,3 +1,0 @@
-multi:
-help: Hostname registered with DDNS service [REQUIRED]
-type: txt

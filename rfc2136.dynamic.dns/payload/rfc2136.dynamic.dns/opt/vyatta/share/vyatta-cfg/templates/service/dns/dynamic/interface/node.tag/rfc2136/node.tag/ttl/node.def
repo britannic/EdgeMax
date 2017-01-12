@@ -1,5 +1,0 @@
-type: u32
-
-help: Time To Live
-
-default: 600
