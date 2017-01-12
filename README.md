@@ -14,7 +14,7 @@ Repository contains scripts for managing Ubiquiti EdgeMax based routers
 * These scripts are written in Bash, Perl and Python, diff and  were designed to make repetitive router management tasks a lot easier.
 
 ## Compatibility
-*  They have been tested on the EdgeRouter Lite family of routers, versions v1.5.0-v1.7.0.
+*  They have been tested on the EdgeRouter Lite family of routers, versions v1.5.0-v1.9.1.
 * Since the EdgeOS is a fork and port of Vyatta 6.3, these scripts could easily be adapted to work on VyOS and Vyatta derived ports
 
 ## Usage: Check the script's comments or run the script with "-h" to see how to use them.
