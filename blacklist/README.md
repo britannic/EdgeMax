@@ -19,6 +19,22 @@ EdgeMax dnsmasq Blacklist and Adware Blocking is derived from the received wisdo
 * update-dnsmasq.pl has been tested on the EdgeRouter Lite family of routers, versions v1.7.0-v1.9.1.1
 * Since the EdgeOS is a fork and port of Vyatta 6.3, this script could be adapted to work on VyOS and Vyatta derived ports
 
+## Installation
+
+- To install:
+    * IMPORTANT, Replace <VERSION> with the downloaded version # and <PATH> with the download link to the desired version!
+    * upload install_dnsmasq_blklist.v<VERSION>.tgz to your router (ensure you modify the command if you want to install an older version)
+        - curl -o /tmp/install_dnsmasq_blklist.v<VERSION>.tgz
+        - cd /tmp
+        - sudo tar zxvf ./install_dnsmasq_blklist.v<VERSION>.tgz
+        - bash ./install_dnsmasq_blklist.v<VERSION>
+        - select menu option #1 if installing for the first time
+        - select menu option #2 to completely remove blacklisting if you have a previous version, then run install again using option #1
+
+## Removal
+* sudo /tmp/install_dnsmasq_blklist.v<VERSION>
+* select option #2
+
 ## Versions
 * v3.6.3.2: Fixes
     - Rewrote version checker to handle EdgeOS versions with an additional sub releases, i.e. v1.9.1.1, v1.9.1.1.1, etc
@@ -98,15 +114,6 @@ EdgeMax dnsmasq Blacklist and Adware Blocking is derived from the received wisdo
                 set service dns forwarding blacklist hosts source sysctl.org url 'http://sysctl.org/cameleon/hosts'
 
 - Additional excludes added to blacklist configuration list
-
-- To install:
-    * upload install_dnsmasq_blklist.v3.6.tgz to your router (ensure you modify the command if you want to install an older version)
-        - curl -o /tmp/install_dnsmasq_blklist.v3.6.tgz http://community.ubnt.com/ubnt/attachments/ubnt/EdgeMAX/78132/53/install_dnsmasq_blklist.v3.6.tgz
-        - cd /tmp
-        - sudo tar zxvf ./install_dnsmasq_blklist.v3.6.tgz
-        - bash ./install_dnsmasq_blklist.v3.6
-        - select menu option #1 if installing for the first time
-        - select menu option #2 to completely remove blacklisting if you have a previous version, then run install again using option #1
 
 * v3.5.5: Updates/fixes include:
 - Added clarifying explanation for failed IP tests; advises user to ignore if router resolves upstream DNS and not locally
@@ -272,26 +279,6 @@ EdgeMax dnsmasq Blacklist and Adware Blocking is derived from the received wisdo
 ---
 * Version 3.00: No longer requires regex strings, just the line prefix/preamble before the hostname in the download. If a version of ADBlock was installed previously, you will need to select option 2 to remove it and then install this version. This is necessary to ensure the configure paths are correctly set up for the new prefix option which replaces the regex string.
 ---
-## Installation
-
-To install:
-
-* upload install_adblock.v3.24a.tgz to your router (ensure you modify the command if you want to install an older version)
-    - curl -o /tmp/install_adblock.v3.24a.tgz http://community.ubnt.com/ubnt/attachments/ubnt/EdgeMAX/78132/34/install_adblock.v3.24a.tgz
-    - sudo tar zxvf ./install_adblock.v3.24a.tgz
-    - sudo bash ./install_adblock.v3.24a.tgz
-    - select menu option #1 if installing for the first time
-    - select menu option #2 to completely remove ADBlock if you have a previous version, then run install again using option #1
-
-* Now run configure and make certain your DHCP services don't give out public nameservers, otherwise they will defeat the dnsmasq redirects:
-
-        delete service dhcp-server shared-network-name <YOUR DHCP SERVICE NAME> subnet <YOUR SUBNET> dns-server <PUBLIC NAME SERVER i.e. 8.8.8.8>
-
-* Now make sure EACH of your DHCP services (for the subnets you want to block adverts and malware servers) gives out the router as the only nameserver (LAN1 and the subnet should be replaced with your own system values):
-
-        set service dhcp-server shared-network-name LAN1 subnet 192.168.1.0/24 dns-server 192.168.1.1
-
-* The script has a menu to either add or remove (if previously installed) AdBlock. It will set up the system task scheduler (cron) via the CLI to run "/config/scripts/update-blacklists-dnsmasq.pl" at mindnight local time.
 
 ## Post Installation
 Here is the scheduler configuration after running install_adblock:
@@ -459,7 +446,3 @@ In order to make this work properly, you will need to first ensure that your dns
      options strict-order
      options listen-address=127.0.0.1
      system
-
-## Removal
-* sudo bash ./install_adblock.v3.24a
-* select option #2
