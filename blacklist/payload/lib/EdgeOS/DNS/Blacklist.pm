@@ -77,7 +77,7 @@ our @EXPORT_OK = (
     write_file
     }
 );
-our $VERSION = q{1.6.2};
+our $VERSION = q{1.6.3};
 our $TRUE;
 *TRUE = \1;
 our $FALSE;
@@ -485,11 +485,16 @@ sub is_admin {
 sub is_build {
   my $input = is_version();
 
-  # v1.2.0: build 4574253
-  # v1.4.1: build 4648309
-  # v1.5.0: build 4677648
-  # v1.6.0: build 4716006
-  # v1.7.0: build 4783374
+  # v1.2.0:   build 4574253
+  # v1.4.1:   build 4648309
+  # v1.5.0:   build 4677648
+  # v1.6.0:   build 4716006
+  # v1.7.0:   build 4783374
+  # v1.8.0:   build 4853089
+  # v1.8.5:   build 4884695
+  # v1.9.0:   build 4901118
+  # v1.9.1:   build 4939093
+  # v1.9.1.1: build 4977347
 
   if ( $input->{build} >= 4783374 )    # script tested on os v1.7.0 & above
   {
@@ -515,8 +520,8 @@ sub is_version {
 
   if ( $edgeOS =~ s{^Version:\s*(?<VERSION>.*)$}{$+{VERSION}}xms ) {
     my @ver = split /\./ => $edgeOS;
-    $version = join "." => @ver[ 0, 1, 2 ];
-    $build = $ver[3];
+    $version = join "." => @ver[ 0..$#ver-3];
+    $build = $ver[$#ver-2];
   }
 
   return { version => $version, build => $build };

@@ -16,11 +16,15 @@ EdgeMax dnsmasq Blacklist and Adware Blocking is derived from the received wisdo
 * Any FQDN in the blacklist will force dnsmasq to return the configured dns redirect IP address
 
 ## Compatibility
-* update-dnsmasq.pl has been tested on the EdgeRouter Lite family of routers, version v1.6.0-v1.9.1.
+* update-dnsmasq.pl has been tested on the EdgeRouter Lite family of routers, versions v1.7.0-v1.9.1.1
 * Since the EdgeOS is a fork and port of Vyatta 6.3, this script could be adapted to work on VyOS and Vyatta derived ports
 
 ## Versions
-* v3.6.3: Fixes
+* v3.6.3.2: Fixes
+    - Rewrote version checker to handle EdgeOS versions with an additional sub releases, i.e. v1.9.1.1, v1.9.1.1.1, etc
+    - Added additional logic to skip testing if main installer exited with an error
+
+* v3.6.3.1: Fixes
     - Updated blacklist exclusions and includes
     - Removed volkerschatz as a source, since the blacklisting service is no longer offered
 
