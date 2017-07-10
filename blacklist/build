@@ -32,7 +32,7 @@ if [[ -e "${0##*/}" ]]; then
 	tar -zcf ../${BLACKLIST}setup.tgz --exclude='._*' --exclude='.svn' --exclude='.DS_Store' --exclude='*.bak' --exclude='*~' "${BASEDIR}"/*
 	mv ../${BLACKLIST}setup.tgz "${BASEDIR}"/
 
-	[[ ${1} ]] && /usr/bin/scp "${BASEDIR}"/${INSTALL} ${1}@scratch:/tmp/${INSTALL}
+#	[[ ${1} ]] && /usr/bin/scp "${BASEDIR}"/${INSTALL} ${1}@scratch:/tmp/${INSTALL}
 else
 	echo "$(basename $0) must be run in the directory where it is located."
 fi
