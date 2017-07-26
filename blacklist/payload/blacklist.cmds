@@ -57,6 +57,8 @@ set service dns forwarding blacklist exclude apple.com
 set service dns forwarding blacklist exclude ask.com
 set service dns forwarding blacklist exclude avast.com
 set service dns forwarding blacklist exclude avira-update.com
+set service dns forwarding blacklist exclude bannerbank.com
+set service dns forwarding blacklist exclude bing.com
 set service dns forwarding blacklist exclude bit.ly
 set service dns forwarding blacklist exclude bitdefender.com
 set service dns forwarding blacklist exclude cdn.ravenjs.com
@@ -77,6 +79,7 @@ set service dns forwarding blacklist exclude gstatic.com
 set service dns forwarding blacklist exclude gvt1.com
 set service dns forwarding blacklist exclude gvt1.net
 set service dns forwarding blacklist exclude hb.disney.go.com
+set service dns forwarding blacklist exclude herokuapp.com
 set service dns forwarding blacklist exclude hp.com
 set service dns forwarding blacklist exclude hulu.com
 set service dns forwarding blacklist exclude images-amazon.com
