@@ -36,14 +36,17 @@ EdgeMax dnsmasq Blacklist and Adware Blocking is derived from the received wisdo
 * select option #2
 
 ## Versions
+* v3.6.3.3: Enhancements
+    - Additional exclusions added to the blacklist commands file
+
 * v3.6.3.2: Fixes
     - Rewrote version checker to handle EdgeOS versions with an additional sub releases, i.e. v1.9.1.1, v1.9.1.1.1, etc
     - Added additional logic to skip testing if main installer exited with an error
-
+---
 * v3.6.3.1: Fixes
     - Updated blacklist exclusions and includes
     - Removed volkerschatz as a source, since the blacklisting service is no longer offered
-
+---
 * v3.6: Enhancements
     - Ability to add a source that uses a local file instead of HTTP
 
@@ -114,17 +117,19 @@ EdgeMax dnsmasq Blacklist and Adware Blocking is derived from the received wisdo
                 set service dns forwarding blacklist hosts source sysctl.org url 'http://sysctl.org/cameleon/hosts'
 
 - Additional excludes added to blacklist configuration list
-
-* v3.5.5: Updates/fixes include:
-- Added clarifying explanation for failed IP tests; advises user to ignore if router resolves upstream DNS and not locally
-- Fixed minor bug with command shell redirection
-- Additional excludes added to blacklist configuration list
-
-- v3.5.3: Updates/fixes include:
-- Added code to fix 'set' failures if /opt/vyatta/active/service/dns/forwarding/ group ownership isn't writable for the operator
-- Additional excludes added based on user feedback
-- Minor optimizations and additional tests added
-- Setup commands now include PURGE to clean up stale config sessions:
+---
+* v3.5.5:
+- Updates/fixes include:
+    - Added clarifying explanation for failed IP tests; advises user to ignore if router resolves upstream DNS and not locally
+    - Fixed minor bug with command shell redirection
+    - Additional excludes added to blacklist configuration list
+---
+* v3.5.3:
+    - Updates/fixes include:
+    - Added code to fix 'set' failures if /opt/vyatta/active/service/dns/forwarding/ group ownership isn't writable for the operator
+    - Additional excludes added based on user feedback
+    - Minor optimizations and additional tests added
+    - Setup commands now include PURGE to clean up stale config sessions:
 
 | # | Option  |                         Function                          |
 |---|---------|-----------------------------------------------------------|
@@ -134,8 +139,9 @@ EdgeMax dnsmasq Blacklist and Adware Blocking is derived from the received wisdo
 | 4 | BACKUP  |Save blacklist configuration to /config/user-data/blacklist.cmds|
 | 5 | PURGE   |Clean up stale config sessions|
 | 5 | QUIT    |Exit the installer|
-
-* v3.5: Updates/fixes include:
+---
+* v3.5:
+- Updates/fixes include:
     - Global exclude is now available ([set service dns forwarding blacklist exclude ...])
     - Removed --debug option from update-dnsmasq.pl
     - New validator script (/configure/scripts/blacklist.t) runs a battery of tests on the blacklist configuration to ensure it is working correctly or checks it is removed correctly
@@ -161,10 +167,9 @@ EdgeMax dnsmasq Blacklist and Adware Blocking is derived from the received wisdo
 | 3 | TEST    |Validate dnsmasq blacklist CLI configuration functionality|
 | 4 | BACKUP  |Save blacklist configuration to /config/user-data/blacklist.cmds|
 | 5 | QUIT    |Exit the installer|
-
 ---
 * v3.3.2: What is new:
-    - Non-essential functions have been pruned, command line switches reduced to:
+- Non-essential functions have been pruned, command line switches reduced to:
 
             /config/scripts/update-dnsmasq.pl -h
             usage: update-dnsmasq.pl <options>
@@ -235,8 +240,6 @@ EdgeMax dnsmasq Blacklist and Adware Blocking is derived from the received wisdo
     - Uses HTTP::Tiny for smaller memory footprint with threads
     - Optional -f config.boot parser has been completely rewritten, so that the XorpConfigParser.pm module is no longer required (saves on memory overhead and compilation time)
     - Over 70% of the code has been rewritten or updated
-
-* Version History:
 ---
 * v3.24d: Updates include:
     - 'hosts' exclusions now incorporates 'domains' exclusions and blacklists
@@ -253,7 +256,7 @@ EdgeMax dnsmasq Blacklist and Adware Blocking is derived from the received wisdo
     - Useragent: HTTP/HTTPS handling uses useragent for improved error/timeout control
     - Uses own node.def to maintain configuration changes. This also forces the script to run the dnsmasq configuration update after DNS is up during boot time
 ---
-* 3.22rc1: Updates include:
+* v3.22rc1: Updates include:
     - Fixes excluded FQDNs by using precise matching instead of fuzzy (i.e. 1.domain.tld won't also exclude b1.domain.tld)
     - New --disable switch enables ADBlock by setting [set service dns forwarding blacklist enabled false]
     - New --doc switch prints out condensed man page
@@ -265,7 +268,7 @@ EdgeMax dnsmasq Blacklist and Adware Blocking is derived from the received wisdo
     - Uses own node.def to maintain configuration changes. This also forces the script to run the dnsmasq configuration update after DNS is up during boot time
     - Uses own node.def to maintain configuration changes. This also forces the script to run the dnsmasq configuration update after DNS is up during router boot time
 ---
-* 3.15: Added features include:
+* v3.15: Added features include:
     - Logging to /var/log/update-blacklists-dnsmasq.log
     - --debug option: prints status messages
     - Additional download sources added to the default lists
@@ -273,11 +276,11 @@ EdgeMax dnsmasq Blacklist and Adware Blocking is derived from the received wisdo
     - Task scheduler update interval is now every 6 hours, as some of the sources change hourly (configure interval using "set system task-scheduler task update_blacklists interval"
     - Status line retains previous downloads for more detail
 ---
-* Version 3.12: Fixed bug reported by @soehest﻿ where certain FQDNs were being rejected by the stream processor.
+* v3.12: Fixed bug reported by @soehest﻿ where certain FQDNs were being rejected by the stream processor.
 ---
-* Version 3.10: Now supports https:// source URLs and improved regex handling in the stream processing engine.
+* v3.10: Now supports https:// source URLs and improved regex handling in the stream processing engine.
 ---
-* Version 3.00: No longer requires regex strings, just the line prefix/preamble before the hostname in the download. If a version of ADBlock was installed previously, you will need to select option 2 to remove it and then install this version. This is necessary to ensure the configure paths are correctly set up for the new prefix option which replaces the regex string.
+* v3.00: No longer requires regex strings, just the line prefix/preamble before the hostname in the download. If a version of ADBlock was installed previously, you will need to select option 2 to remove it and then install this version. This is necessary to ensure the configure paths are correctly set up for the new prefix option which replaces the regex string.
 ---
 
 ## Post Installation
