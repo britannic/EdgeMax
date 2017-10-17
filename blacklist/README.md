@@ -36,6 +36,7 @@ EdgeMax dnsmasq Blacklist and Adware Blocking is derived from the received wisdo
 * select option #2
 
 ## Versions
+
 * v3.6.3.3: Enhancements
     - Additional exclusions added to the blacklist commands file
 

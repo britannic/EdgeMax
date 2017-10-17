@@ -495,8 +495,11 @@ sub is_build {
   # v1.9.0:   build 4901118
   # v1.9.1:   build 4939093
   # v1.9.1.1: build 4977347
+<<<<<<< HEAD
   # v1.9.7: build 5001798
   # v1.9.7+hotfix: build 5005851
+=======
+>>>>>>> origin/master
 
   if ( $input->{build} >= 4783374 )    # script tested on os v1.7.0 & above
   {
