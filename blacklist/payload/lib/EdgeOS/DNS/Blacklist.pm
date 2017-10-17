@@ -485,23 +485,23 @@ sub is_admin {
 sub is_build {
   my $input = is_version();
 
-  # v1.2.0:   build 4574253
-  # v1.4.1:   build 4648309
-  # v1.5.0:   build 4677648
-  # v1.6.0:   build 4716006
-  # v1.7.0:   build 4783374
-  # v1.8.0:   build 4853089
-  # v1.8.5:   build 4884695
-  # v1.9.0:   build 4901118
-  # v1.9.1:   build 4939093
-  # v1.9.1.1: build 4977347
-<<<<<<< HEAD
-  # v1.9.7: build 5001798
-  # v1.9.7+hotfix: build 5005851
-=======
->>>>>>> origin/master
+  # v1.2.0:           build 4574253
+  # v1.4.1:           build 4648309
+  # v1.5.0:           build 4677648
+  # v1.6.0:           build 4716006
+  # v1.7.0:           build 4783374
+  # v1.8.0:           build 4853089
+  # v1.8.5:           build 4884695
+  # v1.9.0:           build 4901118
+  # v1.9.1:           build 4939093
+  # v1.9.1.1:         build 4977347
+  # v1.9.7:           build 5001798
+  # v1.9.7+hotfix:    build 5005851
+  # v1.9.7+hotfix.2:  build 5001798
+  # v1.9.7+hotfix.3:  build 5013619
+  # v1.9.7+hotfix.4:  build 5024004
 
-  if ( $input->{build} >= 4783374 )    # script tested on os v1.7.0 & above
+  if ( $input->{build} >= 5024004 )    # script tested on os v1.7.0 & above
   {
     return $TRUE;
   }
