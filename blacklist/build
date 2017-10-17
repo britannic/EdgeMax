@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+export COPY_EXTENDED_ATTRIBUTES_DISABLE=true
+export COPYFILE_DISABLE=true
+
+VERSION=$(cat ./payload/version)
+NAME='dnsmasq_blklist'
+DROPBOX='/Users/Neil/Dropbox/EdgeMax'
+BLACKLIST="${NAME}.${VERSION}."
+INSTALL="install_${NAME}.v${VERSION}"
+PAYLOAD='payload'
+
+if [[ -e "${0##*/}" ]]; then
+	BASEDIR="$(pwd)"
+	[[ -f ${BLACKLIST}setup.tgz ]] && rm ${BLACKLIST}setup.tgz
+	cd ${PAYLOAD}
+	echo ${VERSION} > version
+	cp setup remove
+	tar zcf ../${PAYLOAD}.tgz --exclude='._*' --exclude='.svn' --exclude='.DS_Store' --exclude='*.bak' --exclude='*~' ./*
+	cd ..
+
+	if [[ -e ${PAYLOAD}.tgz ]]; then
+		cat decompress ${PAYLOAD}.tgz > ${INSTALL}
+	else
+		echo "${PAYLOAD}.tgz does not exist"
+		exit 1
+	fi
+
+	chmod 0755 ${INSTALL}
+	tar zcf ${INSTALL}.tgz ${INSTALL}
+	echo "${INSTALL} created"
+	[[ -d "${DROPBOX}/" ]] && install -m 0755 ${INSTALL}.tgz "${DROPBOX}/"
+	tar -zcf ../${BLACKLIST}setup.tgz --exclude='._*' --exclude='.svn' --exclude='.DS_Store' --exclude='*.bak' --exclude='*~' "${BASEDIR}"/*
+	mv ../${BLACKLIST}setup.tgz "${BASEDIR}"/
+
+#	[[ ${1} ]] && /usr/bin/scp "${BASEDIR}"/${INSTALL} ${1}@scratch:/tmp/${INSTALL}
+else
+	echo "$(basename $0) must be run in the directory where it is located."
+fi
+exit 0
