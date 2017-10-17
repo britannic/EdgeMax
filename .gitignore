@@ -1,7 +1,3 @@
-Blacklist Blocking/payload/hosts.txt
-Blacklist Blocking/payload/nytprof.out
-Blacklist Blocking/payload/update-blacklists-dnsmasq.ptkdb
-
 *.tgz
 *.worksheet
 *.txt
@@ -10,16 +6,12 @@ Blacklist Blocking/payload/update-blacklists-dnsmasq.ptkdb
 
 Blacklist Blocking/ersetup
 *.boot
-*.boot
 
 AdBlock/install_adblock.v3.22rc2
 AdBlock/install_adblock.v3.22rc1
 AdBlock/install_adblock.v3.15.1
 
 blacklist/browse.VC.db
-blacklist/install_dnsmasq_blklist.v*
-blacklist/install_adblock.v*
-blacklist/install_dnsmasq_blklist.v*
 
 .DS_Store
 
