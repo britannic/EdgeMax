@@ -1,7 +1,3 @@
-Blacklist Blocking/payload/hosts.txt
-Blacklist Blocking/payload/nytprof.out
-Blacklist Blocking/payload/update-blacklists-dnsmasq.ptkdb
-
 *.tgz
 *.worksheet
 *.txt
@@ -147,9 +143,3 @@ ENV/
 
 # Rope project settings
 .ropeproject
-
-blacklist/install_dnsmasq_blklist.v3.6.2
-
-
-
-*.tgz
