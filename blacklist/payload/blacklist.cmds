@@ -57,17 +57,15 @@ set service dns forwarding blacklist exclude apple.com
 set service dns forwarding blacklist exclude ask.com
 set service dns forwarding blacklist exclude avast.com
 set service dns forwarding blacklist exclude avira-update.com
-<<<<<<< HEAD
 set service dns forwarding blacklist exclude bannerbank.com
 set service dns forwarding blacklist exclude bing.com
-=======
->>>>>>> origin/master
 set service dns forwarding blacklist exclude bit.ly
 set service dns forwarding blacklist exclude bitdefender.com
 set service dns forwarding blacklist exclude cdn.ravenjs.com
 set service dns forwarding blacklist exclude cdn.visiblemeasures.com
 set service dns forwarding blacklist exclude cloudfront.net
 set service dns forwarding blacklist exclude coremetrics.com
+set service dns forwarding blacklist exclude ebay.com
 set service dns forwarding blacklist exclude edgesuite.net
 set service dns forwarding blacklist exclude freedns.afraid.org
 set service dns forwarding blacklist exclude github.com
@@ -82,10 +80,7 @@ set service dns forwarding blacklist exclude gstatic.com
 set service dns forwarding blacklist exclude gvt1.com
 set service dns forwarding blacklist exclude gvt1.net
 set service dns forwarding blacklist exclude hb.disney.go.com
-<<<<<<< HEAD
 set service dns forwarding blacklist exclude herokuapp.com
-=======
->>>>>>> origin/master
 set service dns forwarding blacklist exclude hp.com
 set service dns forwarding blacklist exclude hulu.com
 set service dns forwarding blacklist exclude images-amazon.com
@@ -115,7 +110,6 @@ set service dns forwarding blacklist exclude windows.net
 set service dns forwarding blacklist exclude xboxlive.com
 set service dns forwarding blacklist exclude yimg.com
 set service dns forwarding blacklist exclude ytimg.com
-set service dns forwarding blacklist exclude ebay.com
 set service dns forwarding blacklist hosts include beap.gemini.yahoo.com
 set service dns forwarding blacklist hosts source openphish description 'OpenPhish automatic phishing detection'
 set service dns forwarding blacklist hosts source openphish prefix http
